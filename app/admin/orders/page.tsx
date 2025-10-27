@@ -21,7 +21,11 @@ export default async function OrdersPage() {
     redirect("/driver")
   }
 
-  const { data: orders } = await supabase.from("orders").select("*").order("created_at", { ascending: false })
+  const { data: orders } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("admin_id", user.id)
+    .order("created_at", { ascending: false })
 
   const needsMigration = orders && orders.length > 0 && !("order_number" in orders[0])
 

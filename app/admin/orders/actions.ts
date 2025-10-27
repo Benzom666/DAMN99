@@ -65,7 +65,8 @@ export async function createOrder(formData: FormData) {
     latitude: geoResult?.latitude || null,
     longitude: geoResult?.longitude || null,
     status: "pending",
-    order_number: generateOrderNumber(), // Auto-generate order number
+    order_number: generateOrderNumber(),
+    admin_id: user.id, // Add admin_id for multi-tenancy
   }
 
   if (hasEmailColumn && customerEmail) {
@@ -110,6 +111,12 @@ export async function updateOrder(orderId: string, formData: FormData) {
   // Geocode the address
   const geoResult = await geocodeAddress(address, city, state, zip)
 
+  const { data: existingOrder } = await supabase.from("orders").select("admin_id").eq("id", orderId).single()
+
+  if (!existingOrder || existingOrder.admin_id !== user.id) {
+    throw new Error("Unauthorized: Order not found or access denied")
+  }
+
   const updateData: any = {
     customer_name: customerName,
     address,
@@ -126,7 +133,7 @@ export async function updateOrder(orderId: string, formData: FormData) {
     updateData.customer_email = customerEmail
   }
 
-  const { error } = await supabase.from("orders").update(updateData).eq("id", orderId)
+  const { error } = await supabase.from("orders").update(updateData).eq("id", orderId).eq("admin_id", user.id)
 
   if (error) throw error
 
@@ -141,7 +148,7 @@ export async function deleteOrder(orderId: string) {
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  const { error } = await supabase.from("orders").delete().eq("id", orderId)
+  const { error } = await supabase.from("orders").delete().eq("id", orderId).eq("admin_id", user.id)
 
   if (error) throw error
 
@@ -159,7 +166,7 @@ export async function bulkDeleteOrders(orderIds: string[]) {
   console.log("[v0] [BULK_DELETE] Deleting", orderIds.length, "orders")
   console.log("[v0] [BULK_DELETE] User:", user.id)
 
-  const { error } = await supabase.from("orders").delete().in("id", orderIds)
+  const { error } = await supabase.from("orders").delete().in("id", orderIds).eq("admin_id", user.id)
 
   if (error) {
     console.error("[v0] [BULK_DELETE] Error:", error)
@@ -290,7 +297,8 @@ export async function importOrdersFromCSV(csvData: string) {
       latitude: geoResult?.latitude || null,
       longitude: geoResult?.longitude || null,
       status: "pending",
-      order_number: order.order_number || generateOrderNumber(), // Use CSV order_number or auto-generate
+      order_number: order.order_number || generateOrderNumber(),
+      admin_id: user.id, // Add admin_id for multi-tenancy
     }
 
     if (hasEmailColumn && order.customer_email) {

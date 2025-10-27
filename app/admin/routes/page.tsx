@@ -23,11 +23,12 @@ export default async function RoutesPage() {
   const { data: routes } = await supabase
     .from("routes")
     .select("*, profiles(display_name, email)")
+    .eq("admin_id", user.id)
     .order("created_at", { ascending: false })
 
-  const { data: orders } = await supabase.from("orders").select("*")
+  const { data: orders } = await supabase.from("orders").select("*").eq("admin_id", user.id)
 
-  const { data: drivers } = await supabase.from("profiles").select("*").eq("role", "driver")
+  const { data: drivers } = await supabase.from("profiles").select("*").eq("role", "driver").eq("admin_id", user.id)
 
   return (
     <div className="flex min-h-screen flex-col">

@@ -43,7 +43,7 @@ export async function createRoute(
     throw new Error("No orders selected")
   }
 
-  const { data: fetchedOrders } = await supabase.from("orders").select("*").in("id", orderIds)
+  const { data: fetchedOrders } = await supabase.from("orders").select("*").in("id", orderIds).eq("admin_id", user.id)
 
   if (!fetchedOrders || fetchedOrders.length === 0) {
     throw new Error("No orders found")
@@ -158,6 +158,7 @@ export async function createRoute(
       status: "draft",
       total_stops: optimizedRoute.length,
       completed_stops: 0,
+      admin_id: user.id,
     })
     .select()
     .single()
@@ -173,6 +174,7 @@ export async function createRoute(
         status: "assigned",
       })
       .eq("id", optimizedRoute[i])
+      .eq("admin_id", user.id)
   }
 
   revalidatePath("/admin/routes")
@@ -200,7 +202,7 @@ export async function createMultipleRoutes(
     throw new Error("No drivers selected")
   }
 
-  const { data: fetchedOrders } = await supabase.from("orders").select("*").in("id", orderIds)
+  const { data: fetchedOrders } = await supabase.from("orders").select("*").in("id", orderIds).eq("admin_id", user.id)
 
   if (!fetchedOrders || fetchedOrders.length === 0) {
     throw new Error("No orders found")
@@ -227,7 +229,7 @@ export async function createMultipleRoutes(
     console.log(`[v0] First 3 orders after geocoding: ${sample}`)
   }
 
-  const { data: profiles } = await supabase.from("profiles").select("*").in("id", driverIds)
+  const { data: profiles } = await supabase.from("profiles").select("*").in("id", driverIds).eq("admin_id", user.id)
 
   if (!profiles || profiles.length === 0) {
     throw new Error("No valid drivers found")
@@ -368,6 +370,7 @@ export async function createMultipleRoutes(
           status: "draft",
           total_stops: deliveryStopIds.length,
           completed_stops: 0,
+          admin_id: user.id,
         })
         .select()
         .single()
@@ -383,6 +386,7 @@ export async function createMultipleRoutes(
             status: "assigned",
           })
           .eq("id", deliveryStopIds[i])
+          .eq("admin_id", user.id)
       }
 
       createdRouteIds.push(route.id)
@@ -404,12 +408,12 @@ export async function updateRouteStatus(routeId: string, status: "draft" | "acti
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  const { error } = await supabase.from("routes").update({ status }).eq("id", routeId)
+  const { error } = await supabase.from("routes").update({ status }).eq("id", routeId).eq("admin_id", user.id)
 
   if (error) throw error
 
   if (status === "active") {
-    await supabase.from("orders").update({ status: "in_transit" }).eq("route_id", routeId)
+    await supabase.from("orders").update({ status: "in_transit" }).eq("route_id", routeId).eq("admin_id", user.id)
   }
 
   revalidatePath("/admin/routes")
@@ -424,12 +428,19 @@ export async function deleteRoute(routeId: string) {
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
+  const { data: route } = await supabase.from("routes").select("admin_id").eq("id", routeId).single()
+
+  if (!route || route.admin_id !== user.id) {
+    throw new Error("Unauthorized: Route not found or access denied")
+  }
+
   await supabase
     .from("orders")
     .update({ route_id: null, stop_sequence: null, status: "pending" })
     .eq("route_id", routeId)
+    .eq("admin_id", user.id)
 
-  const { error } = await supabase.from("routes").delete().eq("id", routeId)
+  const { error } = await supabase.from("routes").delete().eq("id", routeId).eq("admin_id", user.id)
 
   if (error) throw error
 
@@ -444,7 +455,17 @@ export async function assignDriver(routeId: string, driverId: string) {
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  const { error } = await supabase.from("routes").update({ driver_id: driverId }).eq("id", routeId)
+  const { data: driver } = await supabase.from("profiles").select("admin_id").eq("id", driverId).single()
+
+  if (!driver || driver.admin_id !== user.id) {
+    throw new Error("Unauthorized: Driver not found or access denied")
+  }
+
+  const { error } = await supabase
+    .from("routes")
+    .update({ driver_id: driverId })
+    .eq("id", routeId)
+    .eq("admin_id", user.id)
 
   if (error) throw error
 
@@ -468,7 +489,7 @@ export async function updateRoute(
 
   console.log("[v0] Updating route", routeId, "with", updates)
 
-  const { error } = await supabase.from("routes").update(updates).eq("id", routeId)
+  const { error } = await supabase.from("routes").update(updates).eq("id", routeId).eq("admin_id", user.id)
 
   if (error) {
     console.error("[v0] Error updating route:", error)
@@ -488,7 +509,6 @@ export async function recalcRouteMetricsAction(routeId: string) {
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  // Check if user is admin
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
   if (profile?.role !== "admin") {
