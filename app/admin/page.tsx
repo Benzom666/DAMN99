@@ -23,14 +23,21 @@ export default async function AdminDashboard() {
   }
 
   // Get stats
-  const { count: totalOrders } = await supabase.from("orders").select("*", { count: "exact", head: true })
+  const { count: totalOrders } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("admin_id", user.id)
+
   const { count: pendingOrders } = await supabase
     .from("orders")
     .select("*", { count: "exact", head: true })
+    .eq("admin_id", user.id)
     .eq("status", "pending")
+
   const { count: activeRoutes } = await supabase
     .from("routes")
     .select("*", { count: "exact", head: true })
+    .eq("admin_id", user.id)
     .eq("status", "active")
 
   async function signOut() {

@@ -20,6 +20,8 @@ export default async function RoutesPage() {
     redirect("/driver")
   }
 
+  console.log("[v0] [ROUTES] Admin ID:", user.id)
+
   const { data: routes } = await supabase
     .from("routes")
     .select("*, profiles(display_name, email)")
@@ -28,7 +30,19 @@ export default async function RoutesPage() {
 
   const { data: orders } = await supabase.from("orders").select("*").eq("admin_id", user.id)
 
-  const { data: drivers } = await supabase.from("profiles").select("*").eq("role", "driver").eq("admin_id", user.id)
+  const { data: drivers, error: driversError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("role", "driver")
+    .eq("admin_id", user.id)
+    .eq("is_active", true)
+
+  console.log("[v0] [ROUTES] Fetched routes count:", routes?.length || 0)
+  console.log("[v0] [ROUTES] Fetched orders count:", orders?.length || 0)
+  console.log("[v0] [ROUTES] Fetched drivers count:", drivers?.length || 0)
+  if (driversError) {
+    console.error("[v0] [ROUTES] Error fetching drivers:", driversError)
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

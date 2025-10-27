@@ -21,11 +21,18 @@ export default async function OrdersPage() {
     redirect("/driver")
   }
 
-  const { data: orders } = await supabase
+  console.log("[v0] [ORDERS] Admin ID:", user.id)
+
+  const { data: orders, error } = await supabase
     .from("orders")
     .select("*")
     .eq("admin_id", user.id)
     .order("created_at", { ascending: false })
+
+  console.log("[v0] [ORDERS] Fetched orders count:", orders?.length || 0)
+  if (error) {
+    console.error("[v0] [ORDERS] Error fetching orders:", error)
+  }
 
   const needsMigration = orders && orders.length > 0 && !("order_number" in orders[0])
 
