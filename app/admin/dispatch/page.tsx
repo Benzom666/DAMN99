@@ -21,23 +21,36 @@ export default async function DispatchPage() {
   }
 
   // Get active routes with driver info
-  const { data: routes } = await supabase
+  const { data: routes, error: routesError } = await supabase
     .from("routes")
-    .select("*, profiles(display_name, email)")
+    .select("*, driver:profiles!driver_id(display_name, email)")
+    .eq("admin_id", user.id)
     .in("status", ["active", "pending"])
     .order("created_at", { ascending: false })
+
+  if (routesError) {
+    console.error("[v0] [DISPATCH] Error fetching routes:", routesError)
+  }
+
+  console.log("[v0] [DISPATCH] Fetched routes count:", routes?.length || 0)
 
   // Get all orders for active routes
   const routeIds = routes?.map((r) => r.id) || []
 
   let orders = []
   if (routeIds.length > 0) {
-    const { data } = await supabase
+    const { data, error: ordersError } = await supabase
       .from("orders")
       .select("*")
       .in("route_id", routeIds)
       .order("stop_sequence", { ascending: true })
+
+    if (ordersError) {
+      console.error("[v0] [DISPATCH] Error fetching orders:", ordersError)
+    }
+
     orders = data || []
+    console.log("[v0] [DISPATCH] Fetched orders count:", orders.length)
   }
 
   // Get PODs for delivered orders

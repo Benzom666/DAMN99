@@ -114,7 +114,7 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
       })
       toast.success("Route updated successfully")
       setIsEditDialogOpen(false)
-      router.refresh()
+      router.push("/admin/routes")
     } catch (error) {
       console.error("[v0] Error updating route:", error)
       toast.error("Failed to update route")

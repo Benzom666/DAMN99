@@ -621,6 +621,7 @@ export async function updateRoute(
 
   revalidatePath("/admin/routes")
   revalidatePath(`/admin/routes/${routeId}`)
+  revalidatePath("/admin/dispatch")
   return { success: true }
 }
 
@@ -652,4 +653,105 @@ export async function recalcRouteMetricsAction(routeId: string) {
   revalidatePath("/admin/routes")
 
   return metrics
+}
+
+export async function bulkDeleteRoutes(routeIds: string[]) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  console.log("[v0] [BULK_DELETE] Deleting", routeIds.length, "routes")
+
+  const BATCH_SIZE = 50
+  let deleted = 0
+  const errors: string[] = []
+
+  for (let i = 0; i < routeIds.length; i += BATCH_SIZE) {
+    const batch = routeIds.slice(i, i + BATCH_SIZE)
+
+    try {
+      // Reset orders to pending for this batch of routes
+      await supabase
+        .from("orders")
+        .update({ route_id: null, stop_sequence: null, status: "pending" })
+        .in("route_id", batch)
+        .eq("admin_id", user.id)
+
+      // Delete the routes
+      const { error } = await supabase.from("routes").delete().in("id", batch).eq("admin_id", user.id)
+
+      if (error) {
+        console.error("[v0] [BULK_DELETE] Error deleting batch:", error)
+        errors.push(`Batch ${i / BATCH_SIZE + 1}: ${error.message}`)
+      } else {
+        deleted += batch.length
+      }
+    } catch (error) {
+      console.error("[v0] [BULK_DELETE] Exception deleting batch:", error)
+      errors.push(`Batch ${i / BATCH_SIZE + 1}: ${error instanceof Error ? error.message : "Unknown error"}`)
+    }
+  }
+
+  console.log("[v0] [BULK_DELETE] Deleted", deleted, "routes with", errors.length, "errors")
+
+  revalidatePath("/admin/routes")
+  revalidatePath("/admin")
+
+  return { deleted, errors }
+}
+
+export async function bulkAssignDriver(routeIds: string[], driverId: string | null) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  console.log("[v0] [BULK_ASSIGN] Assigning driver", driverId || "unassigned", "to", routeIds.length, "routes")
+
+  // Verify driver belongs to admin if not null
+  if (driverId) {
+    const { data: driver } = await supabase.from("profiles").select("admin_id").eq("id", driverId).single()
+
+    if (!driver || (driver.admin_id && driver.admin_id !== user.id)) {
+      throw new Error("Unauthorized: Driver not found or access denied")
+    }
+  }
+
+  const BATCH_SIZE = 50
+  let updated = 0
+  const errors: string[] = []
+
+  for (let i = 0; i < routeIds.length; i += BATCH_SIZE) {
+    const batch = routeIds.slice(i, i + BATCH_SIZE)
+
+    try {
+      const { error } = await supabase
+        .from("routes")
+        .update({ driver_id: driverId })
+        .in("id", batch)
+        .eq("admin_id", user.id)
+
+      if (error) {
+        console.error("[v0] [BULK_ASSIGN] Error assigning batch:", error)
+        errors.push(`Batch ${i / BATCH_SIZE + 1}: ${error.message}`)
+      } else {
+        updated += batch.length
+      }
+    } catch (error) {
+      console.error("[v0] [BULK_ASSIGN] Exception assigning batch:", error)
+      errors.push(`Batch ${i / BATCH_SIZE + 1}: ${error instanceof Error ? error.message : "Unknown error"}`)
+    }
+  }
+
+  console.log("[v0] [BULK_ASSIGN] Updated", updated, "routes with", errors.length, "errors")
+
+  revalidatePath("/admin/routes")
+  revalidatePath("/admin/dispatch")
+
+  return { updated, errors }
 }
