@@ -13,7 +13,7 @@ export default async function HomePage() {
   }
 
   // Get user profile to determine role
-  const { data: profile, error } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const { data: profile, error } = await supabase.from("profiles").select("role, is_active").eq("id", user.id).single()
 
   // Check if there are database errors
   if (error) {
@@ -42,6 +42,12 @@ export default async function HomePage() {
 
   if (!profile) {
     redirect("/auth/login")
+  }
+
+  if (profile.is_active === false) {
+    console.log("[v0] User is inactive/deleted, signing out")
+    await supabase.auth.signOut()
+    redirect("/auth/login?error=account_inactive")
   }
 
   // Redirect based on role

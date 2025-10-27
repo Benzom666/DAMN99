@@ -19,7 +19,14 @@ export default async function DriverDashboard() {
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
   if (!profile || profile.role !== "driver") {
-    redirect("/admin")
+    console.log("[v0] [DRIVER] Not a driver, redirecting to login")
+    redirect("/auth/login")
+  }
+
+  if (profile.is_active === false) {
+    console.log("[v0] [DRIVER] Driver is inactive/deleted, signing out")
+    await supabase.auth.signOut()
+    redirect("/auth/login?error=account_inactive")
   }
 
   const { data: routes } = await supabase

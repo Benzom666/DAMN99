@@ -38,8 +38,17 @@ export default async function DriverStopPage(props: {
     }
 
     if (!profile || profile.role !== "driver") {
-      console.log("[v0] [DRIVER_STOP] Not a driver, redirecting to admin")
-      redirect("/admin")
+      console.log("[v0] [DRIVER_STOP] Not a driver, redirecting to login")
+      redirect("/auth/login")
+    }
+
+    // Check if driver is active
+    const { data: fullProfile } = await supabase.from("profiles").select("is_active").eq("id", user.id).single()
+
+    if (fullProfile?.is_active === false) {
+      console.log("[v0] [DRIVER_STOP] Driver is inactive/deleted, signing out")
+      await supabase.auth.signOut()
+      redirect("/auth/login?error=account_inactive")
     }
 
     const { data: route, error: routeError } = await supabase
