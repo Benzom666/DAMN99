@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
+import { useToast } from "@/hooks/use-toast"
 
 interface StopDetailProps {
   order: any
@@ -22,6 +23,7 @@ interface StopDetailProps {
 
 export function StopDetail({ order, routeName, routeId, existingPod }: StopDetailProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [notes, setNotes] = useState("")
   const [recipientName, setRecipientName] = useState("")
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -50,82 +52,193 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   }
 
   const handleDeliver = async () => {
-    if (isSubmitting) return
+    if (isSubmitting) {
+      console.log("[v0] [DRIVER] Already submitting, ignoring click")
+      return
+    }
+
     setIsSubmitting(true)
+    console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
+    console.log("[v0] [DRIVER] Order ID:", order.id)
+    console.log("[v0] [DRIVER] Has photo:", !!photoFile)
+    console.log("[v0] [DRIVER] Has signature:", !!signatureData)
+    console.log("[v0] [DRIVER] Recipient:", recipientName || "none")
+    console.log("[v0] [DRIVER] Notes:", notes || "none")
 
     try {
-      console.log("[v0] Starting delivery submission...")
-
       let photoData: string | undefined
       let signatureDataToSend: string | undefined
 
       if (photoFile) {
-        console.log("[v0] Reading photo file...")
-        photoData = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onloadend = () => {
-            if (reader.result && typeof reader.result === "string") {
-              resolve(reader.result)
-            } else {
-              reject(new Error("Failed to read photo file"))
+        console.log("[v0] [DRIVER] Reading photo file...")
+        console.log("[v0] [DRIVER] Photo file size:", photoFile.size, "bytes")
+        console.log("[v0] [DRIVER] Photo file type:", photoFile.type)
+
+        try {
+          photoData = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              if (reader.result && typeof reader.result === "string") {
+                console.log("[v0] [DRIVER] Photo read successfully, length:", reader.result.length)
+                resolve(reader.result)
+              } else {
+                console.error("[v0] [DRIVER] Photo read failed: invalid result")
+                reject(new Error("Failed to read photo file"))
+              }
             }
-          }
-          reader.onerror = () => reject(new Error("File reading failed"))
-          reader.readAsDataURL(photoFile)
-        })
-        console.log("[v0] Photo file read successfully")
+            reader.onerror = () => {
+              console.error("[v0] [DRIVER] Photo read error:", reader.error)
+              reject(new Error("File reading failed"))
+            }
+            reader.readAsDataURL(photoFile)
+          })
+        } catch (photoError) {
+          console.error("[v0] [DRIVER] Photo processing error:", photoError)
+          toast({
+            title: "Photo Error",
+            description: "Failed to process photo. Please try again.",
+            variant: "destructive",
+          })
+          setIsSubmitting(false)
+          return
+        }
       }
 
       if (signatureData && signatureData !== existingPod?.signature_url) {
+        console.log("[v0] [DRIVER] Using signature data, length:", signatureData.length)
         signatureDataToSend = signatureData
       }
 
-      console.log("[v0] Calling delivery API...")
+      console.log("[v0] [DRIVER] Calling delivery API...")
+      console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
 
-      const response = await fetch("/api/driver/deliver", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          photoData,
-          signatureData: signatureDataToSend,
-          notes: notes || undefined,
-          recipientName: recipientName || undefined,
-        }),
-      })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        console.error("[v0] [DRIVER] API call timeout after 30 seconds")
+        controller.abort()
+      }, 30000) // 30 second timeout
 
-      const result = await response.json()
+      let response: Response
+      try {
+        response = await fetch("/api/driver/deliver", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: order.id,
+            photoData,
+            signatureData: signatureDataToSend,
+            notes: notes || undefined,
+            recipientName: recipientName || undefined,
+          }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        console.error("[v0] [DRIVER] Fetch error:", fetchError)
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to mark as delivered")
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          toast({
+            title: "Request Timeout",
+            description: "The request took too long. Please check your connection and try again.",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Network Error",
+            description: "Failed to connect to server. Please check your internet connection.",
+            variant: "destructive",
+          })
+        }
+        setIsSubmitting(false)
+        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (FETCH ERROR) ==========")
+        return
       }
 
-      console.log("[v0] Delivery marked successfully!")
+      console.log("[v0] [DRIVER] API response status:", response.status)
+      console.log("[v0] [DRIVER] API response ok:", response.ok)
 
-      router.push(`/driver/routes/${routeId}`)
-      router.refresh()
+      let result: any
+      try {
+        const responseText = await response.text()
+        console.log("[v0] [DRIVER] API response body:", responseText)
+        result = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("[v0] [DRIVER] Failed to parse response:", parseError)
+        toast({
+          title: "Server Error",
+          description: "Received invalid response from server. Please try again.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (PARSE ERROR) ==========")
+        return
+      }
+
+      if (!response.ok || !result.success) {
+        console.error("[v0] [DRIVER] API error:", result.error)
+        toast({
+          title: "Delivery Failed",
+          description: result.error || "Failed to mark as delivered. Please try again.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (API ERROR) ==========")
+        return
+      }
+
+      console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
+      console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
+
+      toast({
+        title: "Success",
+        description: "Delivery marked as complete!",
+      })
+
+      setTimeout(() => {
+        router.push(`/driver/routes/${routeId}`)
+        router.refresh()
+      }, 500)
     } catch (error) {
-      console.error("[v0] Error delivering order:", error)
+      console.error("[v0] [DRIVER] Unexpected error:", error)
+      console.error("[v0] [DRIVER] Error stack:", error instanceof Error ? error.stack : "no stack")
+
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-      alert(`Failed to mark as delivered: ${errorMessage}`)
-    } finally {
+      toast({
+        title: "Unexpected Error",
+        description: `Failed to mark as delivered: ${errorMessage}`,
+        variant: "destructive",
+      })
       setIsSubmitting(false)
+      console.log("[v0] [DRIVER] ========== POD SUBMISSION END (EXCEPTION) ==========")
     }
   }
 
   const handleFail = async () => {
     if (!notes.trim()) {
-      alert("Please provide a reason for the failed delivery.")
+      toast({
+        title: "Notes Required",
+        description: "Please provide a reason for the failed delivery.",
+        variant: "destructive",
+      })
       return
     }
 
-    if (isSubmitting) return
+    if (isSubmitting) {
+      console.log("[v0] [DRIVER] Already submitting, ignoring click")
+      return
+    }
+
     setIsSubmitting(true)
+    console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
+    console.log("[v0] [DRIVER] Order ID:", order.id)
+    console.log("[v0] [DRIVER] Notes:", notes)
 
     try {
-      console.log("[v0] Marking as failed...")
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
 
       const response = await fetch("/api/driver/fail", {
         method: "POST",
@@ -136,7 +249,10 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           orderId: order.id,
           notes,
         }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       const result = await response.json()
 
@@ -144,15 +260,27 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         throw new Error(result.error || "Failed to update status")
       }
 
-      console.log("[v0] Marked as failed successfully!")
+      console.log("[v0] [DRIVER] ✅ Marked as failed successfully!")
+      console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (SUCCESS) ==========")
 
-      router.push(`/driver/routes/${routeId}`)
-      router.refresh()
+      toast({
+        title: "Success",
+        description: "Delivery marked as failed.",
+      })
+
+      setTimeout(() => {
+        router.push(`/driver/routes/${routeId}`)
+        router.refresh()
+      }, 500)
     } catch (error) {
-      console.error("[v0] Error marking as failed:", error)
-      alert(`Failed to update status: ${error instanceof Error ? error.message : "Unknown error"}`)
-    } finally {
+      console.error("[v0] [DRIVER] Error marking as failed:", error)
+      toast({
+        title: "Error",
+        description: `Failed to update status: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      })
       setIsSubmitting(false)
+      console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (ERROR) ==========")
     }
   }
 
