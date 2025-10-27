@@ -53,7 +53,19 @@ export async function geocodeAddress(
     const response = await fetch(url.toString(), { cache: "no-store" })
 
     if (!response.ok) {
+      if (response.status === 429) {
+        console.warn("[v0] Rate limit exceeded (429) - too many requests")
+        throw new Error("RATE_LIMIT_EXCEEDED")
+      }
       console.error(`[v0] Geocoding error ${response.status}`)
+      return null
+    }
+
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get("content-type")
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text()
+      console.error("[v0] Non-JSON response from geocoding API:", text.substring(0, 100))
       return null
     }
 
@@ -80,6 +92,9 @@ export async function geocodeAddress(
     }
   } catch (error) {
     console.error("[v0] Geocoding error:", error)
+    if (error instanceof Error && error.message === "RATE_LIMIT_EXCEEDED") {
+      throw error
+    }
     return null
   }
 }

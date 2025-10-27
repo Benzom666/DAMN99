@@ -54,50 +54,95 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
 
   const ottawaBias = { lat: 45.4215, lng: -75.6972 }
 
-  for (const o of ordersToGeocode) {
-    const fullAddress =
-      o.full_address ||
-      o.delivery_address ||
-      [o.address_line1 || o.address, o.city, o.state_province || o.state, o.postal_code || o.zip, o.country]
-        .filter(Boolean)
-        .join(", ")
+  const BATCH_SIZE = 10 // Process 10 orders at a time
+  const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between batches
+  const DELAY_BETWEEN_REQUESTS = 100 // 100ms delay between individual requests
+  const MAX_RETRIES = 3
 
-    if (!fullAddress || fullAddress.trim().length === 0) {
-      const error = "No address to geocode"
-      failed.push({ orderId: o.id, error })
-      console.warn(`[v0] ${error}:`, o.id)
-      continue
-    }
+  for (let i = 0; i < ordersToGeocode.length; i += BATCH_SIZE) {
+    const batch = ordersToGeocode.slice(i, i + BATCH_SIZE)
+    console.log(
+      `[v0] Processing geocoding batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(ordersToGeocode.length / BATCH_SIZE)}...`,
+    )
 
-    const g = await geocodeAddress(fullAddress, apiKey, ottawaBias)
+    for (const o of batch) {
+      const fullAddress =
+        o.full_address ||
+        o.delivery_address ||
+        [o.address_line1 || o.address, o.city, o.state_province || o.state, o.postal_code || o.zip, o.country]
+          .filter(Boolean)
+          .join(", ")
 
-    if (!g) {
-      const error = "Geocoding failed - no results"
-      failed.push({ orderId: o.id, error })
-      console.warn(`[v0] ${error}:`, o.id, fullAddress)
-      continue
-    }
-
-    o.latitude = g.lat
-    o.longitude = g.lng
-
-    try {
-      const { error: dbError } = await supabase
-        .from("orders")
-        .update({
-          latitude: g.lat,
-          longitude: g.lng,
-        })
-        .eq("id", o.id)
-
-      if (dbError) {
-        console.warn(`[v0] DB update failed (non-fatal):`, o.id, dbError.message)
+      if (!fullAddress || fullAddress.trim().length === 0) {
+        const error = "No address to geocode"
+        failed.push({ orderId: o.id, error })
+        console.warn(`[v0] ${error}:`, o.id)
+        continue
       }
-    } catch (e) {
-      console.warn(`[v0] DB update exception (non-fatal):`, o.id, String(e))
+
+      // Retry logic with exponential backoff
+      let g = null
+      let lastError = ""
+
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          g = await geocodeAddress(fullAddress, apiKey, ottawaBias)
+          if (g) break // Success!
+
+          lastError = "Geocoding failed - no results"
+        } catch (error) {
+          if (error instanceof Error && error.message === "RATE_LIMIT_EXCEEDED") {
+            lastError = "Rate limit exceeded"
+            const backoffDelay = 2000 * Math.pow(2, attempt) // 2s, 4s, 8s
+            console.warn(`[v0] Rate limit hit, waiting ${backoffDelay}ms before retry ${attempt + 1}/${MAX_RETRIES}`)
+            await new Promise((resolve) => setTimeout(resolve, backoffDelay))
+            continue
+          }
+          lastError = error instanceof Error ? error.message : "Geocoding failed"
+        }
+
+        // If not rate limited, wait a bit before retry
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+      }
+
+      if (!g) {
+        failed.push({ orderId: o.id, error: lastError })
+        console.warn(`[v0] ${lastError}:`, o.id, fullAddress)
+        continue
+      }
+
+      o.latitude = g.lat
+      o.longitude = g.lng
+
+      try {
+        const { error: dbError } = await supabase
+          .from("orders")
+          .update({
+            latitude: g.lat,
+            longitude: g.lng,
+          })
+          .eq("id", o.id)
+
+        if (dbError) {
+          console.warn(`[v0] DB update failed (non-fatal):`, o.id, dbError.message)
+        }
+      } catch (e) {
+        console.warn(`[v0] DB update exception (non-fatal):`, o.id, String(e))
+      }
+
+      console.log(`[v0] Geocoded ${o.id}: ${g.lat.toFixed(5)}, ${g.lng.toFixed(5)} - ${g.label}`)
+
+      // Delay between individual requests to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_REQUESTS))
     }
 
-    console.log(`[v0] Geocoded ${o.id}: ${g.lat.toFixed(5)}, ${g.lng.toFixed(5)} - ${g.label}`)
+    // Delay between batches
+    if (i + BATCH_SIZE < ordersToGeocode.length) {
+      console.log(`[v0] Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...`)
+      await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_BATCHES))
+    }
   }
 
   console.log(
@@ -110,17 +155,17 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
 
   const stillMissing = orders.filter((o) => !Number.isFinite(o.latitude) || !Number.isFinite(o.longitude))
   if (stillMissing.length > 0) {
-    throw new Error(
-      `${stillMissing.length} orders still lack geocoded coords after geocoding: ${stillMissing.map((o) => `${o.id} (${o.full_address || o.delivery_address || "no address"})`).join(", ")}`,
+    console.warn(
+      `[v0] ${stillMissing.length} orders still lack geocoded coords after geocoding (will be excluded from routes)`,
     )
   }
 
   if (failed.length > 0) {
-    console.warn(`[v0] Failed to geocode ${failed.length} orders (continuing with others):`, JSON.stringify(failed))
+    console.warn(`[v0] Failed to geocode ${failed.length} orders:`, JSON.stringify(failed))
   }
 
   return {
-    orders: orders as OrderWithCoords[],
+    orders: orders.filter((o) => Number.isFinite(o.latitude) && Number.isFinite(o.longitude)) as OrderWithCoords[],
     failed,
   }
 }

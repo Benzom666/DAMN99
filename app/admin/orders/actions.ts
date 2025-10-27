@@ -166,18 +166,52 @@ export async function bulkDeleteOrders(orderIds: string[]) {
   console.log("[v0] [BULK_DELETE] Deleting", orderIds.length, "orders")
   console.log("[v0] [BULK_DELETE] User:", user.id)
 
-  const { error } = await supabase.from("orders").delete().in("id", orderIds).eq("admin_id", user.id)
+  const BATCH_SIZE = 100
+  let totalDeleted = 0
+  const errors: string[] = []
 
-  if (error) {
-    console.error("[v0] [BULK_DELETE] Error:", error)
-    throw error
+  for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
+    const batch = orderIds.slice(i, i + BATCH_SIZE)
+    console.log(
+      `[v0] [BULK_DELETE] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(orderIds.length / BATCH_SIZE)}`,
+    )
+
+    try {
+      const { error, count } = await supabase
+        .from("orders")
+        .delete({ count: "exact" })
+        .in("id", batch)
+        .eq("admin_id", user.id)
+
+      if (error) {
+        console.error("[v0] [BULK_DELETE] Batch error:", error)
+        errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${error.message}`)
+      } else {
+        totalDeleted += count || batch.length
+        console.log(
+          `[v0] [BULK_DELETE] Batch ${Math.floor(i / BATCH_SIZE) + 1} deleted ${count || batch.length} orders`,
+        )
+      }
+    } catch (err) {
+      console.error("[v0] [BULK_DELETE] Batch exception:", err)
+      errors.push(
+        `Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      )
+    }
   }
 
-  console.log("[v0] [BULK_DELETE] ✓ Successfully deleted", orderIds.length, "orders")
+  if (errors.length > 0) {
+    console.error("[v0] [BULK_DELETE] Completed with errors:", errors)
+  } else {
+    console.log("[v0] [BULK_DELETE] ✓ Successfully deleted", totalDeleted, "orders")
+  }
 
   revalidatePath("/admin/orders")
 
-  return { deleted: orderIds.length }
+  return {
+    deleted: totalDeleted,
+    errors: errors.length > 0 ? errors : undefined,
+  }
 }
 
 export async function importOrdersFromCSV(csvData: string) {

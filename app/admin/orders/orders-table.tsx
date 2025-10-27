@@ -80,17 +80,26 @@ export function OrdersTable({ orders }: OrdersTableProps) {
 
     setIsDeleting(true)
     try {
-      await bulkDeleteOrders(Array.from(selectedOrderIds))
-      toast({
-        title: "Orders deleted",
-        description: `Successfully deleted ${count} order${count > 1 ? "s" : ""}.`,
-      })
+      const result = await bulkDeleteOrders(Array.from(selectedOrderIds))
+
+      if (result.errors && result.errors.length > 0) {
+        toast({
+          title: "Partial deletion",
+          description: `Deleted ${result.deleted} of ${count} orders. Some batches failed.`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Orders deleted",
+          description: `Successfully deleted ${result.deleted} order${result.deleted > 1 ? "s" : ""}.`,
+        })
+      }
       setSelectedOrderIds(new Set())
     } catch (error) {
       console.error("[v0] Bulk delete error:", error)
       toast({
         title: "Error",
-        description: "Failed to delete orders. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to delete orders. Please try again.",
         variant: "destructive",
       })
     } finally {

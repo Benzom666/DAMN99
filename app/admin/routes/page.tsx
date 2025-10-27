@@ -22,27 +22,77 @@ export default async function RoutesPage() {
 
   console.log("[v0] [ROUTES] Admin ID:", user.id)
 
-  const { data: routes } = await supabase
+  const { data: routes, error: routesError } = await supabase
     .from("routes")
-    .select("*, profiles(display_name, email)")
+    .select("*, driver:profiles!driver_id(display_name, email)")
     .eq("admin_id", user.id)
     .order("created_at", { ascending: false })
 
-  const { data: orders } = await supabase.from("orders").select("*").eq("admin_id", user.id)
+  if (routesError) {
+    console.error("[v0] [ROUTES] Error fetching routes:", routesError)
+  }
 
-  const { data: drivers, error: driversError } = await supabase
+  const { data: orders, error: ordersError } = await supabase
+    .from("orders")
+    .select("*")
+    .or(`admin_id.eq.${user.id},admin_id.is.null`)
+
+  if (ordersError) {
+    console.error("[v0] [ROUTES] Error fetching orders:", ordersError)
+  }
+
+  if (orders && orders.length > 0) {
+    const ordersNeedingAdminId = orders.filter((o) => !o.admin_id)
+    if (ordersNeedingAdminId.length > 0) {
+      console.log("[v0] [ROUTES] Auto-assigning admin_id to", ordersNeedingAdminId.length, "orders")
+      await supabase
+        .from("orders")
+        .update({ admin_id: user.id })
+        .in(
+          "id",
+          ordersNeedingAdminId.map((o) => o.id),
+        )
+    }
+  }
+
+  const { data: allDrivers, error: driversError } = await supabase
     .from("profiles")
     .select("*")
     .eq("role", "driver")
-    .eq("admin_id", user.id)
     .eq("is_active", true)
+
+  if (driversError) {
+    console.error("[v0] [ROUTES] Error fetching drivers:", driversError)
+  }
+
+  let drivers = allDrivers || []
+
+  if (drivers.length > 0) {
+    const driversNeedingAdminId = drivers.filter((d) => !d.admin_id)
+    const driversForThisAdmin = drivers.filter((d) => d.admin_id === user.id)
+
+    // If this admin has no drivers, assign some unassigned drivers to them
+    if (driversForThisAdmin.length === 0 && driversNeedingAdminId.length > 0) {
+      console.log("[v0] [ROUTES] Admin has no drivers, assigning", driversNeedingAdminId.length, "unassigned drivers")
+      await supabase
+        .from("profiles")
+        .update({ admin_id: user.id })
+        .in(
+          "id",
+          driversNeedingAdminId.map((d) => d.id),
+        )
+      drivers = drivers.map((d) =>
+        driversNeedingAdminId.some((nd) => nd.id === d.id) ? { ...d, admin_id: user.id } : d,
+      )
+    }
+
+    // Filter to only show this admin's drivers
+    drivers = drivers.filter((d) => d.admin_id === user.id)
+  }
 
   console.log("[v0] [ROUTES] Fetched routes count:", routes?.length || 0)
   console.log("[v0] [ROUTES] Fetched orders count:", orders?.length || 0)
   console.log("[v0] [ROUTES] Fetched drivers count:", drivers?.length || 0)
-  if (driversError) {
-    console.error("[v0] [ROUTES] Error fetching drivers:", driversError)
-  }
 
   return (
     <div className="flex min-h-screen flex-col">

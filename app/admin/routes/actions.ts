@@ -3,12 +3,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { optimizeRouteNearestNeighbor, optimize2Opt } from "@/lib/routing"
 import { optimizeWithHereTourPlanning } from "@/lib/here/tour-planning"
-import { buildHereProblemV3, buildMultiVehicleProblemV3 } from "@/lib/here/build-problem-v3"
+import { buildHereProblemV3 } from "@/lib/here/build-problem-v3"
 import type { Order, VehicleConfig, Depot } from "@/lib/here/build-problem-v3"
 import { ensureOrderCoordinates } from "@/lib/ensure-coords"
 import { revalidatePath } from "next/cache"
 import type { OptimizationConfig } from "./create-route-dialog"
-import { clusterOrders } from "@/lib/clustering"
 import { env } from "@/lib/env"
 import { recalcRouteMetrics } from "./metrics"
 
@@ -43,22 +42,48 @@ export async function createRoute(
     throw new Error("No orders selected")
   }
 
-  const { data: fetchedOrders } = await supabase.from("orders").select("*").in("id", orderIds).eq("admin_id", user.id)
+  console.log("[v0] [CREATE_ROUTE] Fetching orders for admin:", user.id)
+  console.log("[v0] [CREATE_ROUTE] Order IDs:", orderIds.slice(0, 5))
+
+  const { data: fetchedOrders, error: fetchError } = await supabase.from("orders").select("*").in("id", orderIds)
+
+  console.log("[v0] [CREATE_ROUTE] Fetched orders count:", fetchedOrders?.length || 0)
+  if (fetchError) {
+    console.error("[v0] [CREATE_ROUTE] Fetch error:", fetchError)
+  }
 
   if (!fetchedOrders || fetchedOrders.length === 0) {
-    throw new Error("No orders found")
+    throw new Error("No orders found. Please ensure orders have been imported.")
+  }
+
+  const ordersNeedingAdminId = fetchedOrders.filter((o) => !o.admin_id)
+  const validOrders = fetchedOrders.filter((o) => !o.admin_id || o.admin_id === user.id)
+
+  if (validOrders.length === 0) {
+    throw new Error("No orders available. All selected orders belong to other admins.")
+  }
+
+  if (ordersNeedingAdminId.length > 0) {
+    console.log("[v0] [CREATE_ROUTE] Auto-assigning admin_id to", ordersNeedingAdminId.length, "orders")
+    await supabase
+      .from("orders")
+      .update({ admin_id: user.id })
+      .in(
+        "id",
+        ordersNeedingAdminId.map((o) => o.id),
+      )
   }
 
   console.log("[v0] Ensuring all orders have coordinates...")
-  const { orders, failed } = await ensureOrderCoordinates(fetchedOrders)
+  const { orders, failed } = await ensureOrderCoordinates(validOrders)
 
   if (failed.length > 0) {
     console.warn(`[v0] Failed to geocode ${failed.length} orders:`, failed)
   }
 
-  const validOrders = orders.filter((o) => o.latitude && o.longitude)
+  const validOrdersWithCoords = orders.filter((o) => o.latitude && o.longitude)
 
-  if (validOrders.length === 0) {
+  if (validOrdersWithCoords.length === 0) {
     throw new Error("No orders with valid coordinates")
   }
 
@@ -77,7 +102,7 @@ export async function createRoute(
       }
     }
 
-    vehicleConfig.returnToDepot = optimizationConfig.returnToWarehouse
+    vehicleConfig.returnToDepot = optimizationConfig.returnToDepot
     vehicleConfig.capacity = optimizationConfig.vehicleCapacity || vehicleConfig.capacity
 
     if (optimizationConfig.timeStart && optimizationConfig.timeEnd) {
@@ -107,12 +132,12 @@ export async function createRoute(
         shiftEnd:
           vehicleConfig.shiftEnd ||
           (profile.shift_end ? `${new Date().toISOString().split("T")[0]}T${profile.shift_end}Z` : undefined),
-        returnToDepot: optimizationConfig?.returnToWarehouse ?? true,
+        returnToDepot: optimizationConfig?.returnToDepot ?? true,
       }
     }
   }
 
-  const orderData: Order[] = validOrders.map((o) => ({
+  const orderData: Order[] = validOrdersWithCoords.map((o) => ({
     id: o.id,
     latitude: o.latitude!,
     longitude: o.longitude!,
@@ -137,7 +162,7 @@ export async function createRoute(
   }
 
   if (!usedHere) {
-    const stops = validOrders.map((o) => ({
+    const stops = validOrdersWithCoords.map((o) => ({
       id: o.id,
       latitude: o.latitude!,
       longitude: o.longitude!,
@@ -174,7 +199,7 @@ export async function createRoute(
         status: "assigned",
       })
       .eq("id", optimizedRoute[i])
-      .eq("admin_id", user.id)
+      .or(`admin_id.eq.${user.id},admin_id.is.null`)
   }
 
   revalidatePath("/admin/routes")
@@ -184,220 +209,318 @@ export async function createRoute(
 export async function createMultipleRoutes(
   orderIds: string[],
   driverIds: string[],
+  numberOfRoutes: number,
   use2Opt: boolean,
   optimizationConfig?: OptimizationConfig,
 ) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error("Unauthorized")
 
-  if (orderIds.length === 0) {
-    throw new Error("No orders selected")
-  }
+    if (orderIds.length === 0) {
+      throw new Error("No orders selected")
+    }
 
-  if (driverIds.length === 0) {
-    throw new Error("No drivers selected")
-  }
+    const createWithoutDrivers = driverIds.length === 0
+    const routeCount = numberOfRoutes || Math.max(1, driverIds.length)
 
-  const { data: fetchedOrders } = await supabase.from("orders").select("*").in("id", orderIds).eq("admin_id", user.id)
-
-  if (!fetchedOrders || fetchedOrders.length === 0) {
-    throw new Error("No orders found")
-  }
-
-  console.log("[v0] Ensuring all orders have coordinates...")
-  const { orders: geocodedOrders, failed } = await ensureOrderCoordinates(fetchedOrders)
-
-  if (failed.length > 0) {
-    console.warn(`[v0] Failed to geocode ${failed.length} orders:`, failed)
-  }
-
-  const validOrders = geocodedOrders.filter((o) => o.latitude && o.longitude)
-
-  if (validOrders.length === 0) {
-    throw new Error("No orders with valid coordinates")
-  }
-
-  if (validOrders.length > 0) {
-    const sample = validOrders
-      .slice(0, 3)
-      .map((o) => `${o.id.slice(0, 8)}: ${o.latitude}, ${o.longitude}`)
-      .join(" | ")
-    console.log(`[v0] First 3 orders after geocoding: ${sample}`)
-  }
-
-  const { data: profiles } = await supabase.from("profiles").select("*").in("id", driverIds).eq("admin_id", user.id)
-
-  if (!profiles || profiles.length === 0) {
-    throw new Error("No valid drivers found")
-  }
-
-  const clusters = clusterOrders(
-    validOrders.map((o) => ({
-      id: o.id,
-      latitude: o.latitude!,
-      longitude: o.longitude!,
-      city: o.city,
-      state: o.state,
-    })),
-    profiles.length,
-    env.MAX_DEPOT_DISTANCE_KM,
-  )
-
-  console.log(`[v0] Created ${clusters.length} geographic clusters for ${validOrders.length} orders`)
-  clusters.forEach((cluster, i) => {
     console.log(
-      `[v0] Cluster ${i}: ${cluster.orders.length} orders, centroid: ${cluster.centroid.lat.toFixed(4)}, ${cluster.centroid.lng.toFixed(4)}${cluster.city ? ` (${cluster.city})` : ""}`,
+      "[v0] [CREATE_ROUTES] Creating",
+      routeCount,
+      "routes",
+      createWithoutDrivers ? "without drivers" : `with ${driverIds.length} drivers`,
     )
-  })
+    console.log("[v0] [CREATE_ROUTES] Order IDs count:", orderIds.length)
 
-  const createdRouteIds: string[] = []
+    console.log("[v0] [CREATE_ROUTES] Resetting order status to pending for routing...")
+    await supabase
+      .from("orders")
+      .update({
+        status: "pending",
+        route_id: null,
+        stop_sequence: null,
+      })
+      .in("id", orderIds)
+      .or(`admin_id.eq.${user.id},admin_id.is.null`)
 
-  for (const cluster of clusters) {
-    const clusterOrderData: Order[] = cluster.orders.map((o) => {
-      const fullOrder = validOrders.find((vo) => vo.id === o.id)!
-      return {
-        id: o.id,
-        latitude: o.latitude,
-        longitude: o.longitude,
-        service_seconds: fullOrder.service_seconds || 120,
-        quantity: fullOrder.quantity || 1,
+    const BATCH_SIZE = 100
+    const fetchedOrders: any[] = []
+    let fetchError: any = null
+
+    for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
+      const batch = orderIds.slice(i, i + BATCH_SIZE)
+      const { data, error } = await supabase.from("orders").select("*").in("id", batch)
+
+      if (error) {
+        fetchError = error
+        break
       }
-    })
 
-    const clusterDepot: Depot = {
-      lat: cluster.centroid.lat,
-      lng: cluster.centroid.lng,
+      if (data) {
+        fetchedOrders.push(...data)
+      }
     }
 
-    const driversForCluster = profiles.slice(0, Math.max(1, Math.ceil(profiles.length / clusters.length)))
-
-    const vehicleConfigs: VehicleConfig[] = driversForCluster.map((p) => ({
-      id: p.id,
-      capacity: optimizationConfig?.vehicleCapacity || p.vehicle_capacity || env.ROUTE_CAPACITY,
-      shiftStart:
-        optimizationConfig?.timeStart && optimizationConfig?.timeEnd
-          ? `${new Date().toISOString().split("T")[0]}T${optimizationConfig.timeStart}:00Z`
-          : p.shift_start
-            ? `${new Date().toISOString().split("T")[0]}T${p.shift_start}Z`
-            : undefined,
-      shiftEnd:
-        optimizationConfig?.timeStart && optimizationConfig?.timeEnd
-          ? `${new Date().toISOString().split("T")[0]}T${optimizationConfig.timeEnd}:00Z`
-          : p.shift_end
-            ? `${new Date().toISOString().split("T")[0]}T${p.shift_end}Z`
-            : undefined,
-      returnToDepot: optimizationConfig?.returnToWarehouse ?? true,
-    }))
-
-    let tours: Array<{
-      vehicleId: string
-      orderedStopIds: string[]
-      jobPlaces?: Map<string, { lat: number; lng: number }>
-    }> = []
-    let usedHere = false
-
-    try {
-      console.log(
-        `[v0] Optimizing cluster ${cluster.id} with ${clusterOrderData.length} orders and ${vehicleConfigs.length} vehicles`,
-      )
-
-      const { problem, jobPlaceById } = await buildMultiVehicleProblemV3(clusterOrderData, clusterDepot, vehicleConfigs)
-
-      const hereTours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120)
-
-      if (hereTours.length > 0) {
-        tours = hereTours
-        usedHere = true
-        console.log(`[v0] HERE optimization succeeded for cluster ${cluster.id}: ${hereTours.length} tours`)
-      }
-    } catch (error) {
-      console.error(`[v0] HERE Tour Planning v3 failed for cluster ${cluster.id}, using fallback:`, error)
+    if (fetchError) {
+      throw new Error(`Failed to fetch orders: ${fetchError.message}`)
     }
 
-    if (!usedHere) {
-      const stops = clusterOrderData.map((o) => ({
-        id: o.id,
-        latitude: o.latitude,
-        longitude: o.longitude,
-      }))
+    if (fetchedOrders.length === 0) {
+      throw new Error("No orders found. Please ensure orders have been imported.")
+    }
 
-      const ordersPerDriver = Math.ceil(stops.length / driversForCluster.length)
+    const ordersNeedingAdminId = fetchedOrders.filter((o) => !o.admin_id)
+    const validOrders = fetchedOrders.filter((o) => !o.admin_id || o.admin_id === user.id)
 
-      for (let i = 0; i < driversForCluster.length; i++) {
-        const driverStops = stops.slice(i * ordersPerDriver, (i + 1) * ordersPerDriver)
+    if (validOrders.length === 0) {
+      throw new Error("No orders available. All selected orders belong to other admins.")
+    }
 
-        if (driverStops.length > 0) {
-          let optimized = optimizeRouteNearestNeighbor(driverStops)
+    if (ordersNeedingAdminId.length > 0) {
+      await supabase
+        .from("orders")
+        .update({ admin_id: user.id })
+        .in(
+          "id",
+          ordersNeedingAdminId.map((o) => o.id),
+        )
+    }
 
-          if (use2Opt && driverStops.length >= 4) {
-            optimized = optimize2Opt(driverStops, optimized)
-          }
+    console.log("[v0] Ensuring all orders have coordinates...")
+    const { orders: geocodedOrders, failed } = await ensureOrderCoordinates(validOrders)
 
-          tours.push({
-            vehicleId: driversForCluster[i].id,
-            orderedStopIds: optimized,
-          })
+    if (failed.length > 0) {
+      console.warn(`[v0] Failed to geocode ${failed.length} orders:`, failed)
+    }
+
+    const validOrdersWithCoords = geocodedOrders.filter((o) => o.latitude && o.longitude)
+
+    if (validOrdersWithCoords.length === 0) {
+      throw new Error("No orders with valid coordinates")
+    }
+
+    let profiles: any[] = []
+    if (!createWithoutDrivers && driverIds.length > 0) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", driverIds)
+        .or(`admin_id.eq.${user.id},admin_id.is.null`)
+
+      if (data) {
+        profiles = data
+        const driversNeedingAdminId = profiles.filter((p) => !p.admin_id)
+        if (driversNeedingAdminId.length > 0) {
+          await supabase
+            .from("profiles")
+            .update({ admin_id: user.id })
+            .in(
+              "id",
+              driversNeedingAdminId.map((p) => p.id),
+            )
         }
       }
     }
 
-    for (const tour of tours) {
-      if (tour.orderedStopIds.length === 0) continue
+    // Split orders evenly across the requested number of routes
+    console.log(`[v0] Distributing ${validOrdersWithCoords.length} orders across ${routeCount} routes`)
 
-      const deliveryStopIds = tour.orderedStopIds.filter((jobId) => {
-        if (jobId === "departure" || jobId === "arrival") return false
-        return orderIds.includes(jobId)
-      })
+    const ordersPerRoute = Math.ceil(validOrdersWithCoords.length / routeCount)
+    const routeBatches: any[][] = []
 
-      if (deliveryStopIds.length === 0) continue
+    for (let i = 0; i < routeCount; i++) {
+      const startIdx = i * ordersPerRoute
+      const endIdx = Math.min(startIdx + ordersPerRoute, validOrdersWithCoords.length)
+      const batchOrders = validOrdersWithCoords.slice(startIdx, endIdx)
 
-      const baseVehicleId = tour.vehicleId.split("_")[0]
-      const driverId = baseVehicleId === "default-vehicle" ? null : baseVehicleId
+      if (batchOrders.length > 0) {
+        routeBatches.push(batchOrders)
+      }
+    }
 
-      const routeName = cluster.city
-        ? `${cluster.city} - Route ${createdRouteIds.length + 1}`
-        : `Route ${createdRouteIds.length + 1}`
+    console.log(
+      `[v0] Created ${routeBatches.length} route batches with sizes:`,
+      routeBatches.map((b) => b.length),
+    )
 
-      const { data: route, error: routeError } = await supabase
-        .from("routes")
-        .insert({
-          name: routeName,
-          driver_id: driverId,
-          status: "draft",
-          total_stops: deliveryStopIds.length,
-          completed_stops: 0,
-          admin_id: user.id,
-        })
-        .select()
-        .single()
+    const createdRouteIds: string[] = []
+    const MAX_ORDERS_PER_HERE_REQUEST = 500
+    const DELAY_BETWEEN_ROUTES_MS = 3000
 
-      if (routeError) throw routeError
-
-      for (let i = 0; i < deliveryStopIds.length; i++) {
-        await supabase
-          .from("orders")
-          .update({
-            route_id: route.id,
-            stop_sequence: i + 1,
-            status: "assigned",
-          })
-          .eq("id", deliveryStopIds[i])
-          .eq("admin_id", user.id)
+    for (let batchIndex = 0; batchIndex < routeBatches.length; batchIndex++) {
+      if (batchIndex > 0) {
+        console.log(`[v0] Waiting ${DELAY_BETWEEN_ROUTES_MS / 1000}s before processing next route...`)
+        await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_ROUTES_MS))
       }
 
-      createdRouteIds.push(route.id)
-      console.log(`[v0] Created route ${route.id} with ${deliveryStopIds.length} stops for cluster ${cluster.id}`)
+      const batchOrders = routeBatches[batchIndex]
+
+      const orderData: Order[] = batchOrders.map((o) => ({
+        id: o.id,
+        latitude: o.latitude!,
+        longitude: o.longitude!,
+        service_seconds: o.service_seconds || 120,
+        quantity: o.quantity || 1,
+      }))
+
+      // Calculate centroid for this batch as depot
+      const centroidLat = orderData.reduce((sum, o) => sum + o.latitude, 0) / orderData.length
+      const centroidLng = orderData.reduce((sum, o) => sum + o.longitude, 0) / orderData.length
+
+      const batchDepot: Depot = {
+        lat: centroidLat,
+        lng: centroidLng,
+      }
+
+      // Get driver for this route (if available)
+      const driver = !createWithoutDrivers && profiles[batchIndex] ? profiles[batchIndex] : null
+      const driverId = driver?.id || null
+
+      // Build vehicle config
+      const vehicleConfig: VehicleConfig = {
+        id: driverId || `vehicle-${batchIndex + 1}`,
+        capacity: optimizationConfig?.vehicleCapacity || driver?.vehicle_capacity || env.ROUTE_CAPACITY,
+        shiftStart:
+          optimizationConfig?.useTimeConstraints && optimizationConfig?.timeStart
+            ? `${new Date().toISOString().split("T")[0]}T${optimizationConfig.timeStart}:00Z`
+            : driver?.shift_start
+              ? `${new Date().toISOString().split("T")[0]}T${driver.shift_start}Z`
+              : undefined,
+        shiftEnd:
+          optimizationConfig?.useTimeConstraints && optimizationConfig?.timeEnd
+            ? `${new Date().toISOString().split("T")[0]}T${optimizationConfig.timeEnd}:00Z`
+            : driver?.shift_end
+              ? `${new Date().toISOString().split("T")[0]}T${driver.shift_end}Z`
+              : undefined,
+        returnToDepot: optimizationConfig?.returnToWarehouse ?? true,
+      }
+
+      let optimizedRoute: string[] = []
+      let usedHere = false
+
+      // Try HERE optimization if batch is not too large
+      if (orderData.length <= MAX_ORDERS_PER_HERE_REQUEST) {
+        try {
+          const { problem, jobPlaceById } = await buildHereProblemV3(orderData, batchDepot, vehicleConfig)
+          const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120)
+
+          if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
+            optimizedRoute = tours[0].orderedStopIds
+            usedHere = true
+            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops`)
+          }
+        } catch (error: any) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          console.error(`[v0] HERE optimization failed for route ${batchIndex + 1}:`, errorMessage)
+
+          if (
+            error?.isRateLimit ||
+            errorMessage.includes("Too Many Requests") ||
+            errorMessage.includes("rate limit") ||
+            errorMessage.includes("429")
+          ) {
+            console.log("[v0] Rate limit detected, waiting 20 seconds before fallback...")
+            await new Promise((resolve) => setTimeout(resolve, 20000))
+          }
+        }
+      } else {
+        console.log(`[v0] Batch ${batchIndex + 1} has ${orderData.length} orders, exceeds HERE limit, using fallback`)
+      }
+
+      // Use fallback optimization if HERE failed or wasn't used
+      if (!usedHere) {
+        console.log(`[v0] Using fallback optimization for route ${batchIndex + 1} with ${orderData.length} orders`)
+        const stops = orderData.map((o) => ({
+          id: o.id,
+          latitude: o.latitude,
+          longitude: o.longitude,
+        }))
+
+        optimizedRoute = optimizeRouteNearestNeighbor(stops)
+
+        if (use2Opt && stops.length >= 4) {
+          optimizedRoute = optimize2Opt(stops, optimizedRoute)
+        }
+      }
+
+      // Create the route
+      if (optimizedRoute.length > 0) {
+        const routeName = `Route ${createdRouteIds.length + 1}`
+
+        try {
+          const actualOrderIds = optimizedRoute.filter((id) => id !== "departure" && id !== "arrival")
+
+          const { data: route, error: routeError } = await supabase
+            .from("routes")
+            .insert({
+              name: routeName,
+              driver_id: driverId,
+              status: "draft",
+              total_stops: actualOrderIds.length,
+              completed_stops: 0,
+              admin_id: user.id,
+            })
+            .select()
+            .single()
+
+          if (routeError) {
+            console.error("[v0] Error creating route:", routeError)
+            continue
+          }
+
+          if (!route?.id) {
+            console.error("[v0] Route created but no ID returned")
+            continue
+          }
+
+          const { error: updateError } = await supabase
+            .from("orders")
+            .update({
+              route_id: route.id,
+              status: "assigned",
+            })
+            .in("id", actualOrderIds)
+            .or(`admin_id.eq.${user.id},admin_id.is.null`)
+
+          if (updateError) {
+            console.error("[v0] Error updating orders:", updateError)
+          }
+
+          for (let i = 0; i < actualOrderIds.length; i++) {
+            await supabase
+              .from("orders")
+              .update({ stop_sequence: i + 1 })
+              .eq("id", actualOrderIds[i])
+              .eq("route_id", route.id)
+          }
+
+          createdRouteIds.push(route.id)
+          console.log(`[v0] Created route ${route.id} with ${actualOrderIds.length} stops`)
+        } catch (routeCreationError) {
+          console.error("[v0] Exception creating route:", routeCreationError)
+          continue
+        }
+      }
     }
+
+    console.log(`[v0] Created ${createdRouteIds.length} total routes out of ${routeCount} requested`)
+
+    if (createdRouteIds.length === 0) {
+      throw new Error("No routes were created. Please check the logs for errors.")
+    }
+
+    revalidatePath("/admin/routes")
+    revalidatePath("/admin")
+
+    return createdRouteIds
+  } catch (error) {
+    console.error("[v0] [CREATE_ROUTES] Error:", error)
+    throw error
   }
-
-  console.log(`[v0] Created ${createdRouteIds.length} total routes from ${clusters.length} clusters`)
-
-  revalidatePath("/admin/routes")
-  return createdRouteIds
 }
 
 export async function updateRouteStatus(routeId: string, status: "draft" | "active" | "completed") {

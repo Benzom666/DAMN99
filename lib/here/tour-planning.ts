@@ -108,10 +108,26 @@ export async function submitOrPoll(problem: any, maxSeconds = 120): Promise<Here
       const responseText = await response.text()
       if (responseText) {
         body = JSON.parse(responseText)
-        console.log("[SERVER] [v0] Response body received")
+        console.log("[SERVER] [v0] Response body keys:", Object.keys(body || {}))
       }
     } catch (e) {
       console.log("[SERVER] [v0] No JSON body or empty response")
+    }
+
+    if (body && body.error) {
+      const errorCode = body.error.code || body.error.status
+      const errorMessage = body.error.message || "Unknown error"
+
+      console.error("[SERVER] [v0] HERE API returned error:", JSON.stringify(body.error, null, 2))
+
+      // Check if it's a rate limit error
+      if (errorCode === "429" || errorCode === 429 || errorMessage.includes("Too Many Requests")) {
+        const rateLimitError = new Error(`HERE API rate limit exceeded: ${errorMessage}`)
+        ;(rateLimitError as any).isRateLimit = true
+        throw rateLimitError
+      }
+
+      throw new Error(`HERE API error ${errorCode}: ${errorMessage}`)
     }
 
     if (
@@ -126,17 +142,37 @@ export async function submitOrPoll(problem: any, maxSeconds = 120): Promise<Here
       return body as HereSolution
     }
 
-    let problemId: string | undefined = (body && typeof body.id === "string" && body.id) || undefined
+    let problemId: string | undefined = undefined
 
+    // Try body.id
+    if (body && typeof body.id === "string" && body.id) {
+      problemId = body.id
+      console.log("[SERVER] [v0] Found problemId in body.id:", problemId)
+    }
+
+    // Try body.problemId
+    if (!problemId && body && typeof body.problemId === "string" && body.problemId) {
+      problemId = body.problemId
+      console.log("[SERVER] [v0] Found problemId in body.problemId:", problemId)
+    }
+
+    // Try Location header
     if (!problemId) {
       const location = response.headers.get("location") || response.headers.get("Location")
       if (location) {
         const match = location.match(/\/problems\/([^/?#]+)/i)
-        if (match) problemId = match[1]
+        if (match) {
+          problemId = match[1]
+          console.log("[SERVER] [v0] Extracted problemId from Location header:", problemId)
+        }
       }
     }
 
     if (!problemId) {
+      console.error("[SERVER] [v0] Failed to extract problemId. Response details:")
+      console.error("[SERVER] [v0]   Status:", response.status)
+      console.error("[SERVER] [v0]   Body keys:", Object.keys(body || {}))
+      console.error("[SERVER] [v0]   Body:", JSON.stringify(body, null, 2).substring(0, 500))
       throw new Error("Create problem succeeded but no problem id found and no immediate solution returned")
     }
 

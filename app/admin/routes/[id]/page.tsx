@@ -33,7 +33,7 @@ export default async function AdminRouteDetailPage({
 
   const { data: route, error: routeError } = await supabase
     .from("routes")
-    .select("*, profiles(display_name, email)")
+    .select("*, driver:profiles!driver_id(display_name, email)")
     .eq("id", id)
     .single()
 

@@ -110,7 +110,7 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
     try {
       await updateRoute(route.id, {
         name: editName,
-        driver_id: editDriverId || null,
+        driver_id: editDriverId === "unassigned" ? null : editDriverId,
       })
       toast.success("Route updated successfully")
       setIsEditDialogOpen(false)
