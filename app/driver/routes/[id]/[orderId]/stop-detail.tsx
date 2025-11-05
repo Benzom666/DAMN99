@@ -30,6 +30,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
 
@@ -45,6 +46,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
+    setUploadProgress(null)
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
@@ -56,12 +58,16 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       const photoDataArray: string[] = []
 
       if (photoFiles.length > 0) {
-        console.log("[v0] [DRIVER] Reading photo files...")
+        console.log("[v0] [DRIVER] Processing photos sequentially...")
+        setUploadProgress({ current: 0, total: photoFiles.length })
 
         for (let i = 0; i < photoFiles.length; i++) {
           const photoFile = photoFiles[i]
+          console.log(`[v0] [DRIVER] Processing photo ${i + 1}/${photoFiles.length}`)
           console.log(`[v0] [DRIVER] Photo ${i + 1} size:`, photoFile.size, "bytes")
           console.log(`[v0] [DRIVER] Photo ${i + 1} type:`, photoFile.type)
+
+          setUploadProgress({ current: i + 1, total: photoFiles.length })
 
           try {
             const photoData = await new Promise<string>((resolve, reject) => {
@@ -90,9 +96,12 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               variant: "destructive",
             })
             setIsSubmitting(false)
+            setUploadProgress(null)
             return
           }
         }
+
+        console.log("[v0] [DRIVER] All photos processed successfully")
       }
 
       let signatureDataToSend: string | undefined
@@ -107,9 +116,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 30 seconds")
+        console.error("[v0] [DRIVER] API call timeout after 60 seconds")
         controller.abort()
-      }, 30000)
+      }, 60000)
 
       let response: Response
       try {
@@ -135,7 +144,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
           toast({
             title: "Request Timeout",
-            description: "The request took too long. Please check your connection and try again.",
+            description: "The upload took too long. Please check your connection and try again.",
             variant: "destructive",
           })
         } else {
@@ -146,6 +155,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           })
         }
         setIsSubmitting(false)
+        setUploadProgress(null)
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (FETCH ERROR) ==========")
         return
       }
@@ -166,6 +176,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           variant: "destructive",
         })
         setIsSubmitting(false)
+        setUploadProgress(null)
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (PARSE ERROR) ==========")
         return
       }
@@ -178,6 +189,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           variant: "destructive",
         })
         setIsSubmitting(false)
+        setUploadProgress(null)
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (API ERROR) ==========")
         return
       }
@@ -189,6 +201,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         title: "Success",
         description: "Delivery marked as complete!",
       })
+
+      setUploadProgress(null)
 
       setTimeout(() => {
         router.push(`/driver/routes/${routeId}`)
@@ -205,6 +219,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         variant: "destructive",
       })
       setIsSubmitting(false)
+      setUploadProgress(null)
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (EXCEPTION) ==========")
     }
   }
@@ -392,9 +407,31 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               </Button>
               <Button className="flex-1" size="lg" onClick={handleDeliver} disabled={isSubmitting}>
                 <CheckCircle className="h-5 w-5 mr-2" />
-                {isSubmitting ? "Processing..." : "Delivered"}
+                {isSubmitting
+                  ? uploadProgress
+                    ? `Uploading ${uploadProgress.current}/${uploadProgress.total}...`
+                    : "Processing..."
+                  : "Delivered"}
               </Button>
             </div>
+
+            {/* Upload Progress Indicator */}
+            {uploadProgress && (
+              <Card className="p-4 bg-primary/5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Uploading Photos</span>
+                  <span className="text-sm text-muted-foreground">
+                    {uploadProgress.current} / {uploadProgress.total}
+                  </span>
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                  />
+                </div>
+              </Card>
+            )}
           </>
         )}
 
