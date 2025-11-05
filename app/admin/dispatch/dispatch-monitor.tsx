@@ -422,8 +422,8 @@ export function DispatchMonitor({
                 </div>
               )}
               <div>
-                <p className="text-sm font-medium mb-1">Captured At</p>
-                <p className="text-base">{new Date(selectedPOD.captured_at).toLocaleString()}</p>
+                <p className="text-sm font-medium mb-1">Delivered At</p>
+                <p className="text-base">{new Date(selectedPOD.delivered_at).toLocaleString()}</p>
               </div>
             </div>
           ) : (
