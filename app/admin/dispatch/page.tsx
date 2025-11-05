@@ -53,13 +53,13 @@ export default async function DispatchPage() {
     console.log("[v0] [DISPATCH] Fetched orders count:", orders.length)
   }
 
-  // Get PODs for delivered orders
-  const deliveredOrderIds = orders?.filter((o: any) => o.status === "delivered").map((o: any) => o.id) || []
+  const completedOrderIds =
+    orders?.filter((o: any) => o.status === "delivered" || o.status === "failed").map((o: any) => o.id) || []
 
   let pods = []
   let podPhotos = []
-  if (deliveredOrderIds.length > 0) {
-    const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrderIds)
+  if (completedOrderIds.length > 0) {
+    const { data } = await supabase.from("pods").select("*").in("order_id", completedOrderIds)
     pods = data || []
 
     // Fetch all photos for these PODs
