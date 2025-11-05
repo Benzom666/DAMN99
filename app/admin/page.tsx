@@ -68,6 +68,9 @@ export default async function AdminDashboard() {
               <Link href="/admin/dispatch" className="text-sm text-muted-foreground hover:text-foreground">
                 Dispatch
               </Link>
+              <Link href="/admin/analytics" className="text-sm text-muted-foreground hover:text-foreground">
+                Analytics
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -150,6 +153,14 @@ export default async function AdminDashboard() {
                 <CardHeader>
                   <CardTitle>Dispatch</CardTitle>
                   <CardDescription>Monitor active deliveries in real-time</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+            <Link href="/admin/analytics">
+              <Card className="cursor-pointer hover:bg-accent transition-colors">
+                <CardHeader>
+                  <CardTitle>Analytics</CardTitle>
+                  <CardDescription>View detailed metrics and reports</CardDescription>
                 </CardHeader>
               </Card>
             </Link>

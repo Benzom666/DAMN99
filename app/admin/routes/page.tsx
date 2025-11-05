@@ -115,6 +115,9 @@ export default async function RoutesPage() {
               <Link href="/admin/dispatch" className="text-sm text-muted-foreground hover:text-foreground">
                 Dispatch
               </Link>
+              <Link href="/admin/analytics" className="text-sm text-muted-foreground hover:text-foreground">
+                Analytics
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">

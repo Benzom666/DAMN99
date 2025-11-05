@@ -102,7 +102,28 @@ export default async function DriverStopPage(props: {
       // Don't throw error for POD, just log it
     }
 
-    return <StopDetail order={order} routeName={route.name} routeId={routeId} existingPod={existingPod} />
+    let existingPhotos: string[] = []
+    if (existingPod) {
+      const { data: podPhotos } = await supabase
+        .from("pod_photos")
+        .select("photo_url, photo_order")
+        .eq("pod_id", existingPod.id)
+        .order("photo_order", { ascending: true })
+
+      if (podPhotos && podPhotos.length > 0) {
+        existingPhotos = podPhotos.map((p) => p.photo_url)
+        console.log("[v0] [DRIVER_STOP] Found", existingPhotos.length, "photos for POD")
+      }
+    }
+
+    return (
+      <StopDetail
+        order={order}
+        routeName={route.name}
+        routeId={routeId}
+        existingPod={existingPod ? { ...existingPod, existingPhotos } : null}
+      />
+    )
   } catch (error) {
     console.error("[v0] [DRIVER_STOP] Fatal error:", error)
     // Re-throw to show error page
