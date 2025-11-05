@@ -31,15 +31,19 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null)
+  const [showNotesError, setShowNotesError] = useState(false)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
 
   const handleSignatureSave = (dataUrl: string) => {
     setSignatureData(dataUrl)
     setShowSignaturePad(false)
+    console.log("[v0] Signature saved successfully")
   }
 
   const handleDeliver = async () => {
+    console.log("[v0] [DRIVER] Deliver button clicked")
+
     if (isSubmitting) {
       console.log("[v0] [DRIVER] Already submitting, ignoring click")
       return
@@ -225,12 +229,26 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   }
 
   const handleFail = async () => {
+    console.log("[v0] [DRIVER] ========== FAILED BUTTON CLICKED ==========")
+    console.log("[v0] [DRIVER] Order ID:", order.id)
+    console.log("[v0] [DRIVER] Notes length:", notes.trim().length)
+    console.log("[v0] [DRIVER] Notes content:", notes)
+    console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
+    console.log("[v0] [DRIVER] isSubmitting:", isSubmitting)
+
     if (!notes.trim()) {
+      console.log("[v0] [DRIVER] ❌ Failed: Notes are required but empty")
+      setShowNotesError(true)
       toast({
         title: "Notes Required",
         description: "Please provide a reason for the failed delivery.",
         variant: "destructive",
       })
+      const notesElement = document.getElementById("notes")
+      if (notesElement) {
+        notesElement.focus()
+        notesElement.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
       return
     }
 
@@ -240,13 +258,56 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
+    setShowNotesError(false)
     console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
-    console.log("[v0] [DRIVER] Order ID:", order.id)
-    console.log("[v0] [DRIVER] Notes:", notes)
 
     try {
+      const photoDataArray: string[] = []
+
+      if (photoFiles.length > 0) {
+        console.log("[v0] [DRIVER] Processing photos for failed delivery...")
+        setUploadProgress({ current: 0, total: photoFiles.length })
+
+        for (let i = 0; i < photoFiles.length; i++) {
+          const photoFile = photoFiles[i]
+          console.log(`[v0] [DRIVER] Processing photo ${i + 1}/${photoFiles.length}`)
+
+          setUploadProgress({ current: i + 1, total: photoFiles.length })
+
+          try {
+            const photoData = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                if (reader.result && typeof reader.result === "string") {
+                  console.log(`[v0] [DRIVER] Photo ${i + 1} read successfully`)
+                  resolve(reader.result)
+                } else {
+                  reject(new Error(`Failed to read photo file ${i + 1}`))
+                }
+              }
+              reader.onerror = () => reject(new Error("File reading failed"))
+              reader.readAsDataURL(photoFile)
+            })
+            photoDataArray.push(photoData)
+          } catch (photoError) {
+            console.error(`[v0] [DRIVER] Photo ${i + 1} processing error:`, photoError)
+            toast({
+              title: "Photo Error",
+              description: `Failed to process photo ${i + 1}. Continuing without it.`,
+              variant: "destructive",
+            })
+          }
+        }
+
+        console.log("[v0] [DRIVER] Processed", photoDataArray.length, "photos for failed delivery")
+      }
+
+      console.log("[v0] [DRIVER] Calling fail API...")
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const timeoutId = setTimeout(() => {
+        console.error("[v0] [DRIVER] API call timeout after 60 seconds")
+        controller.abort()
+      }, 60000)
 
       const response = await fetch("/api/driver/fail", {
         method: "POST",
@@ -256,13 +317,16 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         body: JSON.stringify({
           orderId: order.id,
           notes,
+          photoDataArray,
         }),
         signal: controller.signal,
       })
 
       clearTimeout(timeoutId)
+      console.log("[v0] [DRIVER] API response status:", response.status)
 
       const result = await response.json()
+      console.log("[v0] [DRIVER] API response:", result)
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to update status")
@@ -273,8 +337,10 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
       toast({
         title: "Success",
-        description: "Delivery marked as failed.",
+        description: "Delivery marked as failed. Customer will be notified.",
       })
+
+      setUploadProgress(null)
 
       setTimeout(() => {
         router.push(`/driver/routes/${routeId}`)
@@ -282,12 +348,14 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       }, 500)
     } catch (error) {
       console.error("[v0] [DRIVER] Error marking as failed:", error)
+      console.error("[v0] [DRIVER] Error details:", error instanceof Error ? error.stack : "no stack")
       toast({
         title: "Error",
         description: `Failed to update status: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       })
       setIsSubmitting(false)
+      setUploadProgress(null)
       console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (ERROR) ==========")
     }
   }
@@ -384,19 +452,32 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                 placeholder="Who received the delivery?"
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
+                disabled={isSubmitting}
               />
             </Card>
 
-            {/* Notes */}
-            <Card className="p-4 space-y-3">
-              <Label htmlFor="notes">Notes (Optional)</Label>
+            {/* Notes - Made more prominent with error state */}
+            <Card className={`p-4 space-y-3 ${showNotesError ? "border-destructive border-2" : ""}`}>
+              <Label htmlFor="notes" className={showNotesError ? "text-destructive" : ""}>
+                Notes {showNotesError && <span className="text-destructive">(Required for failed deliveries)</span>}
+              </Label>
               <Textarea
                 id="notes"
                 placeholder="Add any notes about this delivery..."
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => {
+                  setNotes(e.target.value)
+                  if (showNotesError && e.target.value.trim()) {
+                    setShowNotesError(false)
+                  }
+                }}
                 rows={3}
+                disabled={isSubmitting}
+                className={showNotesError ? "border-destructive" : ""}
               />
+              {showNotesError && (
+                <p className="text-sm text-destructive">Please provide a reason for the failed delivery</p>
+              )}
             </Card>
 
             {/* Action Buttons */}
