@@ -59,7 +59,10 @@ export default async function DispatchPage() {
   let pods = []
   let podPhotos = []
   if (deliveredOrFailedOrderIds.length > 0) {
-    const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrFailedOrderIds)
+    const { data } = await supabase
+      .from("pods")
+      .select("*, delivery_latitude, delivery_longitude, delivery_accuracy")
+      .in("order_id", deliveredOrFailedOrderIds)
     pods = data || []
     
     console.log("[v0] [DISPATCH] Fetched pods count:", pods.length)

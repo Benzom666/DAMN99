@@ -369,6 +369,33 @@ export function DispatchMonitor({
 
           {selectedPOD ? (
             <div className="space-y-4">
+              {selectedPOD.delivery_latitude && selectedPOD.delivery_longitude && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Delivery Location</p>
+                  <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                    <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <a
+                        href={`https://www.google.com/maps?q=${selectedPOD.delivery_latitude},${selectedPOD.delivery_longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline block text-sm"
+                      >
+                        View on Google Maps
+                      </a>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Lat: {selectedPOD.delivery_latitude.toFixed(6)}, Lng: {selectedPOD.delivery_longitude.toFixed(6)}
+                      </p>
+                      {selectedPOD.delivery_accuracy && (
+                        <p className="text-xs text-muted-foreground">
+                          Accuracy: ±{Math.round(selectedPOD.delivery_accuracy)}m
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {selectedPodPhotos.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Photos ({selectedPodPhotos.length})</p>
