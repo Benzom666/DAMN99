@@ -21,7 +21,6 @@ Verify all required environment variables are set in Vercel Production environme
 
 #### Maps (HERE)
 - [ ] `HERE_API_KEY` (server-side)
-- [ ] `NEXT_PUBLIC_HERE_API_KEY` (client-side)
 - [ ] Verify production domain is whitelisted in HERE Developer Dashboard
 
 #### Email (SendGrid)
