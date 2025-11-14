@@ -23,15 +23,29 @@ export default function HomePage() {
               <span className="text-2xl font-bold text-foreground tracking-tight">Delivery OS</span>
             </div>
             <div className="hidden md:flex items-center gap-8">
-              <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <a 
+                href="#features" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+                }}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
                 Platform
-              </Link>
+              </a>
               <Link href="/home/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Pricing
               </Link>
-              <Link href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <a 
+                href="#testimonials"
+                onClick={(e) => {
+                  e.preventDefault()
+                  document.getElementById('testimonials')?.scrollIntoView({ behavior: 'smooth' })
+                }}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
                 Customers
-              </Link>
+              </a>
               <ThemeToggle />
               <Link href="/auth/login">
                 <Button variant="ghost" size="sm" className="text-foreground">Log In</Button>
@@ -48,7 +62,7 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-32 pb-40">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-background to-background"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-primary via-background to-background"></div>
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f12_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f12_1px,transparent_1px)] bg-[size:32px_32px]"></div>
         <div className="container relative mx-auto px-6 lg:px-8">
           <div className="mx-auto max-w-5xl text-center">
@@ -72,11 +86,14 @@ export default function HomePage() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="#features">
-                <Button size="lg" variant="outline" className="text-lg h-14 px-10 border-border/50 font-semibold">
-                  Explore the Product
-                </Button>
-              </Link>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="text-lg h-14 px-10 border-border/50 font-semibold"
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                Explore the Product
+              </Button>
             </div>
           </div>
         </div>
@@ -312,7 +329,18 @@ export default function HomePage() {
             <div>
               <h3 className="font-semibold text-foreground mb-5">Product</h3>
               <ul className="space-y-3 text-sm text-muted-foreground">
-                <li><Link href="#features" className="hover:text-foreground transition-colors">Platform Overview</Link></li>
+                <li>
+                  <a 
+                    href="#features"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                    className="hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    Platform Overview
+                  </a>
+                </li>
                 <li><Link href="/home/pricing" className="hover:text-foreground transition-colors">Pricing</Link></li>
                 <li><Link href="/auth/login" className="hover:text-foreground transition-colors">Login</Link></li>
               </ul>
