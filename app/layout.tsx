@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
@@ -8,8 +8,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Delivery Management",
-  description: "Manage deliveries, routes, and drivers",
+  title: "Delivery OS - Advanced Logistics Management Platform",
+  description: "Transform your delivery operations with AI-powered route optimization, real-time tracking, and intelligent driver management. Start your 14-day free trial today.",
   generator: "v0.app",
 }
 
