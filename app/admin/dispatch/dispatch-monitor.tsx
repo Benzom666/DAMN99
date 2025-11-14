@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useState, useEffect } from "react"
-import { CheckCircle, XCircle, Clock, Package, User, MapIcon, MapPin } from "lucide-react"
+import { CheckCircle, XCircle, Clock, Package, User, MapIcon, MapPin } from 'lucide-react'
 import { HereMap } from "@/components/here-map"
 
 interface DispatchMonitorProps {
@@ -329,7 +329,14 @@ export function DispatchMonitor({
                                 </Button>
                               </>
                             )}
-                            {order.status === "failed" && <XCircle className="h-5 w-5 text-red-600" />}
+                            {order.status === "failed" && (
+                              <>
+                                <XCircle className="h-5 w-5 text-red-600" />
+                                <Button variant="ghost" size="sm" onClick={() => handleViewPOD(order)}>
+                                  View POD
+                                </Button>
+                              </>
+                            )}
                             {order.status === "assigned" && <Clock className="h-5 w-5 text-muted-foreground" />}
                           </div>
                         </div>
