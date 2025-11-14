@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -31,9 +31,29 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
   const MAX_PHOTOS = 4
+
+  useEffect(() => {
+    if (!isCompleted && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          })
+          console.log("[v0] [GPS] Location captured:", position.coords.latitude, position.coords.longitude)
+        },
+        (error) => {
+          console.error("[v0] [GPS] Location error:", error.message)
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      )
+    }
+  }, [isCompleted])
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -83,6 +103,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     console.log("[v0] [DRIVER] Has signature:", !!signatureData)
     console.log("[v0] [DRIVER] Recipient:", recipientName || "none")
     console.log("[v0] [DRIVER] Notes:", notes || "none")
+    console.log("[v0] [DRIVER] GPS Location:", location)
 
     try {
       const photoDataArray: string[] = []
@@ -156,6 +177,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
             signatureData: signatureDataToSend,
             notes: notes || undefined,
             recipientName: recipientName || undefined,
+            location: location || undefined,
           }),
           signal: controller.signal,
         })
@@ -260,6 +282,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Notes:", notes)
+    console.log("[v0] [DRIVER] GPS Location:", location)
 
     try {
       const controller = new AbortController()
@@ -273,6 +296,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         body: JSON.stringify({
           orderId: order.id,
           notes,
+          location: location || undefined,
         }),
         signal: controller.signal,
       })
@@ -522,6 +546,29 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               <div>
                 <p className="text-sm text-muted-foreground">Notes</p>
                 <p className="font-medium">{existingPod.notes}</p>
+              </div>
+            )}
+            {(existingPod.delivery_latitude && existingPod.delivery_longitude) && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Delivery Location</p>
+                <div className="bg-muted p-3 rounded-lg space-y-1">
+                  <p className="text-sm font-mono">
+                    {Number(existingPod.delivery_latitude).toFixed(6)}, {Number(existingPod.delivery_longitude).toFixed(6)}
+                  </p>
+                  <a
+                    href={`https://www.google.com/maps?q=${existingPod.delivery_latitude},${existingPod.delivery_longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline inline-block"
+                  >
+                    View on Map →
+                  </a>
+                  {existingPod.delivery_accuracy && (
+                    <p className="text-xs text-muted-foreground">
+                      Accuracy: ±{Math.round(existingPod.delivery_accuracy)}m
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </Card>

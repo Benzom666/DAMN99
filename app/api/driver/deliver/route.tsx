@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     const { user } = await requireDriver()
 
     const body = await request.json()
-    const { orderId, photoDataArray, signatureData, recipientName, notes } = body
+    const { orderId, photoDataArray, signatureData, recipientName, notes, location } = body
 
     if (!validateUUID(orderId)) {
       return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 })
@@ -201,11 +201,14 @@ export async function POST(request: Request) {
       .insert({
         order_id: orderId,
         driver_id: user.id,
-        photo_url: photoUrls[0] || null, // Keep first photo for backward compatibility
+        photo_url: photoUrls[0] || null,
         signature_url: signatureUrl,
         recipient_name: sanitizedRecipient,
         notes: sanitizedNotes,
         delivered_at: new Date().toISOString(),
+        delivery_latitude: location?.latitude || null,
+        delivery_longitude: location?.longitude || null,
+        delivery_accuracy: location?.accuracy || null,
       })
       .select()
       .single()

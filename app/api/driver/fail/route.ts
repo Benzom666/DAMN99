@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     const { user } = await requireDriver()
 
     const body = await request.json()
-    const { orderId, notes } = body
+    const { orderId, notes, location } = body
 
     if (!validateUUID(orderId)) {
       return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 })
@@ -39,6 +39,16 @@ export async function POST(request: Request) {
     if (orderError) {
       return NextResponse.json({ success: false, error: "Failed to update order status" }, { status: 500 })
     }
+
+    await supabase.from("pods").insert({
+      order_id: orderId,
+      driver_id: user.id,
+      notes: sanitizedNotes,
+      delivered_at: new Date().toISOString(),
+      delivery_latitude: location?.latitude || null,
+      delivery_longitude: location?.longitude || null,
+      delivery_accuracy: location?.accuracy || null,
+    })
 
     await supabase.from("stop_events").insert({
       order_id: orderId,
