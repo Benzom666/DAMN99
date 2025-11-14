@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { Package, Route, Radio } from 'lucide-react'
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -87,6 +88,7 @@ export default async function AdminDashboard() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
             <form action={signOut}>
               <Button variant="outline" size="sm">

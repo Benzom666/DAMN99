@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ArrowRight, MapPin, TrendingUp, BarChart3, Zap, Shield, Smartphone, CheckCircle, Clock, Star } from 'lucide-react'
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export const metadata = {
   title: "Delivery OS - Unified Logistics Platform",
@@ -31,6 +32,7 @@ export default function HomePage() {
               <Link href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Customers
               </Link>
+              <ThemeToggle />
               <Link href="/auth/login">
                 <Button variant="ghost" size="sm" className="text-foreground">Log In</Button>
               </Link>

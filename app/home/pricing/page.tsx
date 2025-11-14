@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { CheckCircle, Zap, ArrowRight, TrendingDown, Shield, X } from 'lucide-react'
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export const metadata = {
   title: "Pricing - Delivery OS | Better Value, Better Results",
@@ -22,6 +23,7 @@ export default function PricingPage() {
               <span className="text-2xl font-bold text-foreground tracking-tight">Delivery OS</span>
             </Link>
             <div className="flex items-center gap-4">
+              <ThemeToggle />
               <Link href="/home">
                 <Button variant="ghost" size="sm" className="text-foreground">Back to Home</Button>
               </Link>

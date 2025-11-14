@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import Link from "next/link"
 import { Package, Clock } from 'lucide-react'
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default async function DriverDashboard() {
   const supabase = await createServerClient()
@@ -78,6 +79,7 @@ export default async function DriverDashboard() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <h1 className="text-xl font-semibold">Driver Dashboard</h1>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
             <form action={signOut}>
               <Button variant="outline" size="sm">

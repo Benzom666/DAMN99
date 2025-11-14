@@ -1,8 +1,9 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { DriversTable } from "./drivers-table"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default async function DriversPage() {
   const supabase = await createClient()
@@ -59,6 +60,7 @@ export default async function DriversPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
             <form action={signOut}>
               <Button variant="outline" size="sm">

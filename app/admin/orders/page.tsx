@@ -1,8 +1,9 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { OrdersTable } from "./orders-table"
 import { MigrationBanner } from "./migration-banner"
 import Link from "next/link"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default async function OrdersPage() {
   const supabase = await createClient()
@@ -60,6 +61,7 @@ export default async function OrdersPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
           </div>
         </div>

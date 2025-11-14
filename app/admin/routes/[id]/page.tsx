@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { RouteDetailView } from "./route-detail-view"
 import Link from "next/link"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -85,6 +86,7 @@ export default async function AdminRouteDetailPage({
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
           </div>
         </div>

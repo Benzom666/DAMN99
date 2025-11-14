@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { DispatchMonitor } from "./dispatch-monitor"
 import Link from "next/link"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default async function DispatchPage() {
   const supabase = await createClient()
@@ -96,6 +97,7 @@ export default async function DispatchPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { requireSuperAdmin } from '@/lib/auth/super-admin'
 import Link from 'next/link'
 import { Shield, Building2, Truck, Package, Activity, Database, FileText } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export default async function SuperAdminLayout({
   children,
@@ -72,6 +73,7 @@ export default async function SuperAdminLayout({
                 System
               </Link>
               <div className="h-4 w-px bg-border" />
+              <ThemeToggle />
               <Link 
                 href="/admin/orders" 
                 className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { RoutesTable } from "./routes-table"
 import Link from "next/link"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default async function RoutesPage() {
   const supabase = await createClient()
@@ -130,6 +131,7 @@ export default async function RoutesPage() {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
           </div>
         </div>
