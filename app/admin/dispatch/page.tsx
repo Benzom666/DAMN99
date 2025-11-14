@@ -53,25 +53,13 @@ export default async function DispatchPage() {
     console.log("[v0] [DISPATCH] Fetched orders count:", orders.length)
   }
 
-  const completedOrderIds =
-    orders?.filter((o: any) => o.status === "delivered" || o.status === "failed").map((o: any) => o.id) || []
+  // Get PODs for delivered orders
+  const deliveredOrderIds = orders?.filter((o: any) => o.status === "delivered").map((o: any) => o.id) || []
 
   let pods = []
-  let podPhotos = []
-  if (completedOrderIds.length > 0) {
-    const { data } = await supabase.from("pods").select("*").in("order_id", completedOrderIds)
+  if (deliveredOrderIds.length > 0) {
+    const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrderIds)
     pods = data || []
-
-    // Fetch all photos for these PODs
-    const podIds = pods.map((p: any) => p.id)
-    if (podIds.length > 0) {
-      const { data: photosData } = await supabase
-        .from("pod_photos")
-        .select("*")
-        .in("pod_id", podIds)
-        .order("photo_order", { ascending: true })
-      podPhotos = photosData || []
-    }
   }
 
   const driverIds = routes?.map((r) => r.driver_id).filter(Boolean) || []
@@ -105,9 +93,6 @@ export default async function DispatchPage() {
               <Link href="/admin/dispatch" className="text-sm font-medium">
                 Dispatch
               </Link>
-              <Link href="/admin/analytics" className="text-sm text-muted-foreground hover:text-foreground">
-                Analytics
-              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -120,7 +105,6 @@ export default async function DispatchPage() {
           routes={routes || []}
           orders={orders || []}
           pods={pods || []}
-          podPhotos={podPhotos || []}
           driverPositions={driverPositions || []}
         />
       </main>

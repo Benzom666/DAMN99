@@ -1,0 +1,111 @@
+{
+  "version": "1.0.0",
+  "lastMigration": "016_fix_multi_tenancy_data",
+  "migrations": [
+    {
+      "id": "001",
+      "name": "create_tables",
+      "description": "Initial database schema creation",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "002",
+      "name": "enable_rls",
+      "description": "Enable Row Level Security on all tables",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "003",
+      "name": "create_profile_trigger",
+      "description": "Auto-create profile on user signup",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "004",
+      "name": "add_geocoding_columns",
+      "description": "Add latitude and longitude columns",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "005",
+      "name": "add_vrp_fields",
+      "description": "Add vehicle routing problem fields",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "006",
+      "name": "add_global_routing_fields",
+      "description": "Add global depot and optimization settings",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "007",
+      "name": "create_driver_positions",
+      "description": "Real-time driver position tracking",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "009",
+      "name": "route_metrics",
+      "description": "Add route performance metrics",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "010",
+      "name": "pod_emails_idempotency",
+      "description": "Prevent duplicate POD emails",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "011",
+      "name": "require_customer_email",
+      "description": "Make customer email required for POD",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "012",
+      "name": "add_order_number",
+      "description": "Add unique order number field",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "013",
+      "name": "add_driver_active_status",
+      "description": "Add is_active flag for drivers",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "014",
+      "name": "add_multi_tenancy",
+      "description": "Add admin_id for multi-tenant support",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "015",
+      "name": "populate_admin_id",
+      "description": "Populate admin_id for existing data",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "016",
+      "name": "fix_multi_tenancy_data",
+      "description": "Fix data integrity for multi-tenancy",
+      "appliedAt": null,
+      "status": "pending"
+    }
+  ]
+}

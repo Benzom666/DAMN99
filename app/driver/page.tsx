@@ -1,9 +1,9 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createServerClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import Link from "next/link"
-import { Package, Clock } from "lucide-react"
+import { Package, Clock } from 'lucide-react'
 
 export default async function DriverDashboard() {
   const supabase = await createServerClient()
@@ -16,18 +16,29 @@ export default async function DriverDashboard() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle()
 
-  if (!profile || profile.role !== "driver") {
-    console.log("[v0] [DRIVER] Not a driver, redirecting to login")
-    redirect("/auth/login")
+  // If no profile exists, redirect to complete profile
+  if (!profile) {
+    console.log("[v0] [DRIVER] No profile found, redirecting to complete profile")
+    redirect("/auth/complete-profile")
   }
 
-  if (profile.is_active === false) {
-    console.log("[v0] [DRIVER] Driver is inactive/deleted, signing out")
-    await supabase.auth.signOut()
-    redirect("/auth/login?error=account_inactive")
+  // If not a driver, redirect to admin (they must be admin or super_admin)
+  if (profile.role !== "driver") {
+    console.log("[v0] [DRIVER] Not a driver, redirecting to admin")
+    redirect("/admin")
   }
+
+  // if (profile.is_active === false) {
+  //   console.log("[v0] [DRIVER] Driver is inactive/deleted, signing out")
+  //   await supabase.auth.signOut()
+  //   redirect("/auth/login?error=account_inactive")
+  // }
 
   const { data: routes } = await supabase
     .from("routes")

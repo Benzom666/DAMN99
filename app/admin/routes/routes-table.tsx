@@ -54,17 +54,6 @@ export function RoutesTable({ routes, orders, drivers }: RoutesTableProps) {
   const router = useRouter()
   const { toast } = useToast()
 
-  const routesWithProgress = routes.map((route) => {
-    const routeOrders = orders.filter((o) => o.route_id === route.id)
-    const totalStops = routeOrders.length
-    const completedStops = routeOrders.filter((o) => o.status === "delivered").length
-    return {
-      ...route,
-      total_stops: totalStops,
-      completed_stops: completedStops,
-    }
-  })
-
   async function handleDeleteRoute(routeId: string) {
     if (confirm("Are you sure you want to delete this route? Orders will be reset to pending.")) {
       setDeletingRouteId(routeId)
@@ -141,10 +130,10 @@ export function RoutesTable({ routes, orders, drivers }: RoutesTableProps) {
   }
 
   function toggleAllRoutes() {
-    if (selectedRouteIds.size === routesWithProgress.length) {
+    if (selectedRouteIds.size === routes.length) {
       setSelectedRouteIds(new Set())
     } else {
-      setSelectedRouteIds(new Set(routesWithProgress.map((r) => r.id)))
+      setSelectedRouteIds(new Set(routes.map((r) => r.id)))
     }
   }
 
@@ -261,7 +250,7 @@ export function RoutesTable({ routes, orders, drivers }: RoutesTableProps) {
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedRouteIds.size === routesWithProgress.length && routesWithProgress.length > 0}
+                  checked={selectedRouteIds.size === routes.length && routes.length > 0}
                   onCheckedChange={toggleAllRoutes}
                 />
               </TableHead>
@@ -274,14 +263,14 @@ export function RoutesTable({ routes, orders, drivers }: RoutesTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {routesWithProgress.length === 0 ? (
+            {routes.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No routes found. Create your first route from pending orders.
                 </TableCell>
               </TableRow>
             ) : (
-              routesWithProgress.map((route) => (
+              routes.map((route) => (
                 <TableRow key={route.id}>
                   <TableCell>
                     <Checkbox
@@ -293,16 +282,7 @@ export function RoutesTable({ routes, orders, drivers }: RoutesTableProps) {
                   <TableCell>{route.driver ? route.driver.display_name || route.driver.email : "Unassigned"}</TableCell>
                   <TableCell>{route.total_stops}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>
-                        {route.completed_stops} / {route.total_stops}
-                      </span>
-                      {route.total_stops > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          ({Math.round((route.completed_stops / route.total_stops) * 100)}%)
-                        </span>
-                      )}
-                    </div>
+                    {route.completed_stops} / {route.total_stops}
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusColor(route.status)}>{route.status}</Badge>

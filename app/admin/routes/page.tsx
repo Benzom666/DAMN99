@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { RoutesTable } from "./routes-table"
 import Link from "next/link"
@@ -94,6 +94,18 @@ export default async function RoutesPage() {
   console.log("[v0] [ROUTES] Fetched orders count:", orders?.length || 0)
   console.log("[v0] [ROUTES] Fetched drivers count:", drivers?.length || 0)
 
+  const routesWithProgress = (routes || []).map((route) => {
+    const routeOrders = orders?.filter((o) => o.route_id === route.id) || []
+    const totalStops = routeOrders.length
+    const completedStops = routeOrders.filter((o) => o.status === 'delivered' || o.status === 'failed').length
+    
+    return {
+      ...route,
+      total_stops: totalStops,
+      completed_stops: completedStops
+    }
+  })
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b bg-card">
@@ -115,9 +127,6 @@ export default async function RoutesPage() {
               <Link href="/admin/dispatch" className="text-sm text-muted-foreground hover:text-foreground">
                 Dispatch
               </Link>
-              <Link href="/admin/analytics" className="text-sm text-muted-foreground hover:text-foreground">
-                Analytics
-              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -126,7 +135,7 @@ export default async function RoutesPage() {
         </div>
       </header>
       <main className="flex-1 container mx-auto p-6">
-        <RoutesTable routes={routes || []} orders={orders || []} drivers={drivers || []} />
+        <RoutesTable routes={routesWithProgress || []} orders={orders || []} drivers={drivers || []} />
       </main>
     </div>
   )

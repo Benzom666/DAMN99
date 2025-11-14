@@ -12,7 +12,6 @@ interface DispatchMonitorProps {
   routes: any[]
   orders: any[]
   pods: any[]
-  podPhotos: any[]
   driverPositions: any[]
 }
 
@@ -20,7 +19,6 @@ export function DispatchMonitor({
   routes,
   orders,
   pods,
-  podPhotos,
   driverPositions: initialDriverPositions,
 }: DispatchMonitorProps) {
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -59,12 +57,7 @@ export function DispatchMonitor({
     setIsPODDialogOpen(true)
   }
 
-  function getPODPhotos(podId: string) {
-    return podPhotos.filter((p) => p.pod_id === podId)
-  }
-
   const selectedPOD = selectedOrder ? getOrderPOD(selectedOrder.id) : null
-  const selectedPODPhotos = selectedPOD ? getPODPhotos(selectedPOD.id) : []
 
   const allMarkers = orders
     .filter((o) => o.latitude && o.longitude)
@@ -336,14 +329,7 @@ export function DispatchMonitor({
                                 </Button>
                               </>
                             )}
-                            {order.status === "failed" && (
-                              <>
-                                <XCircle className="h-5 w-5 text-red-600" />
-                                <Button variant="ghost" size="sm" onClick={() => handleViewPOD(order)}>
-                                  View POD
-                                </Button>
-                              </>
-                            )}
+                            {order.status === "failed" && <XCircle className="h-5 w-5 text-red-600" />}
                             {order.status === "assigned" && <Clock className="h-5 w-5 text-muted-foreground" />}
                           </div>
                         </div>
@@ -369,27 +355,7 @@ export function DispatchMonitor({
 
           {selectedPOD ? (
             <div className="space-y-4">
-              {selectedPODPhotos.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Delivery Photos ({selectedPODPhotos.length})</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {selectedPODPhotos.map((photo, index) => (
-                      <div key={photo.id} className="relative">
-                        <img
-                          src={photo.photo_url || "/placeholder.svg"}
-                          alt={`Delivery proof ${index + 1}`}
-                          className="w-full rounded-lg border aspect-square object-cover"
-                        />
-                        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                          {index + 1} of {selectedPODPhotos.length}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Fallback to legacy single photo if no pod_photos exist */}
-              {selectedPODPhotos.length === 0 && selectedPOD.photo_url && (
+              {selectedPOD.photo_url && (
                 <div>
                   <p className="text-sm font-medium mb-2">Photo</p>
                   <img
@@ -422,8 +388,8 @@ export function DispatchMonitor({
                 </div>
               )}
               <div>
-                <p className="text-sm font-medium mb-1">Delivered At</p>
-                <p className="text-base">{new Date(selectedPOD.delivered_at).toLocaleString()}</p>
+                <p className="text-sm font-medium mb-1">Captured At</p>
+                <p className="text-base">{new Date(selectedPOD.captured_at).toLocaleString()}</p>
               </div>
             </div>
           ) : (

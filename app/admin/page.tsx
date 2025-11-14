@@ -1,9 +1,9 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { Package, Route, Radio } from "lucide-react"
+import { Package, Route, Radio } from 'lucide-react'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -16,9 +16,20 @@ export default async function AdminDashboard() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle()
 
-  if (!profile || profile.role !== "admin") {
+  // If no profile exists, redirect to complete profile
+  if (!profile) {
+    console.log("[v0] [ADMIN] No profile found, redirecting to complete profile")
+    redirect("/auth/complete-profile")
+  }
+
+  // If not an admin or super_admin, redirect to driver
+  if (profile.role !== "admin" && profile.role !== "super_admin") {
     redirect("/driver")
   }
 
@@ -68,9 +79,11 @@ export default async function AdminDashboard() {
               <Link href="/admin/dispatch" className="text-sm text-muted-foreground hover:text-foreground">
                 Dispatch
               </Link>
-              <Link href="/admin/analytics" className="text-sm text-muted-foreground hover:text-foreground">
-                Analytics
-              </Link>
+              {profile.role === "super_admin" && (
+                <Link href="/super-admin" className="text-sm text-purple-600 hover:text-purple-700 font-medium">
+                  Super Admin
+                </Link>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -153,14 +166,6 @@ export default async function AdminDashboard() {
                 <CardHeader>
                   <CardTitle>Dispatch</CardTitle>
                   <CardDescription>Monitor active deliveries in real-time</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-            <Link href="/admin/analytics">
-              <Card className="cursor-pointer hover:bg-accent transition-colors">
-                <CardHeader>
-                  <CardTitle>Analytics</CardTitle>
-                  <CardDescription>View detailed metrics and reports</CardDescription>
                 </CardHeader>
               </Card>
             </Link>

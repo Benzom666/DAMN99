@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Ban } from 'lucide-react'
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect } from "react"
 
 export default function LoginPage() {
@@ -16,17 +18,43 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isChecking, setIsChecking] = useState(true)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  const isSuspended = searchParams.get('suspended') === 'true'
 
   useEffect(() => {
     const checkUser = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()
+      
       if (user) {
-        router.replace("/admin")
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle()
+
+        if (!profile) {
+          router.replace("/auth/complete-profile")
+          return
+        }
+
+        // Profile exists, redirect based on role
+        if (profile.role === "super_admin") {
+          router.replace("/super-admin")
+        } else if (profile.role === "admin") {
+          router.replace("/admin")
+        } else {
+          router.replace("/driver")
+        }
+        return
       }
+      
+      setIsChecking(false)
     }
     checkUser()
   }, [router, supabase])
@@ -43,11 +71,40 @@ export default function LoginPage() {
       })
       if (error) throw error
 
-      router.replace("/admin")
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Login failed")
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (!profile) {
+        router.replace("/auth/complete-profile")
+        return
+      }
+
+      // Redirect based on role
+      if (profile.role === "super_admin") {
+        router.replace("/super-admin")
+      } else if (profile.role === "admin") {
+        router.replace("/admin")
+      } else {
+        router.replace("/driver")
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
       setIsLoading(false)
     }
+  }
+
+  if (isChecking) {
+    return (
+      <div className="flex min-h-svh w-full items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    )
   }
 
   return (
@@ -59,6 +116,15 @@ export default function LoginPage() {
             <CardDescription>Sign in to access your dashboard</CardDescription>
           </CardHeader>
           <CardContent>
+            {isSuspended && (
+              <Alert variant="destructive" className="mb-4">
+                <Ban className="h-4 w-4" />
+                <AlertDescription>
+                  Your account has been suspended. Please contact support for assistance.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleLogin}>
               <div className="flex flex-col gap-6">
                 <div className="grid gap-2">

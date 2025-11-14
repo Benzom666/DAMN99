@@ -79,44 +79,7 @@ export async function POST(req: Request) {
       return j(400, { ok: false, error: "POD missing", detail: pe })
     }
 
-    const { data: podPhotos } = await supabase
-      .from("pod_photos")
-      .select("photo_url")
-      .eq("pod_id", podId)
-      .order("photo_order", { ascending: true })
-
-    const allPhotos = podPhotos || []
-
     const fullAddress = [order.address, order.city, order.state, order.zip].filter(Boolean).join(", ")
-
-    let photosHtml = ""
-    if (allPhotos.length > 0) {
-      photosHtml = `
-        <div style="margin: 20px 0;">
-          <p style="font-weight: bold; margin-bottom: 10px;">Delivery Photos (${allPhotos.length}):</p>
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-            ${allPhotos
-              .map(
-                (photo, index) => `
-              <div>
-                <a href="${photo.photo_url}" target="_blank">
-                  <img src="${photo.photo_url}" alt="Delivery photo ${index + 1}" 
-                       style="width: 100%; border-radius: 8px; border: 1px solid #ddd;" />
-                </a>
-                <p style="text-align: center; font-size: 12px; color: #666; margin-top: 5px;">
-                  Photo ${index + 1} of ${allPhotos.length}
-                </p>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        </div>
-      `
-    } else if (pod.photo_url) {
-      // Fallback to legacy single photo
-      photosHtml = `<p><a href="${pod.photo_url}">View delivery photo</a></p>`
-    }
 
     const html = `
       <h2>Delivery Complete – Order ${order.id.slice(0, 8)}</h2>
@@ -124,7 +87,7 @@ export async function POST(req: Request) {
       <p><b>Delivered at:</b> ${pod.delivered_at ?? new Date().toISOString()}</p>
       <p><b>Address:</b> ${fullAddress}</p>
       ${pod.notes ? `<p><b>Notes:</b> ${pod.notes}</p>` : ""}
-      ${photosHtml}
+      ${pod.photo_url ? `<p><a href="${pod.photo_url}">View delivery photo</a></p>` : ""}
       ${pod.signature_url ? `<p><a href="${pod.signature_url}">View signature</a></p>` : ""}
     `.trim()
 
