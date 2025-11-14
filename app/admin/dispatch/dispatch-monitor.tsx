@@ -438,29 +438,6 @@ export function DispatchMonitor({
                 <p className="text-sm font-medium mb-1">Delivered At</p>
                 <p className="text-base">{new Date(selectedPOD.delivered_at).toLocaleString()}</p>
               </div>
-              {(selectedPOD.delivery_latitude && selectedPOD.delivery_longitude) && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Delivery Location</p>
-                  <div className="bg-muted p-3 rounded-lg space-y-2">
-                    <p className="text-sm font-mono">
-                      {Number(selectedPOD.delivery_latitude).toFixed(6)}, {Number(selectedPOD.delivery_longitude).toFixed(6)}
-                    </p>
-                    <a
-                      href={`https://www.google.com/maps?q=${selectedPOD.delivery_latitude},${selectedPOD.delivery_longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                      View on Google Maps →
-                    </a>
-                    {selectedPOD.delivery_accuracy && (
-                      <p className="text-xs text-muted-foreground">
-                        GPS Accuracy: ±{Math.round(selectedPOD.delivery_accuracy)}m
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             <p className="text-muted-foreground">No proof of delivery available</p>

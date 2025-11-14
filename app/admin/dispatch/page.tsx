@@ -59,8 +59,11 @@ export default async function DispatchPage() {
   let pods = []
   let podPhotos = []
   if (deliveredOrFailedOrderIds.length > 0) {
-    const { data } = await supabase.from("pods").select("*, delivery_latitude, delivery_longitude, delivery_accuracy").in("order_id", deliveredOrFailedOrderIds)
+    const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrFailedOrderIds)
     pods = data || []
+    
+    console.log("[v0] [DISPATCH] Fetched pods count:", pods.length)
+    console.log("[v0] [DISPATCH] Pod order IDs:", pods.map((p: any) => p.order_id))
     
     if (pods.length > 0) {
       const podIds = pods.map((p: any) => p.id)
@@ -71,6 +74,7 @@ export default async function DispatchPage() {
         .order("photo_order", { ascending: true })
       
       podPhotos = photosData || []
+      console.log("[v0] [DISPATCH] Fetched pod photos count:", podPhotos.length)
     }
   }
 
