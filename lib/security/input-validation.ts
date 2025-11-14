@@ -1,8 +1,12 @@
 // Input validation and sanitization utilities
-import DOMPurify from "isomorphic-dompurify"
 
+/**
+ * Sanitizes HTML input by removing all HTML tags
+ * This is a simple but effective approach for text-only fields
+ */
 export function sanitizeHtml(input: string): string {
-  return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] })
+  // Remove all HTML tags
+  return input.replace(/<[^>]*>/g, '')
 }
 
 export function validateEmail(email: string): boolean {
