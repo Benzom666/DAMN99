@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { DispatchMonitor } from "./dispatch-monitor"
 import Link from "next/link"
@@ -53,12 +53,12 @@ export default async function DispatchPage() {
     console.log("[v0] [DISPATCH] Fetched orders count:", orders.length)
   }
 
-  // Get PODs for delivered orders
-  const deliveredOrderIds = orders?.filter((o: any) => o.status === "delivered").map((o: any) => o.id) || []
+  // Get PODs for delivered and failed orders
+  const deliveredOrFailedOrderIds = orders?.filter((o: any) => o.status === "delivered" || o.status === "failed").map((o: any) => o.id) || []
 
   let pods = []
-  if (deliveredOrderIds.length > 0) {
-    const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrderIds)
+  if (deliveredOrFailedOrderIds.length > 0) {
+    const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrFailedOrderIds)
     pods = data || []
   }
 
