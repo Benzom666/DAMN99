@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { CheckCircle, Zap, ArrowRight, TrendingDown, Shield } from 'lucide-react'
+import { CheckCircle, Zap, ArrowRight, TrendingDown, Shield, X } from 'lucide-react'
 
 export const metadata = {
   title: "Pricing - Delivery OS | Better Value, Better Results",
@@ -12,22 +12,22 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <Link href="/home" className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+      <nav className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="flex h-20 items-center justify-between">
+            <Link href="/home" className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80">
                 <Zap className="h-6 w-6 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-foreground">Delivery OS</span>
+              <span className="text-2xl font-bold text-foreground tracking-tight">Delivery OS</span>
             </Link>
             <div className="flex items-center gap-4">
               <Link href="/home">
-                <Button variant="ghost" size="sm">Back to Home</Button>
+                <Button variant="ghost" size="sm" className="text-foreground">Back to Home</Button>
               </Link>
               <Link href="/auth/login">
-                <Button size="sm" className="bg-accent hover:bg-accent/90">
-                  Start Free Trial
+                <Button size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                  Get Started
                 </Button>
               </Link>
             </div>
@@ -36,150 +36,42 @@ export default function PricingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20 bg-gradient-to-b from-primary/5 to-background">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-4 py-1.5 text-sm font-medium text-accent mb-6">
+      <section className="py-28 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-background"></div>
+        <div className="container relative mx-auto px-6 lg:px-8">
+          <div className="text-center max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-5 py-2 text-sm font-semibold text-accent mb-8 backdrop-blur-sm">
               <TrendingDown className="h-4 w-4" />
               Up to 40% Less Than Competitors
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6 text-balance">
-              Transparent Pricing, <span className="text-primary">Exceptional Value</span>
+            <h1 className="text-6xl md:text-7xl font-bold text-foreground mb-8 text-balance tracking-tighter">
+              Pricing
             </h1>
-            <p className="text-xl text-muted-foreground text-pretty leading-relaxed">
-              Get more features at better prices. Start with a 14-day free trial—no credit card required. Scale as you grow with flexible, affordable pricing.
+            <p className="text-xl md:text-2xl text-muted-foreground text-balance leading-relaxed">
+              Get more features at better prices. Start with a 14-day free trial—no credit card required.
             </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Comparison Table */}
-      <section className="py-16">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              See How We Compare
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Same features, better prices, superior support
-            </p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b-2 border-border">
-                  <th className="text-left p-4 font-semibold text-foreground">Feature</th>
-                  <th className="text-center p-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20">
-                      <Zap className="h-4 w-4 text-accent" />
-                      <span className="font-bold text-accent">Delivery OS</span>
-                    </div>
-                  </th>
-                  <th className="text-center p-4 font-semibold text-muted-foreground">Competitor A</th>
-                  <th className="text-center p-4 font-semibold text-muted-foreground">Competitor B</th>
-                  <th className="text-center p-4 font-semibold text-muted-foreground">Competitor C</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                <tr className="bg-accent/5">
-                  <td className="p-4 font-semibold text-foreground">Starting Price/Month</td>
-                  <td className="p-4 text-center">
-                    <span className="text-2xl font-bold text-accent">$49</span>
-                  </td>
-                  <td className="p-4 text-center text-muted-foreground line-through">$79</td>
-                  <td className="p-4 text-center text-muted-foreground line-through">$89</td>
-                  <td className="p-4 text-center text-muted-foreground line-through">$75</td>
-                </tr>
-                <tr>
-                  <td className="p-4 text-foreground">Route Optimization</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-accent mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                </tr>
-                <tr className="bg-muted/30">
-                  <td className="p-4 text-foreground">Real-Time GPS Tracking</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-accent mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center text-muted-foreground">Limited</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="p-4 text-foreground">Driver Management</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-accent mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center text-muted-foreground">Basic</td>
-                </tr>
-                <tr className="bg-muted/30">
-                  <td className="p-4 text-foreground">Advanced Analytics</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-accent mx-auto" /></td>
-                  <td className="p-4 text-center text-muted-foreground">Add-on $20</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center text-muted-foreground">Add-on $15</td>
-                </tr>
-                <tr>
-                  <td className="p-4 text-foreground">API Access</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-accent mx-auto" /></td>
-                  <td className="p-4 text-center text-muted-foreground">Add-on $30</td>
-                  <td className="p-4 text-center text-muted-foreground">Enterprise Only</td>
-                  <td className="p-4 text-center text-muted-foreground">Add-on $25</td>
-                </tr>
-                <tr className="bg-muted/30">
-                  <td className="p-4 text-foreground">Mobile Apps (iOS & Android)</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-accent mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-muted-foreground mx-auto" /></td>
-                  <td className="p-4 text-center text-muted-foreground">iOS Only</td>
-                </tr>
-                <tr>
-                  <td className="p-4 text-foreground">24/7 Support</td>
-                  <td className="p-4 text-center"><CheckCircle className="h-5 w-5 text-accent mx-auto" /></td>
-                  <td className="p-4 text-center text-muted-foreground">Business Hours</td>
-                  <td className="p-4 text-center text-muted-foreground">Email Only</td>
-                  <td className="p-4 text-center text-muted-foreground">Business Hours</td>
-                </tr>
-                <tr className="bg-muted/30">
-                  <td className="p-4 text-foreground">Free Trial Period</td>
-                  <td className="p-4 text-center"><span className="font-bold text-accent">14 days</span></td>
-                  <td className="p-4 text-center text-muted-foreground">7 days</td>
-                  <td className="p-4 text-center text-muted-foreground">No trial</td>
-                  <td className="p-4 text-center text-muted-foreground">7 days</td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </div>
       </section>
 
       {/* Pricing Cards */}
-      <section className="py-16 bg-gradient-to-b from-background to-primary/5">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Choose Your Plan
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              All plans include 14-day free trial. No credit card required.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+      <section className="py-20">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
             {/* Starter Plan */}
-            <Card className="p-8 border-border flex flex-col">
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold text-foreground mb-2">Starter</h3>
-                <p className="text-muted-foreground">Perfect for small teams</p>
+            <Card className="p-10 border-border/50 bg-card/50 backdrop-blur-sm flex flex-col hover:shadow-2xl transition-shadow">
+              <div className="mb-8">
+                <h3 className="text-3xl font-bold text-foreground mb-3">Starter</h3>
+                <p className="text-muted-foreground text-base">Perfect for small teams</p>
               </div>
-              <div className="mb-6">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-bold text-foreground">$49</span>
-                  <span className="text-muted-foreground">/month</span>
+              <div className="mb-10">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-6xl font-bold text-foreground">$49</span>
+                  <span className="text-muted-foreground text-lg">/month</span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">Up to 100 deliveries/month</p>
+                <p className="text-sm text-muted-foreground mt-3">Up to 100 deliveries/month</p>
               </div>
-              <ul className="space-y-3 mb-8 flex-grow">
+              <ul className="space-y-4 mb-10 flex-grow">
                 {[
                   "Route optimization",
                   "Real-time GPS tracking",
@@ -188,36 +80,36 @@ export default function PricingPage() {
                   "Email support",
                   "API access",
                 ].map((feature, index) => (
-                  <li key={index} className="flex items-start gap-2">
+                  <li key={index} className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                    <span className="text-sm text-foreground">{feature}</span>
+                    <span className="text-foreground">{feature}</span>
                   </li>
                 ))}
               </ul>
               <Link href="/auth/login" className="w-full">
-                <Button className="w-full" variant="outline">
+                <Button className="w-full h-12 text-base font-semibold" variant="outline">
                   Start Free Trial
                 </Button>
               </Link>
             </Card>
 
             {/* Professional Plan */}
-            <Card className="p-8 border-2 border-accent shadow-xl flex flex-col relative">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground px-4 py-1 rounded-full text-sm font-medium">
+            <Card className="p-10 border-2 border-accent shadow-2xl flex flex-col relative bg-card/80 backdrop-blur-sm scale-105">
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground px-6 py-2 rounded-full text-sm font-bold">
                 Most Popular
               </div>
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold text-foreground mb-2">Professional</h3>
-                <p className="text-muted-foreground">For growing businesses</p>
+              <div className="mb-8">
+                <h3 className="text-3xl font-bold text-foreground mb-3">Professional</h3>
+                <p className="text-muted-foreground text-base">For growing businesses</p>
               </div>
-              <div className="mb-6">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-bold text-foreground">$99</span>
-                  <span className="text-muted-foreground">/month</span>
+              <div className="mb-10">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-6xl font-bold text-foreground">$99</span>
+                  <span className="text-muted-foreground text-lg">/month</span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">Up to 500 deliveries/month</p>
+                <p className="text-sm text-muted-foreground mt-3">Up to 500 deliveries/month</p>
               </div>
-              <ul className="space-y-3 mb-8 flex-grow">
+              <ul className="space-y-4 mb-10 flex-grow">
                 {[
                   "Everything in Starter",
                   "Advanced route optimization",
@@ -227,14 +119,14 @@ export default function PricingPage() {
                   "Custom integrations",
                   "Multi-user access",
                 ].map((feature, index) => (
-                  <li key={index} className="flex items-start gap-2">
+                  <li key={index} className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-                    <span className="text-sm text-foreground">{feature}</span>
+                    <span className="text-foreground">{feature}</span>
                   </li>
                 ))}
               </ul>
               <Link href="/auth/login" className="w-full">
-                <Button className="w-full bg-accent hover:bg-accent/90">
+                <Button className="w-full h-12 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -242,19 +134,19 @@ export default function PricingPage() {
             </Card>
 
             {/* Enterprise Plan */}
-            <Card className="p-8 border-border flex flex-col">
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold text-foreground mb-2">Enterprise</h3>
-                <p className="text-muted-foreground">For large operations</p>
+            <Card className="p-10 border-border/50 bg-card/50 backdrop-blur-sm flex flex-col hover:shadow-2xl transition-shadow">
+              <div className="mb-8">
+                <h3 className="text-3xl font-bold text-foreground mb-3">Enterprise</h3>
+                <p className="text-muted-foreground text-base">For large operations</p>
               </div>
-              <div className="mb-6">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-bold text-foreground">$299</span>
-                  <span className="text-muted-foreground">/month</span>
+              <div className="mb-10">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-6xl font-bold text-foreground">$299</span>
+                  <span className="text-muted-foreground text-lg">/month</span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">Unlimited deliveries</p>
+                <p className="text-sm text-muted-foreground mt-3">Unlimited deliveries</p>
               </div>
-              <ul className="space-y-3 mb-8 flex-grow">
+              <ul className="space-y-4 mb-10 flex-grow">
                 {[
                   "Everything in Professional",
                   "Dedicated account manager",
@@ -265,14 +157,14 @@ export default function PricingPage() {
                   "Training & onboarding",
                   "Custom contracts",
                 ].map((feature, index) => (
-                  <li key={index} className="flex items-start gap-2">
+                  <li key={index} className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                    <span className="text-sm text-foreground">{feature}</span>
+                    <span className="text-foreground">{feature}</span>
                   </li>
                 ))}
               </ul>
               <Link href="/auth/login" className="w-full">
-                <Button className="w-full" variant="outline">
+                <Button className="w-full h-12 text-base font-semibold" variant="outline">
                   Contact Sales
                 </Button>
               </Link>
@@ -281,20 +173,106 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Value Proposition */}
-      <section className="py-24">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+      {/* Comparison Table */}
+      <section className="py-28 bg-gradient-to-b from-background via-card/30 to-background">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-5 tracking-tight">
+              See How We Compare
+            </h2>
+            <p className="text-xl text-muted-foreground">
+              Same features, better prices, superior support
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-border/50">
+                  <th className="text-left p-6 font-bold text-foreground text-lg">Feature</th>
+                  <th className="text-center p-6">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/20 border border-accent/30">
+                      <Zap className="h-5 w-5 text-accent" />
+                      <span className="font-bold text-accent text-base">Delivery OS</span>
+                    </div>
+                  </th>
+                  <th className="text-center p-6 font-semibold text-muted-foreground">Competitor A</th>
+                  <th className="text-center p-6 font-semibold text-muted-foreground">Competitor B</th>
+                  <th className="text-center p-6 font-semibold text-muted-foreground">Competitor C</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                <tr className="bg-accent/5">
+                  <td className="p-6 font-bold text-foreground text-base">Starting Price/Month</td>
+                  <td className="p-6 text-center">
+                    <span className="text-3xl font-bold text-accent">$49</span>
+                  </td>
+                  <td className="p-6 text-center text-muted-foreground line-through text-lg">$79</td>
+                  <td className="p-6 text-center text-muted-foreground line-through text-lg">$89</td>
+                  <td className="p-6 text-center text-muted-foreground line-through text-lg">$75</td>
+                </tr>
+                <tr>
+                  <td className="p-6 text-foreground">Route Optimization</td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-accent mx-auto" /></td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-muted-foreground mx-auto" /></td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-muted-foreground mx-auto" /></td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-muted-foreground mx-auto" /></td>
+                </tr>
+                <tr className="bg-card/30">
+                  <td className="p-6 text-foreground">Real-Time GPS Tracking</td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-accent mx-auto" /></td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-muted-foreground mx-auto" /></td>
+                  <td className="p-6 text-center text-muted-foreground">Limited</td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-muted-foreground mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="p-6 text-foreground">Advanced Analytics</td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-accent mx-auto" /></td>
+                  <td className="p-6 text-center text-muted-foreground">Add-on $20</td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-muted-foreground mx-auto" /></td>
+                  <td className="p-6 text-center text-muted-foreground">Add-on $15</td>
+                </tr>
+                <tr className="bg-card/30">
+                  <td className="p-6 text-foreground">API Access</td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-accent mx-auto" /></td>
+                  <td className="p-6 text-center text-muted-foreground">Add-on $30</td>
+                  <td className="p-6 text-center text-muted-foreground">Enterprise Only</td>
+                  <td className="p-6 text-center text-muted-foreground">Add-on $25</td>
+                </tr>
+                <tr>
+                  <td className="p-6 text-foreground">24/7 Support</td>
+                  <td className="p-6 text-center"><CheckCircle className="h-6 w-6 text-accent mx-auto" /></td>
+                  <td className="p-6 text-center text-muted-foreground">Business Hours</td>
+                  <td className="p-6 text-center"><X className="h-6 w-6 text-muted-foreground/30 mx-auto" /></td>
+                  <td className="p-6 text-center text-muted-foreground">Business Hours</td>
+                </tr>
+                <tr className="bg-card/30">
+                  <td className="p-6 text-foreground">Free Trial Period</td>
+                  <td className="p-6 text-center"><span className="font-bold text-accent text-lg">14 days</span></td>
+                  <td className="p-6 text-center text-muted-foreground">7 days</td>
+                  <td className="p-6 text-center text-muted-foreground">No trial</td>
+                  <td className="p-6 text-center text-muted-foreground">7 days</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Value Props */}
+      <section className="py-28">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-20">
+              <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-5 tracking-tight">
                 Why Delivery OS Offers Better Value
               </h2>
-              <p className="text-lg text-muted-foreground">
-                We believe in transparent pricing with no hidden fees
+              <p className="text-xl text-muted-foreground">
+                Transparent pricing with no hidden fees
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8">
+            <div className="grid md:grid-cols-2 gap-10">
               {[
                 {
                   icon: Shield,
@@ -317,12 +295,12 @@ export default function PricingPage() {
                   description: "Twice as long as most competitors. Test everything with real deliveries before committing a single dollar.",
                 },
               ].map((item, index) => (
-                <div key={index} className="flex gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <item.icon className="h-6 w-6 text-primary" />
+                <div key={index} className="flex gap-5">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <item.icon className="h-8 w-8 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-lg text-foreground mb-2">{item.title}</h3>
+                    <h3 className="font-bold text-xl text-foreground mb-3">{item.title}</h3>
                     <p className="text-muted-foreground leading-relaxed">{item.description}</p>
                   </div>
                 </div>
@@ -332,54 +310,20 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-16 bg-muted/30">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl font-bold text-foreground mb-8 text-center">
-              Frequently Asked Questions
-            </h2>
-            <div className="space-y-6">
-              {[
-                {
-                  q: "Is the 14-day trial really free?",
-                  a: "Yes! No credit card required, no commitments. Get full access to all features for 14 days. Cancel anytime.",
-                },
-                {
-                  q: "Can I change plans later?",
-                  a: "Absolutely. Upgrade or downgrade anytime. Changes take effect on your next billing cycle with prorated adjustments.",
-                },
-                {
-                  q: "What happens if I exceed my delivery limit?",
-                  a: "We'll notify you before you hit the limit. You can upgrade your plan or purchase additional delivery credits at discounted rates.",
-                },
-                {
-                  q: "Do you offer annual discounts?",
-                  a: "Yes! Save 20% when you pay annually. Contact our sales team for custom pricing on multi-year contracts.",
-                },
-              ].map((faq, index) => (
-                <Card key={index} className="p-6 border-border">
-                  <h3 className="font-semibold text-foreground mb-2">{faq.q}</h3>
-                  <p className="text-muted-foreground">{faq.a}</p>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Final CTA */}
-      <section className="py-24 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-balance">
+      <section className="py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-accent"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+        <div className="container relative mx-auto px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-5xl md:text-6xl font-bold mb-8 text-balance text-white tracking-tight">
               Start Your Free 14-Day Trial Today
             </h2>
-            <p className="text-xl mb-8 text-primary-foreground/90 text-pretty">
-              No credit card required. Full access to all features. Cancel anytime. Join 1,000+ businesses transforming their delivery operations.
+            <p className="text-xl mb-12 text-white/90 text-balance">
+              No credit card required. Full access to all features. Cancel anytime.
             </p>
             <Link href="/auth/login">
-              <Button size="lg" variant="secondary" className="text-lg h-12 px-8">
+              <Button size="lg" variant="secondary" className="text-lg h-14 px-10 font-semibold">
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -389,14 +333,14 @@ export default function PricingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card py-12">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <Link href="/home" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+      <footer className="border-t border-border/50 bg-card/30 backdrop-blur-sm py-16">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <Link href="/home" className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80">
                 <Zap className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-lg font-bold text-foreground">Delivery OS</span>
+              <span className="text-xl font-bold text-foreground tracking-tight">Delivery OS</span>
             </Link>
             <p className="text-sm text-muted-foreground">
               © 2025 Delivery OS. All rights reserved.
