@@ -375,7 +375,7 @@ SELECT * FROM driver_positions WHERE driver_id != auth.uid();
 -- Expected: Error (can only see own position)
 
 -- As admin
-SELECT * FROM driver_positions;
+SELECT COUNT(*) FROM driver_positions;
 -- Expected: All positions
 \`\`\`
 
@@ -462,6 +462,7 @@ If critical issues are discovered in production:
 - [ ] All features working in production
 - [ ] No critical errors in logs
 - [ ] Performance meets benchmarks
+- [ ] Security audit passed
 - [ ] User acceptance testing complete
 - [ ] Documentation updated
 

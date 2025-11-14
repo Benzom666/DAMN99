@@ -28,7 +28,6 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 HERE_API_KEY=your-here-api-key
-NEXT_PUBLIC_HERE_API_KEY=your-here-api-key
 BLOB_READ_WRITE_TOKEN=auto-generated-by-vercel
 \`\`\`
 
@@ -242,7 +241,3 @@ Before marking deployment complete:
 - [ ] Documentation updated
 
 **Your delivery management system is now production-ready! 🎉**
-\`\`\`
-
-```md file="EMERGENCY_FIX_NOW.md" isDeleted="true"
-...deleted...
