@@ -12,6 +12,7 @@ interface DispatchMonitorProps {
   routes: any[]
   orders: any[]
   pods: any[]
+  podPhotos: any[]
   driverPositions: any[]
 }
 
@@ -19,6 +20,7 @@ export function DispatchMonitor({
   routes,
   orders,
   pods,
+  podPhotos,
   driverPositions: initialDriverPositions,
 }: DispatchMonitorProps) {
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -52,12 +54,17 @@ export function DispatchMonitor({
     return pods.find((p) => p.order_id === orderId)
   }
 
+  function getPodPhotos(podId: string) {
+    return podPhotos.filter((pp) => pp.pod_id === podId)
+  }
+
   function handleViewPOD(order: any) {
     setSelectedOrder(order)
     setIsPODDialogOpen(true)
   }
 
   const selectedPOD = selectedOrder ? getOrderPOD(selectedOrder.id) : null
+  const selectedPodPhotos = selectedPOD ? getPodPhotos(selectedPOD.id) : []
 
   const allMarkers = orders
     .filter((o) => o.latitude && o.longitude)
@@ -352,7 +359,7 @@ export function DispatchMonitor({
 
       {/* POD Dialog */}
       <Dialog open={isPODDialogOpen} onOpenChange={setIsPODDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Proof of Delivery</DialogTitle>
             <DialogDescription>
@@ -362,32 +369,32 @@ export function DispatchMonitor({
 
           {selectedPOD ? (
             <div className="space-y-4">
-              {selectedPOD.photo_urls && selectedPOD.photo_urls.length > 0 && (
+              {selectedPodPhotos.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium mb-2">Photos</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedPOD.photo_urls.map((url: string, index: number) => (
-                      <div key={index}>
+                  <p className="text-sm font-medium mb-2">Photos ({selectedPodPhotos.length})</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedPodPhotos.map((photo: any) => (
+                      <div key={photo.id} className="space-y-2">
                         <img
-                          src={url || "/placeholder.svg"}
-                          alt={`Delivery Photo ${index + 1}`}
+                          src={photo.photo_url || "/placeholder.svg"}
+                          alt={`Delivery Photo ${photo.photo_order}`}
                           className="w-full aspect-square object-cover rounded-lg border"
                         />
                         <a 
-                          href={url} 
+                          href={photo.photo_url} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline block mt-1"
+                          className="text-xs text-primary hover:underline block"
                         >
-                          View Full Size
+                          View Full Size Photo {photo.photo_order}
                         </a>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-              {/* Fallback for old single photo_url */}
-              {(!selectedPOD.photo_urls || selectedPOD.photo_urls.length === 0) && selectedPOD.photo_url && (
+              {/* Fallback for old single photo_url if no photos in pod_photos table */}
+              {selectedPodPhotos.length === 0 && selectedPOD.photo_url && (
                 <div>
                   <p className="text-sm font-medium mb-2">Photo</p>
                   <img
@@ -395,6 +402,14 @@ export function DispatchMonitor({
                     alt="Delivery proof"
                     className="w-full rounded-lg border"
                   />
+                  <a 
+                    href={selectedPOD.photo_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline block mt-2"
+                  >
+                    View Full Size
+                  </a>
                 </div>
               )}
               {selectedPOD.signature_url && (
@@ -403,7 +418,7 @@ export function DispatchMonitor({
                   <img
                     src={selectedPOD.signature_url || "/placeholder.svg"}
                     alt="Signature"
-                    className="w-full rounded-lg border bg-white"
+                    className="w-full rounded-lg border bg-white dark:bg-muted"
                   />
                 </div>
               )}
@@ -420,8 +435,8 @@ export function DispatchMonitor({
                 </div>
               )}
               <div>
-                <p className="text-sm font-medium mb-1">Captured At</p>
-                <p className="text-base">{new Date(selectedPOD.captured_at).toLocaleString()}</p>
+                <p className="text-sm font-medium mb-1">Delivered At</p>
+                <p className="text-base">{new Date(selectedPOD.delivered_at).toLocaleString()}</p>
               </div>
             </div>
           ) : (

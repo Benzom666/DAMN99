@@ -27,15 +27,24 @@ async function sendPODEmail(orderId: string, podId: string) {
 
     const { data: pod } = await supabase
       .from("pods")
-      .select("photo_urls, photo_url, signature_url, recipient_name, notes, delivered_at")
+      .select("photo_url, signature_url, recipient_name, notes, delivered_at")
       .eq("id", podId)
       .maybeSingle()
+
+    // Fetch all photos for this POD
+    const { data: podPhotos } = await supabase
+      .from("pod_photos")
+      .select("photo_url, photo_order")
+      .eq("pod_id", podId)
+      .order("photo_order", { ascending: true })
 
     const deliveryAddress =
       order.delivery_address || order.full_address || order.address || order.address_line1 || "Address not available"
     const orderNumber = order.order_number || order.id.substring(0, 8).toUpperCase()
 
-    const photoUrls = pod?.photo_urls && pod.photo_urls.length > 0 ? pod.photo_urls : (pod?.photo_url ? [pod.photo_url] : [])
+    const photoUrls = podPhotos && podPhotos.length > 0 
+      ? podPhotos.map(p => p.photo_url) 
+      : (pod?.photo_url ? [pod.photo_url] : [])
 
     const emailData = {
       personalizations: [
@@ -192,7 +201,6 @@ export async function POST(request: Request) {
       .insert({
         order_id: orderId,
         driver_id: user.id,
-        photo_urls: photoUrls, // Save as array
         photo_url: photoUrls[0] || null, // Keep first photo for backward compatibility
         signature_url: signatureUrl,
         recipient_name: sanitizedRecipient,
@@ -205,6 +213,22 @@ export async function POST(request: Request) {
     if (podError) {
       console.error("[v0] POD save error:", podError)
       return NextResponse.json({ success: false, error: "Failed to save POD" }, { status: 500 })
+    }
+
+    if (photoUrls.length > 0) {
+      const photosToInsert = photoUrls.map((url, index) => ({
+        pod_id: podData.id,
+        photo_url: url,
+        photo_order: index + 1,
+      }))
+
+      const { error: photosError } = await supabase
+        .from("pod_photos")
+        .insert(photosToInsert)
+
+      if (photosError) {
+        console.error("[v0] Error saving photos:", photosError)
+      }
     }
 
     // Update order status

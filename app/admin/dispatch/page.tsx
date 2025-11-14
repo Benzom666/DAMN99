@@ -54,13 +54,24 @@ export default async function DispatchPage() {
     console.log("[v0] [DISPATCH] Fetched orders count:", orders.length)
   }
 
-  // Get PODs for delivered and failed orders
   const deliveredOrFailedOrderIds = orders?.filter((o: any) => o.status === "delivered" || o.status === "failed").map((o: any) => o.id) || []
 
   let pods = []
+  let podPhotos = []
   if (deliveredOrFailedOrderIds.length > 0) {
     const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrFailedOrderIds)
     pods = data || []
+    
+    if (pods.length > 0) {
+      const podIds = pods.map((p: any) => p.id)
+      const { data: photosData } = await supabase
+        .from("pod_photos")
+        .select("*")
+        .in("pod_id", podIds)
+        .order("photo_order", { ascending: true })
+      
+      podPhotos = photosData || []
+    }
   }
 
   const driverIds = routes?.map((r) => r.driver_id).filter(Boolean) || []
@@ -107,6 +118,7 @@ export default async function DispatchPage() {
           routes={routes || []}
           orders={orders || []}
           pods={pods || []}
+          podPhotos={podPhotos || []}
           driverPositions={driverPositions || []}
         />
       </main>
