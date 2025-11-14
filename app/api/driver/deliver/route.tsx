@@ -27,13 +27,15 @@ async function sendPODEmail(orderId: string, podId: string) {
 
     const { data: pod } = await supabase
       .from("pods")
-      .select("photo_url, signature_url, recipient_name, notes, delivered_at")
+      .select("photo_urls, photo_url, signature_url, recipient_name, notes, delivered_at")
       .eq("id", podId)
       .maybeSingle()
 
     const deliveryAddress =
       order.delivery_address || order.full_address || order.address || order.address_line1 || "Address not available"
     const orderNumber = order.order_number || order.id.substring(0, 8).toUpperCase()
+
+    const photoUrls = pod?.photo_urls && pod.photo_urls.length > 0 ? pod.photo_urls : (pod?.photo_url ? [pod.photo_url] : [])
 
     const emailData = {
       personalizations: [
@@ -61,24 +63,16 @@ async function sendPODEmail(orderId: string, podId: string) {
               </div>
 
               ${
-                pod?.photo_url
+                photoUrls.length > 0
                   ? `
                 <div style="margin: 20px 0;">
-                  <p><strong>Delivery Photo:</strong></p>
-                  <img src="${pod.photo_url}" alt="Delivery Photo" style="max-width: 100%; height: auto; border-radius: 8px;" />
-                  <p><a href="${pod.photo_url}" style="color: #2563eb;">View Full Size</a></p>
-                </div>
-              `
-                  : ""
-              }
-
-              ${
-                pod?.signature_url
-                  ? `
-                <div style="margin: 20px 0;">
-                  <p><strong>Signature:</strong></p>
-                  <img src="${pod.signature_url}" alt="Signature" style="max-width: 300px; height: auto; border: 1px solid #e5e7eb; border-radius: 8px;" />
-                  <p><a href="${pod.signature_url}" style="color: #2563eb;">View Full Size</a></p>
+                  <p><strong>Delivery Photos:</strong></p>
+                  ${photoUrls.map((url: string, index: number) => `
+                    <div style="margin-bottom: 15px;">
+                      <img src="${url}" alt="Delivery Photo ${index + 1}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+                      <p><a href="${url}" style="color: #2563eb;">View Full Size Photo ${index + 1}</a></p>
+                    </div>
+                  `).join('')}
                 </div>
               `
                   : ""
@@ -145,7 +139,7 @@ export async function POST(request: Request) {
     const { user } = await requireDriver()
 
     const body = await request.json()
-    const { orderId, photoData, signatureData, recipientName, notes } = body
+    const { orderId, photoDataArray, signatureData, recipientName, notes } = body
 
     if (!validateUUID(orderId)) {
       return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 })
@@ -166,15 +160,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
     }
 
-    // Upload photo
-    let photoUrl = null
-    if (photoData) {
-      const photoBlob = base64ToBlob(photoData)
-      const uploaded = await put(`pod-photos/${orderId}-${Date.now()}.jpg`, photoBlob, {
-        access: "public",
-        contentType: "image/jpeg",
-      })
-      photoUrl = uploaded.url
+    const photoUrls: string[] = []
+    if (photoDataArray && Array.isArray(photoDataArray) && photoDataArray.length > 0) {
+      console.log("[v0] Uploading", photoDataArray.length, "photos")
+      
+      for (let i = 0; i < Math.min(photoDataArray.length, 4); i++) {
+        const photoData = photoDataArray[i]
+        const photoBlob = base64ToBlob(photoData)
+        const uploaded = await put(`pod-photos/${orderId}-${Date.now()}-${i}.jpg`, photoBlob, {
+          access: "public",
+          contentType: "image/jpeg",
+        })
+        photoUrls.push(uploaded.url)
+        console.log(`[v0] Photo ${i + 1} uploaded:`, uploaded.url)
+      }
     }
 
     // Upload signature
@@ -188,13 +187,13 @@ export async function POST(request: Request) {
       signatureUrl = uploaded.url
     }
 
-    // Save POD
     const { data: podData, error: podError } = await supabase
       .from("pods")
       .insert({
         order_id: orderId,
         driver_id: user.id,
-        photo_url: photoUrl,
+        photo_urls: photoUrls, // Save as array
+        photo_url: photoUrls[0] || null, // Keep first photo for backward compatibility
         signature_url: signatureUrl,
         recipient_name: sanitizedRecipient,
         notes: sanitizedNotes,
@@ -204,6 +203,7 @@ export async function POST(request: Request) {
       .single()
 
     if (podError) {
+      console.error("[v0] POD save error:", podError)
       return NextResponse.json({ success: false, error: "Failed to save POD" }, { status: 500 })
     }
 
@@ -220,6 +220,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Failed to update order status" }, { status: 500 })
     }
 
+    // Send POD email (photos only, no signature)
     if (process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
       await sendPODEmail(orderId, podData.id)
     }

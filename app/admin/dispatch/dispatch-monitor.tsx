@@ -362,7 +362,32 @@ export function DispatchMonitor({
 
           {selectedPOD ? (
             <div className="space-y-4">
-              {selectedPOD.photo_url && (
+              {selectedPOD.photo_urls && selectedPOD.photo_urls.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Photos</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedPOD.photo_urls.map((url: string, index: number) => (
+                      <div key={index}>
+                        <img
+                          src={url || "/placeholder.svg"}
+                          alt={`Delivery Photo ${index + 1}`}
+                          className="w-full aspect-square object-cover rounded-lg border"
+                        />
+                        <a 
+                          href={url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline block mt-1"
+                        >
+                          View Full Size
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Fallback for old single photo_url */}
+              {(!selectedPOD.photo_urls || selectedPOD.photo_urls.length === 0) && selectedPOD.photo_url && (
                 <div>
                   <p className="text-sm font-medium mb-2">Photo</p>
                   <img

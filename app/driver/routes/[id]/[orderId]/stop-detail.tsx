@@ -3,13 +3,13 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle, X } from 'lucide-react'
 import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
 import { useToast } from "@/hooks/use-toast"
@@ -26,24 +26,43 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const { toast } = useToast()
   const [notes, setNotes] = useState("")
   const [recipientName, setRecipientName] = useState("")
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(existingPod?.photo_url || null)
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>(existingPod?.photo_urls || existingPod?.photo_url ? [existingPod.photo_url] : [])
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
+  const MAX_PHOTOS = 4
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setPhotoFile(file)
+    const files = Array.from(e.target.files || [])
+    
+    if (photoFiles.length + files.length > MAX_PHOTOS) {
+      toast({
+        title: "Too many photos",
+        description: `You can only upload up to ${MAX_PHOTOS} photos per order.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const newPhotoFiles = [...photoFiles, ...files].slice(0, MAX_PHOTOS)
+    setPhotoFiles(newPhotoFiles)
+
+    // Generate previews for new files
+    files.forEach(file => {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
+        setPhotoPreviews(prev => [...prev, reader.result as string].slice(0, MAX_PHOTOS))
       }
       reader.readAsDataURL(file)
-    }
+    })
+  }
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index))
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSignatureSave = (dataUrl: string) => {
@@ -60,49 +79,55 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     setIsSubmitting(true)
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
-    console.log("[v0] [DRIVER] Has photo:", !!photoFile)
+    console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
     console.log("[v0] [DRIVER] Has signature:", !!signatureData)
     console.log("[v0] [DRIVER] Recipient:", recipientName || "none")
     console.log("[v0] [DRIVER] Notes:", notes || "none")
 
     try {
-      let photoData: string | undefined
-      let signatureDataToSend: string | undefined
+      const photoDataArray: string[] = []
+      
+      if (photoFiles.length > 0) {
+        console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files...")
 
-      if (photoFile) {
-        console.log("[v0] [DRIVER] Reading photo file...")
-        console.log("[v0] [DRIVER] Photo file size:", photoFile.size, "bytes")
-        console.log("[v0] [DRIVER] Photo file type:", photoFile.type)
+        for (let i = 0; i < photoFiles.length; i++) {
+          const file = photoFiles[i]
+          console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
 
-        try {
-          photoData = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-              if (reader.result && typeof reader.result === "string") {
-                console.log("[v0] [DRIVER] Photo read successfully, length:", reader.result.length)
-                resolve(reader.result)
-              } else {
-                console.error("[v0] [DRIVER] Photo read failed: invalid result")
-                reject(new Error("Failed to read photo file"))
+          try {
+            const photoData = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                if (reader.result && typeof reader.result === "string") {
+                  console.log(`[v0] [DRIVER] Photo ${i + 1} read successfully, length:`, reader.result.length)
+                  resolve(reader.result)
+                } else {
+                  console.error(`[v0] [DRIVER] Photo ${i + 1} read failed: invalid result`)
+                  reject(new Error(`Failed to read photo ${i + 1}`))
+                }
               }
-            }
-            reader.onerror = () => {
-              console.error("[v0] [DRIVER] Photo read error:", reader.error)
-              reject(new Error("File reading failed"))
-            }
-            reader.readAsDataURL(photoFile)
-          })
-        } catch (photoError) {
-          console.error("[v0] [DRIVER] Photo processing error:", photoError)
-          toast({
-            title: "Photo Error",
-            description: "Failed to process photo. Please try again.",
-            variant: "destructive",
-          })
-          setIsSubmitting(false)
-          return
+              reader.onerror = () => {
+                console.error(`[v0] [DRIVER] Photo ${i + 1} read error:`, reader.error)
+                reject(new Error(`File reading failed for photo ${i + 1}`))
+              }
+              reader.readAsDataURL(file)
+            })
+            
+            photoDataArray.push(photoData)
+          } catch (photoError) {
+            console.error(`[v0] [DRIVER] Photo ${i + 1} processing error:`, photoError)
+            toast({
+              title: "Photo Error",
+              description: `Failed to process photo ${i + 1}. Please try again.`,
+              variant: "destructive",
+            })
+            setIsSubmitting(false)
+            return
+          }
         }
       }
+
+      let signatureDataToSend: string | undefined
 
       if (signatureData && signatureData !== existingPod?.signature_url) {
         console.log("[v0] [DRIVER] Using signature data, length:", signatureData.length)
@@ -116,7 +141,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       const timeoutId = setTimeout(() => {
         console.error("[v0] [DRIVER] API call timeout after 30 seconds")
         controller.abort()
-      }, 30000) // 30 second timeout
+      }, 30000)
 
       let response: Response
       try {
@@ -127,7 +152,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           },
           body: JSON.stringify({
             orderId: order.id,
-            photoData,
+            photoDataArray, // Send array of photos
             signatureData: signatureDataToSend,
             notes: notes || undefined,
             recipientName: recipientName || undefined,
@@ -340,29 +365,38 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
         {!isCompleted && (
           <>
-            {/* Photo Capture */}
+            {/* Photo Capture - Support up to 4 photos */}
             <Card className="p-4 space-y-3">
-              <Label>Photo (Optional)</Label>
-              {photoPreview ? (
-                <div className="space-y-2">
-                  <img src={photoPreview || "/placeholder.svg"} alt="Delivery proof" className="w-full rounded-lg" />
-                  <Button
-                    variant="outline"
-                    className="w-full bg-transparent"
-                    onClick={() => {
-                      setPhotoFile(null)
-                      setPhotoPreview(null)
-                    }}
-                  >
-                    Remove Photo
-                  </Button>
+              <div className="flex items-center justify-between">
+                <Label>Photos (Optional)</Label>
+                <span className="text-sm text-muted-foreground">{photoPreviews.length}/{MAX_PHOTOS}</span>
+              </div>
+              
+              {photoPreviews.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {photoPreviews.map((preview, index) => (
+                    <div key={index} className="relative">
+                      <img src={preview || "/placeholder.svg"} alt={`Delivery proof ${index + 1}`} className="w-full aspect-square object-cover rounded-lg" />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => handleRemovePhoto(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ) : (
+              )}
+              
+              {photoPreviews.length < MAX_PHOTOS && (
                 <div>
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
+                    multiple
                     onChange={handlePhotoChange}
                     className="hidden"
                     id="photo-input"
@@ -371,7 +405,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     <Button variant="outline" className="w-full bg-transparent" asChild>
                       <span>
                         <Camera className="h-4 w-4 mr-2" />
-                        Take Photo
+                        Add Photo {photoPreviews.length > 0 && `(${MAX_PHOTOS - photoPreviews.length} remaining)`}
                       </span>
                     </Button>
                   </label>
@@ -443,7 +477,22 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         {isCompleted && existingPod && (
           <Card className="p-4 space-y-4">
             <h3 className="font-semibold">Proof of Delivery</h3>
-            {existingPod.photo_url && (
+            {(existingPod.photo_urls && existingPod.photo_urls.length > 0) && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Photos</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {existingPod.photo_urls.map((url: string, index: number) => (
+                    <img
+                      key={index}
+                      src={url || "/placeholder.svg"}
+                      alt={`Delivery proof ${index + 1}`}
+                      className="w-full aspect-square object-cover rounded-lg"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {!existingPod.photo_urls && existingPod.photo_url && (
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Photo</p>
                 <img

@@ -70,7 +70,7 @@ export async function POST(req: Request) {
 
     const { data: pod, error: pe } = await supabase
       .from("pods")
-      .select("photo_url, signature_url, notes, delivered_at")
+      .select("photo_urls, photo_url, signature_url, notes, delivered_at")
       .eq("id", podId)
       .single()
 
@@ -81,14 +81,23 @@ export async function POST(req: Request) {
 
     const fullAddress = [order.address, order.city, order.state, order.zip].filter(Boolean).join(", ")
 
+    const photoUrls = pod.photo_urls && pod.photo_urls.length > 0 ? pod.photo_urls : (pod.photo_url ? [pod.photo_url] : [])
+
     const html = `
       <h2>Delivery Complete – Order ${order.id.slice(0, 8)}</h2>
       <p><b>Customer:</b> ${order.customer_name}</p>
       <p><b>Delivered at:</b> ${pod.delivered_at ?? new Date().toISOString()}</p>
       <p><b>Address:</b> ${fullAddress}</p>
       ${pod.notes ? `<p><b>Notes:</b> ${pod.notes}</p>` : ""}
-      ${pod.photo_url ? `<p><a href="${pod.photo_url}">View delivery photo</a></p>` : ""}
-      ${pod.signature_url ? `<p><a href="${pod.signature_url}">View signature</a></p>` : ""}
+      ${
+        photoUrls.length > 0
+          ? photoUrls.map((url: string, index: number) => `
+            <div style="margin: 10px 0;">
+              <p><a href="${url}">View delivery photo ${index + 1}</a></p>
+            </div>
+          `).join('')
+          : ""
+      }
     `.trim()
 
     console.log("[MAIL][POD] Sending email to:", customerEmail)
