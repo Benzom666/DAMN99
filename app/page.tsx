@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 
 export default async function HomePage() {
@@ -9,7 +9,7 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/auth/login")
+    redirect("/home")
   }
 
   // Get user profile to determine role
