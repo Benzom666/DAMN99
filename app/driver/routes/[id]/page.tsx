@@ -1,6 +1,9 @@
 import { createServerClient } from "@/lib/supabase/server"
-import { notFound, redirect } from "next/navigation"
+import { notFound, redirect } from 'next/navigation'
 import { RouteDetail } from "./route-detail"
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function DriverRoutePage(props: {
   params: Promise<{ id: string }>

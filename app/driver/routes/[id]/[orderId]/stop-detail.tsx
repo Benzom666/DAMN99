@@ -292,6 +292,11 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       // Wait 2 seconds then navigate
       setTimeout(() => {
         console.log("[v0] [DRIVER] Navigating back to route...")
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => caches.delete(name))
+          })
+        }
         window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
       }, 2000)
     } catch (error) {
@@ -484,6 +489,11 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       // Wait 2 seconds then navigate
       setTimeout(() => {
         console.log("[v0] [DRIVER] Navigating back to route...")
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => caches.delete(name))
+          })
+        }
         window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
       }, 2000)
     } catch (error) {
