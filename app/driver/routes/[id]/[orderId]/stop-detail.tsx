@@ -281,10 +281,61 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     setIsSubmitting(true)
     console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
+    console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
+    console.log("[v0] [DRIVER] Has signature:", !!signatureData)
     console.log("[v0] [DRIVER] Notes:", notes)
     console.log("[v0] [DRIVER] GPS Location:", location)
 
     try {
+      const photoDataArray: string[] = []
+      
+      if (photoFiles.length > 0) {
+        console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files for failed delivery...")
+
+        for (let i = 0; i < photoFiles.length; i++) {
+          const file = photoFiles[i]
+          console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
+
+          try {
+            const photoData = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                if (reader.result && typeof reader.result === "string") {
+                  console.log(`[v0] [DRIVER] Photo ${i + 1} read successfully, length:`, reader.result.length)
+                  resolve(reader.result)
+                } else {
+                  console.error(`[v0] [DRIVER] Photo ${i + 1} read failed: invalid result`)
+                  reject(new Error(`Failed to read photo ${i + 1}`))
+                }
+              }
+              reader.onerror = () => {
+                console.error(`[v0] [DRIVER] Photo ${i + 1} read error:`, reader.error)
+                reject(new Error(`File reading failed for photo ${i + 1}`))
+              }
+              reader.readAsDataURL(file)
+            })
+            
+            photoDataArray.push(photoData)
+          } catch (photoError) {
+            console.error(`[v0] [DRIVER] Photo ${i + 1} processing error:`, photoError)
+            toast({
+              title: "Photo Error",
+              description: `Failed to process photo ${i + 1}. Please try again.`,
+              variant: "destructive",
+            })
+            setIsSubmitting(false)
+            return
+          }
+        }
+      }
+
+      let signatureDataToSend: string | undefined
+
+      if (signatureData && signatureData !== existingPod?.signature_url) {
+        console.log("[v0] [DRIVER] Using signature data for failed delivery, length:", signatureData.length)
+        signatureDataToSend = signatureData
+      }
+
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000)
 
@@ -295,6 +346,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         },
         body: JSON.stringify({
           orderId: order.id,
+          photoDataArray, // Send array of photos
+          signatureData: signatureDataToSend,
           notes,
           location: location || undefined,
         }),
