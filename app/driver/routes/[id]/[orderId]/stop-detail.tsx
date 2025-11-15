@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle, X } from 'lucide-react'
 import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
 import { useToast } from "@/hooks/use-toast"
@@ -31,7 +31,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState<string>("")
+  const [uploadProgress, setUploadProgress] = useState("")
   const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
@@ -98,7 +98,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
-    setUploadProgress('Starting...')
+    setUploadProgress("Preparing...")
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
@@ -109,10 +109,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
     try {
       const photoDataArray: string[] = []
-
+      
       if (photoFiles.length > 0) {
         console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files...")
-        setUploadProgress(`Reading ${photoFiles.length} photo(s)...`)
 
         for (let i = 0; i < photoFiles.length; i++) {
           const file = photoFiles[i]
@@ -147,7 +146,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               variant: "destructive",
             })
             setIsSubmitting(false)
-            setUploadProgress('')
+            setUploadProgress("")
             return
           }
         }
@@ -160,15 +159,15 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         signatureDataToSend = signatureData
       }
 
-      setUploadProgress('Uploading to server...')
+      setUploadProgress("Uploading to server...")
       console.log("[v0] [DRIVER] Calling delivery API...")
       console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 60 seconds")
+        console.error("[v0] [DRIVER] API call timeout after 90 seconds")
         controller.abort()
-      }, 60000)
+      }, 90000)
 
       let response: Response
       try {
@@ -179,7 +178,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           },
           body: JSON.stringify({
             orderId: order.id,
-            photoDataArray, // Send array of photos
+            photoDataArray,
             signatureData: signatureDataToSend,
             notes: notes || undefined,
             recipientName: recipientName || undefined,
@@ -195,7 +194,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
           toast({
             title: "Request Timeout",
-            description: "The upload took too long. Please check your connection and try again.",
+            description: "The request took too long. Please check your connection and try again.",
             variant: "destructive",
           })
         } else {
@@ -206,7 +205,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           })
         }
         setIsSubmitting(false)
-        setUploadProgress('')
+        setUploadProgress("")
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (FETCH ERROR) ==========")
         return
       }
@@ -214,7 +213,6 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       console.log("[v0] [DRIVER] API response status:", response.status)
       console.log("[v0] [DRIVER] API response ok:", response.ok)
 
-      setUploadProgress('Processing upload...')
       let result: any
       try {
         const responseText = await response.text()
@@ -228,7 +226,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           variant: "destructive",
         })
         setIsSubmitting(false)
-        setUploadProgress('')
+        setUploadProgress("")
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (PARSE ERROR) ==========")
         return
       }
@@ -241,15 +239,15 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           variant: "destructive",
         })
         setIsSubmitting(false)
-        setUploadProgress('')
+        setUploadProgress("")
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (API ERROR) ==========")
         return
       }
 
-      console.log("[v0] [DRIVER] ✅ Server confirmed upload complete!")
+      console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
 
-      setUploadProgress('Upload complete!')
+      setUploadProgress("Upload complete!")
       toast({
         title: "Success",
         description: "Delivery marked as complete!",
@@ -257,8 +255,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
       setTimeout(() => {
         console.log("[v0] [DRIVER] Navigating back to route...")
-        window.location.href = `/driver/routes/${routeId}`
-      }, 1500)
+        window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
+      }, 2000)
     } catch (error) {
       console.error("[v0] [DRIVER] Unexpected error:", error)
       console.error("[v0] [DRIVER] Error stack:", error instanceof Error ? error.stack : "no stack")
@@ -270,7 +268,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         variant: "destructive",
       })
       setIsSubmitting(false)
-      setUploadProgress('')
+      setUploadProgress("")
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (EXCEPTION) ==========")
     }
   }
@@ -291,7 +289,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
-    setUploadProgress('Starting...')
+    setUploadProgress("Preparing...")
     console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
@@ -301,10 +299,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
     try {
       const photoDataArray: string[] = []
-
+      
       if (photoFiles.length > 0) {
         console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files for failed delivery...")
-        setUploadProgress(`Reading ${photoFiles.length} photo(s)...`)
 
         for (let i = 0; i < photoFiles.length; i++) {
           const file = photoFiles[i]
@@ -339,7 +336,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               variant: "destructive",
             })
             setIsSubmitting(false)
-            setUploadProgress('')
+            setUploadProgress("")
             return
           }
         }
@@ -352,63 +349,38 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         signatureDataToSend = signatureData
       }
 
-      setUploadProgress('Uploading to server...')
+      setUploadProgress("Uploading to server...")
+
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 60 seconds")
-        controller.abort()
-      }, 60000)
+      const timeoutId = setTimeout(() => controller.abort(), 90000)
 
-      let response: Response
-      try {
-        response = await fetch("/api/driver/fail", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            photoDataArray,
-            signatureData: signatureDataToSend,
-            notes,
-            location: location || undefined,
-          }),
-          signal: controller.signal,
-        })
-        clearTimeout(timeoutId)
-      } catch (fetchError) {
-        clearTimeout(timeoutId)
-        console.error("[v0] [DRIVER] Fetch error:", fetchError)
+      const response = await fetch("/api/driver/fail", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          photoDataArray,
+          signatureData: signatureDataToSend,
+          notes,
+          location: location || undefined,
+        }),
+        signal: controller.signal,
+      })
 
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          toast({
-            title: "Request Timeout",
-            description: "The upload took too long. Please check your connection and try again.",
-            variant: "destructive",
-          })
-        } else {
-          toast({
-            title: "Network Error",
-            description: "Failed to connect to server. Please check your internet connection.",
-            variant: "destructive",
-          })
-        }
-        setIsSubmitting(false)
-        setUploadProgress('')
-        return
-      }
+      clearTimeout(timeoutId)
 
-      setUploadProgress('Processing upload...')
       const result = await response.json()
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to update status")
       }
 
-      console.log("[v0] [DRIVER] ✅ Server confirmed upload complete!")
+      console.log("[v0] [DRIVER] ✅ Marked as failed successfully!")
       console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (SUCCESS) ==========")
 
-      setUploadProgress('Upload complete!')
+      setUploadProgress("Upload complete!")
       toast({
         title: "Success",
         description: "Delivery marked as failed.",
@@ -416,8 +388,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
       setTimeout(() => {
         console.log("[v0] [DRIVER] Navigating back to route...")
-        window.location.href = `/driver/routes/${routeId}`
-      }, 1500)
+        window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
+      }, 2000)
     } catch (error) {
       console.error("[v0] [DRIVER] Error marking as failed:", error)
       toast({
@@ -426,7 +398,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         variant: "destructive",
       })
       setIsSubmitting(false)
-      setUploadProgress('')
+      setUploadProgress("")
       console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (ERROR) ==========")
     }
   }
@@ -504,6 +476,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                         size="icon"
                         className="absolute top-1 right-1 h-6 w-6"
                         onClick={() => handleRemovePhoto(index)}
+                        disabled={isSubmitting}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -522,9 +495,10 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     onChange={handlePhotoChange}
                     className="hidden"
                     id="photo-input"
+                    disabled={isSubmitting}
                   />
                   <label htmlFor="photo-input">
-                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                    <Button variant="outline" className="w-full bg-transparent" asChild disabled={isSubmitting}>
                       <span>
                         <Camera className="h-4 w-4 mr-2" />
                         Add Photo {photoPreviews.length > 0 && `(${MAX_PHOTOS - photoPreviews.length} remaining)`}
@@ -547,12 +521,12 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     alt="Signature"
                     className="w-full border rounded-lg bg-white"
                   />
-                  <Button variant="outline" className="w-full bg-transparent" onClick={() => setSignatureData(null)}>
+                  <Button variant="outline" className="w-full bg-transparent" onClick={() => setSignatureData(null)} disabled={isSubmitting}>
                     Clear Signature
                   </Button>
                 </div>
               ) : (
-                <Button variant="outline" className="w-full bg-transparent" onClick={() => setShowSignaturePad(true)}>
+                <Button variant="outline" className="w-full bg-transparent" onClick={() => setShowSignaturePad(true)} disabled={isSubmitting}>
                   <PenTool className="h-4 w-4 mr-2" />
                   Capture Signature
                 </Button>
@@ -567,6 +541,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                 placeholder="Who received the delivery?"
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
+                disabled={isSubmitting}
               />
             </Card>
 
@@ -579,36 +554,19 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
+                disabled={isSubmitting}
               />
             </Card>
 
             {/* Action Buttons */}
             <div className="flex gap-3">
               <Button variant="destructive" className="flex-1" size="lg" onClick={handleFail} disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    {uploadProgress || 'Processing...'}
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-5 w-5 mr-2" />
-                    Failed
-                  </>
-                )}
+                <XCircle className="h-5 w-5 mr-2" />
+                {isSubmitting ? uploadProgress || "Processing..." : "Failed"}
               </Button>
               <Button className="flex-1" size="lg" onClick={handleDeliver} disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    {uploadProgress || 'Processing...'}
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-5 w-5 mr-2" />
-                    Delivered
-                  </>
-                )}
+                <CheckCircle className="h-5 w-5 mr-2" />
+                {isSubmitting ? uploadProgress || "Processing..." : "Delivered"}
               </Button>
             </div>
           </>
