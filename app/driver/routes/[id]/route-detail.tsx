@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, CheckCircle, XCircle, Clock, Navigation } from "lucide-react"
+import { ArrowLeft, CheckCircle, XCircle, Clock, Navigation } from 'lucide-react'
 import Link from "next/link"
 import { HereMap } from "@/components/here-map"
 import { useState, useEffect } from "react"
@@ -65,8 +65,7 @@ export function RouteDetail({ route, orders }: RouteDetailProps) {
     }))
 
   const buildNavigationUrl = (lat: number, lng: number) => {
-    // Destination-only link (no origin)
-    return `https://www.here.com/directions/drive/${lat},${lng}`
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
   }
 
   return (

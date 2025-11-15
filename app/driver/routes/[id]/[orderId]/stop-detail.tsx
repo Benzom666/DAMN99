@@ -160,9 +160,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 30 seconds")
+        console.error("[v0] [DRIVER] API call timeout after 60 seconds")
         controller.abort()
-      }, 30000)
+      }, 60000)
 
       let response: Response
       try {
@@ -245,9 +245,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       })
 
       setTimeout(() => {
-        router.push(`/driver/routes/${routeId}`)
-        router.refresh()
-      }, 500)
+        console.log("[v0] [DRIVER] Navigating back to route...")
+        window.location.href = `/driver/routes/${routeId}`
+      }, 1500)
     } catch (error) {
       console.error("[v0] [DRIVER] Unexpected error:", error)
       console.error("[v0] [DRIVER] Error stack:", error instanceof Error ? error.stack : "no stack")
@@ -337,7 +337,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       }
 
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const timeoutId = setTimeout(() => controller.abort(), 60000)
 
       const response = await fetch("/api/driver/fail", {
         method: "POST",
@@ -346,7 +346,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         },
         body: JSON.stringify({
           orderId: order.id,
-          photoDataArray, // Send array of photos
+          photoDataArray,
           signatureData: signatureDataToSend,
           notes,
           location: location || undefined,
@@ -371,9 +371,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       })
 
       setTimeout(() => {
-        router.push(`/driver/routes/${routeId}`)
-        router.refresh()
-      }, 500)
+        console.log("[v0] [DRIVER] Navigating back to route...")
+        window.location.href = `/driver/routes/${routeId}`
+      }, 1500)
     } catch (error) {
       console.error("[v0] [DRIVER] Error marking as failed:", error)
       toast({
