@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle, X } from 'lucide-react'
+import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle, X, Loader2 } from 'lucide-react'
 import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
 import { useToast } from "@/hooks/use-toast"
@@ -31,6 +31,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string>("")
   const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
@@ -97,6 +98,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
+    setUploadProgress('Starting...')
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
@@ -107,12 +109,14 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
     try {
       const photoDataArray: string[] = []
-      
+
       if (photoFiles.length > 0) {
         console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files...")
+        setUploadProgress(`Reading ${photoFiles.length} photo(s)...`)
 
         for (let i = 0; i < photoFiles.length; i++) {
           const file = photoFiles[i]
+          setUploadProgress(`Reading photo ${i + 1}/${photoFiles.length}...`)
           console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
 
           try {
@@ -143,6 +147,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               variant: "destructive",
             })
             setIsSubmitting(false)
+            setUploadProgress('')
             return
           }
         }
@@ -155,6 +160,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         signatureDataToSend = signatureData
       }
 
+      setUploadProgress('Uploading to server...')
       console.log("[v0] [DRIVER] Calling delivery API...")
       console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
 
@@ -189,7 +195,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
           toast({
             title: "Request Timeout",
-            description: "The request took too long. Please check your connection and try again.",
+            description: "The upload took too long. Please check your connection and try again.",
             variant: "destructive",
           })
         } else {
@@ -200,6 +206,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           })
         }
         setIsSubmitting(false)
+        setUploadProgress('')
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (FETCH ERROR) ==========")
         return
       }
@@ -207,6 +214,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       console.log("[v0] [DRIVER] API response status:", response.status)
       console.log("[v0] [DRIVER] API response ok:", response.ok)
 
+      setUploadProgress('Processing upload...')
       let result: any
       try {
         const responseText = await response.text()
@@ -220,6 +228,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           variant: "destructive",
         })
         setIsSubmitting(false)
+        setUploadProgress('')
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (PARSE ERROR) ==========")
         return
       }
@@ -232,13 +241,15 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           variant: "destructive",
         })
         setIsSubmitting(false)
+        setUploadProgress('')
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (API ERROR) ==========")
         return
       }
 
-      console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
+      console.log("[v0] [DRIVER] ✅ Server confirmed upload complete!")
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
 
+      setUploadProgress('Upload complete!')
       toast({
         title: "Success",
         description: "Delivery marked as complete!",
@@ -259,6 +270,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         variant: "destructive",
       })
       setIsSubmitting(false)
+      setUploadProgress('')
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (EXCEPTION) ==========")
     }
   }
@@ -279,6 +291,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
+    setUploadProgress('Starting...')
     console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
@@ -288,12 +301,14 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
     try {
       const photoDataArray: string[] = []
-      
+
       if (photoFiles.length > 0) {
         console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files for failed delivery...")
+        setUploadProgress(`Reading ${photoFiles.length} photo(s)...`)
 
         for (let i = 0; i < photoFiles.length; i++) {
           const file = photoFiles[i]
+          setUploadProgress(`Reading photo ${i + 1}/${photoFiles.length}...`)
           console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
 
           try {
@@ -324,6 +339,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               variant: "destructive",
             })
             setIsSubmitting(false)
+            setUploadProgress('')
             return
           }
         }
@@ -336,35 +352,63 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         signatureDataToSend = signatureData
       }
 
+      setUploadProgress('Uploading to server...')
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60000)
+      const timeoutId = setTimeout(() => {
+        console.error("[v0] [DRIVER] API call timeout after 60 seconds")
+        controller.abort()
+      }, 60000)
 
-      const response = await fetch("/api/driver/fail", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          photoDataArray,
-          signatureData: signatureDataToSend,
-          notes,
-          location: location || undefined,
-        }),
-        signal: controller.signal,
-      })
+      let response: Response
+      try {
+        response = await fetch("/api/driver/fail", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: order.id,
+            photoDataArray,
+            signatureData: signatureDataToSend,
+            notes,
+            location: location || undefined,
+          }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        console.error("[v0] [DRIVER] Fetch error:", fetchError)
 
-      clearTimeout(timeoutId)
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          toast({
+            title: "Request Timeout",
+            description: "The upload took too long. Please check your connection and try again.",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Network Error",
+            description: "Failed to connect to server. Please check your internet connection.",
+            variant: "destructive",
+          })
+        }
+        setIsSubmitting(false)
+        setUploadProgress('')
+        return
+      }
 
+      setUploadProgress('Processing upload...')
       const result = await response.json()
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to update status")
       }
 
-      console.log("[v0] [DRIVER] ✅ Marked as failed successfully!")
+      console.log("[v0] [DRIVER] ✅ Server confirmed upload complete!")
       console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (SUCCESS) ==========")
 
+      setUploadProgress('Upload complete!')
       toast({
         title: "Success",
         description: "Delivery marked as failed.",
@@ -382,6 +426,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         variant: "destructive",
       })
       setIsSubmitting(false)
+      setUploadProgress('')
       console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (ERROR) ==========")
     }
   }
@@ -540,12 +585,30 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
             {/* Action Buttons */}
             <div className="flex gap-3">
               <Button variant="destructive" className="flex-1" size="lg" onClick={handleFail} disabled={isSubmitting}>
-                <XCircle className="h-5 w-5 mr-2" />
-                {isSubmitting ? "Processing..." : "Failed"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    {uploadProgress || 'Processing...'}
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 mr-2" />
+                    Failed
+                  </>
+                )}
               </Button>
               <Button className="flex-1" size="lg" onClick={handleDeliver} disabled={isSubmitting}>
-                <CheckCircle className="h-5 w-5 mr-2" />
-                {isSubmitting ? "Processing..." : "Delivered"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    {uploadProgress || 'Processing...'}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-5 w-5 mr-2" />
+                    Delivered
+                  </>
+                )}
               </Button>
             </div>
           </>
