@@ -91,83 +91,62 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     setShowSignaturePad(false)
   }
 
-  const handleDeliver = async () => {
-    if (isSubmitting) {
-      console.log("[v0] [DRIVER] Already submitting, ignoring click")
-      return
+  const uploadPhotoToBlob = async (file: File, index: number): Promise<string> => {
+    console.log(`[v0] [UPLOAD] Starting upload for photo ${index + 1}, size:`, file.size)
+    setUploadProgress(`Uploading photo ${index + 1}/${photoFiles.length}...`)
+
+    // Convert to base64
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (reader.result && typeof reader.result === "string") {
+          resolve(reader.result)
+        } else {
+          reject(new Error("Failed to read file"))
+        }
+      }
+      reader.onerror = () => reject(new Error("File reading error"))
+      reader.readAsDataURL(file)
+    })
+
+    // Upload to blob storage via our API
+    const uploadResponse = await fetch("/api/upload-photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photoData: base64, orderId: order.id, photoIndex: index }),
+    })
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Upload failed for photo ${index + 1}`)
     }
 
+    const { url } = await uploadResponse.json()
+    console.log(`[v0] [UPLOAD] Photo ${index + 1} uploaded successfully:`, url)
+    return url
+  }
+
+  const handleDeliver = async () => {
+    if (isSubmitting) return
+
     setIsSubmitting(true)
-    setUploadProgress("Preparing...")
+    setUploadProgress("Starting...")
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
-    console.log("[v0] [DRIVER] Order ID:", order.id)
-    console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
-    console.log("[v0] [DRIVER] Has signature:", !!signatureData)
-    console.log("[v0] [DRIVER] Recipient:", recipientName || "none")
-    console.log("[v0] [DRIVER] Notes:", notes || "none")
-    console.log("[v0] [DRIVER] GPS Location:", location)
 
     try {
-      // Read all photo files into base64
-      const photoDataArray: string[] = []
+      const photoUrls: string[] = []
       
       if (photoFiles.length > 0) {
-        console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files...")
-
+        console.log("[v0] [DRIVER] Uploading", photoFiles.length, "photos one by one...")
+        
         for (let i = 0; i < photoFiles.length; i++) {
-          const file = photoFiles[i]
-          setUploadProgress(`Reading photo ${i + 1}/${photoFiles.length}...`)
-          console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
-
-          // Add file size check for mobile
-          if (file.size > 10 * 1024 * 1024) {
-            console.error(`[v0] [DRIVER] Photo ${i + 1} is too large:`, file.size, "bytes")
-            toast({
-              title: "Photo Too Large",
-              description: `Photo ${i + 1} is too large (max 10MB). Please take a smaller photo.`,
-              variant: "destructive",
-            })
-            setIsSubmitting(false)
-            setUploadProgress("")
-            return
-          }
-
           try {
-            const photoData = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader()
-              
-              // Add timeout for reading
-              const timeout = setTimeout(() => {
-                console.error(`[v0] [DRIVER] Photo ${i + 1} read timeout`)
-                reject(new Error(`Timeout reading photo ${i + 1}`))
-              }, 30000) // 30 seconds per photo
-              
-              reader.onloadend = () => {
-                clearTimeout(timeout)
-                if (reader.result && typeof reader.result === "string") {
-                  console.log(`[v0] [DRIVER] Photo ${i + 1} read successfully, length:`, reader.result.length)
-                  resolve(reader.result)
-                } else {
-                  console.error(`[v0] [DRIVER] Photo ${i + 1} read failed: invalid result`)
-                  reject(new Error(`Failed to read photo ${i + 1}`))
-                }
-              }
-              
-              reader.onerror = () => {
-                clearTimeout(timeout)
-                console.error(`[v0] [DRIVER] Photo ${i + 1} read error:`, reader.error)
-                reject(new Error(`File reading failed for photo ${i + 1}`))
-              }
-              
-              reader.readAsDataURL(file)
-            })
-            
-            photoDataArray.push(photoData)
-          } catch (photoError) {
-            console.error(`[v0] [DRIVER] Photo ${i + 1} processing error:`, photoError)
+            const url = await uploadPhotoToBlob(photoFiles[i], i)
+            photoUrls.push(url)
+          } catch (error) {
+            console.error(`[v0] [DRIVER] Photo ${i + 1} upload failed:`, error)
             toast({
-              title: "Photo Error",
-              description: `Failed to process photo ${i + 1}. Please try again.`,
+              title: "Upload Failed",
+              description: `Failed to upload photo ${i + 1}. Please try again.`,
               variant: "destructive",
             })
             setIsSubmitting(false)
@@ -175,145 +154,79 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
             return
           }
         }
+        console.log("[v0] [DRIVER] All photos uploaded successfully")
       }
 
-      // Prepare signature data
-      let signatureDataToSend: string | undefined
+      let signatureUrl: string | undefined
       if (signatureData && signatureData !== existingPod?.signature_url) {
-        console.log("[v0] [DRIVER] Using signature data, length:", signatureData.length)
-        signatureDataToSend = signatureData
-      }
-
-      // Send to API
-      setUploadProgress("Uploading to server...")
-      console.log("[v0] [DRIVER] Calling delivery API...")
-      console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
-      console.log("[v0] [DRIVER] Payload size estimate:", JSON.stringify({
-        orderId: order.id,
-        photoDataArray: photoDataArray.map(p => p.length),
-        signatureData: signatureDataToSend?.length || 0,
-      }))
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 120 seconds")
-        controller.abort()
-      }, 120000) // Increased to 120 seconds
-
-      let response: Response
-      try {
-        response = await fetch("/api/driver/deliver", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            photoDataArray,
-            signatureData: signatureDataToSend,
-            notes: notes || undefined,
-            recipientName: recipientName || undefined,
-            location: location || undefined,
-          }),
-          signal: controller.signal,
-        })
-        clearTimeout(timeoutId)
-        console.log("[v0] [DRIVER] API response received, status:", response.status)
-      } catch (fetchError) {
-        clearTimeout(timeoutId)
-        console.error("[v0] [DRIVER] Fetch error:", fetchError)
-        console.error("[v0] [DRIVER] Fetch error name:", fetchError instanceof Error ? fetchError.name : "unknown")
-        console.error("[v0] [DRIVER] Fetch error message:", fetchError instanceof Error ? fetchError.message : "unknown")
-
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          toast({
-            title: "Request Timeout",
-            description: "The upload took too long. Please check your connection and try again.",
-            variant: "destructive",
+        setUploadProgress("Uploading signature...")
+        console.log("[v0] [DRIVER] Uploading signature...")
+        
+        try {
+          const uploadResponse = await fetch("/api/upload-photo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              photoData: signatureData, 
+              orderId: order.id, 
+              photoIndex: 'signature' 
+            }),
           })
-        } else {
-          toast({
-            title: "Network Error",
-            description: "Failed to connect to server. Please check your internet connection.",
-            variant: "destructive",
-          })
+
+          if (uploadResponse.ok) {
+            const { url } = await uploadResponse.json()
+            signatureUrl = url
+            console.log("[v0] [DRIVER] Signature uploaded:", url)
+          }
+        } catch (error) {
+          console.error("[v0] [DRIVER] Signature upload failed:", error)
+          // Continue anyway - signature is optional
         }
-        setIsSubmitting(false)
-        setUploadProgress("")
-        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (FETCH ERROR) ==========")
-        return
       }
 
-      console.log("[v0] [DRIVER] API response status:", response.status)
-      console.log("[v0] [DRIVER] API response ok:", response.ok)
+      setUploadProgress("Finalizing delivery...")
+      console.log("[v0] [DRIVER] Calling delivery API with URLs...")
 
-      // Parse response
-      let result: any
-      try {
-        const responseText = await response.text()
-        console.log("[v0] [DRIVER] API response body:", responseText.substring(0, 500))
-        result = JSON.parse(responseText)
-        console.log("[v0] [DRIVER] Parsed result:", result)
-      } catch (parseError) {
-        console.error("[v0] [DRIVER] Failed to parse response:", parseError)
-        toast({
-          title: "Server Error",
-          description: "Received invalid response from server. Please try again.",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        setUploadProgress("")
-        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (PARSE ERROR) ==========")
-        return
-      }
+      const response = await fetch("/api/driver/deliver", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          photoUrls, // Just URLs now, not base64
+          signatureUrl,
+          notes: notes || undefined,
+          recipientName: recipientName || undefined,
+          location: location || undefined,
+        }),
+      })
+
+      const result = await response.json()
 
       if (!response.ok || !result.success) {
-        console.error("[v0] [DRIVER] API error:", result.error)
-        toast({
-          title: "Delivery Failed",
-          description: result.error || "Failed to mark as delivered. Please try again.",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        setUploadProgress("")
-        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (API ERROR) ==========")
-        return
+        throw new Error(result.error || "Failed to mark as delivered")
       }
 
       console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
-      console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
-
-      setUploadProgress("Upload complete!")
+      setUploadProgress("Complete!")
+      
       toast({
         title: "Success",
         description: "Delivery marked as complete!",
       })
 
-      // Wait 2 seconds then navigate
+      // Navigate after 1.5 seconds
       setTimeout(() => {
-        console.log("[v0] [DRIVER] Navigating back to route...")
-        if ('caches' in window) {
-          caches.keys().then(names => {
-            names.forEach(name => caches.delete(name))
-          })
-        }
         window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
-      }, 2000)
+      }, 1500)
     } catch (error) {
-      console.error("[v0] [DRIVER] Unexpected error:", error)
-      console.error("[v0] [DRIVER] Error name:", error instanceof Error ? error.name : "unknown")
-      console.error("[v0] [DRIVER] Error message:", error instanceof Error ? error.message : "unknown")
-      console.error("[v0] [DRIVER] Error stack:", error instanceof Error ? error.stack : "no stack")
-
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      console.error("[v0] [DRIVER] Error:", error)
       toast({
-        title: "Unexpected Error",
-        description: `Failed to mark as delivered: ${errorMessage}`,
+        title: "Error",
+        description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       })
       setIsSubmitting(false)
       setUploadProgress("")
-      console.log("[v0] [DRIVER] ========== POD SUBMISSION END (EXCEPTION) ==========")
     }
   }
 
@@ -327,81 +240,27 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       return
     }
 
-    if (isSubmitting) {
-      console.log("[v0] [DRIVER] Already submitting, ignoring click")
-      return
-    }
+    if (isSubmitting) return
 
     setIsSubmitting(true)
-    setUploadProgress("Preparing...")
+    setUploadProgress("Starting...")
     console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
-    console.log("[v0] [DRIVER] Order ID:", order.id)
-    console.log("[v0] [DRIVER] Number of photos:", photoFiles.length)
-    console.log("[v0] [DRIVER] Has signature:", !!signatureData)
-    console.log("[v0] [DRIVER] Notes:", notes)
-    console.log("[v0] [DRIVER] GPS Location:", location)
 
     try {
-      // Read all photo files into base64
-      const photoDataArray: string[] = []
+      const photoUrls: string[] = []
       
       if (photoFiles.length > 0) {
-        console.log("[v0] [DRIVER] Reading", photoFiles.length, "photo files for failed delivery...")
-
+        console.log("[v0] [DRIVER] Uploading", photoFiles.length, "photos for failed delivery...")
+        
         for (let i = 0; i < photoFiles.length; i++) {
-          const file = photoFiles[i]
-          setUploadProgress(`Reading photo ${i + 1}/${photoFiles.length}...`)
-          console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
-
-          // Add file size check for mobile
-          if (file.size > 10 * 1024 * 1024) {
-            console.error(`[v0] [DRIVER] Photo ${i + 1} is too large:`, file.size, "bytes")
-            toast({
-              title: "Photo Too Large",
-              description: `Photo ${i + 1} is too large (max 10MB). Please take a smaller photo.`,
-              variant: "destructive",
-            })
-            setIsSubmitting(false)
-            setUploadProgress("")
-            return
-          }
-
           try {
-            const photoData = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader()
-              
-              // Add timeout for reading
-              const timeout = setTimeout(() => {
-                console.error(`[v0] [DRIVER] Photo ${i + 1} read timeout`)
-                reject(new Error(`Timeout reading photo ${i + 1}`))
-              }, 30000) // 30 seconds per photo
-              
-              reader.onloadend = () => {
-                clearTimeout(timeout)
-                if (reader.result && typeof reader.result === "string") {
-                  console.log(`[v0] [DRIVER] Photo ${i + 1} read successfully, length:`, reader.result.length)
-                  resolve(reader.result)
-                } else {
-                  console.error(`[v0] [DRIVER] Photo ${i + 1} read failed: invalid result`)
-                  reject(new Error(`Failed to read photo ${i + 1}`))
-                }
-              }
-              
-              reader.onerror = () => {
-                clearTimeout(timeout)
-                console.error(`[v0] [DRIVER] Photo ${i + 1} read error:`, reader.error)
-                reject(new Error(`File reading failed for photo ${i + 1}`))
-              }
-              
-              reader.readAsDataURL(file)
-            })
-            
-            photoDataArray.push(photoData)
-          } catch (photoError) {
-            console.error(`[v0] [DRIVER] Photo ${i + 1} processing error:`, photoError)
+            const url = await uploadPhotoToBlob(photoFiles[i], i)
+            photoUrls.push(url)
+          } catch (error) {
+            console.error(`[v0] [DRIVER] Photo ${i + 1} upload failed:`, error)
             toast({
-              title: "Photo Error",
-              description: `Failed to process photo ${i + 1}. Please try again.`,
+              title: "Upload Failed",
+              description: `Failed to upload photo ${i + 1}. Please try again.`,
               variant: "destructive",
             })
             setIsSubmitting(false)
@@ -411,101 +270,70 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         }
       }
 
-      // Prepare signature data
-      let signatureDataToSend: string | undefined
+      let signatureUrl: string | undefined
       if (signatureData && signatureData !== existingPod?.signature_url) {
-        console.log("[v0] [DRIVER] Using signature data for failed delivery, length:", signatureData.length)
-        signatureDataToSend = signatureData
-      }
-
-      // Send to API
-      setUploadProgress("Uploading to server...")
-      console.log("[v0] [DRIVER] Calling fail API...")
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 120 seconds")
-        controller.abort()
-      }, 120000) // Increased to 120 seconds
-
-      let response: Response
-      try {
-        response = await fetch("/api/driver/fail", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            photoDataArray,
-            signatureData: signatureDataToSend,
-            notes,
-            location: location || undefined,
-          }),
-          signal: controller.signal,
-        })
-        clearTimeout(timeoutId)
-        console.log("[v0] [DRIVER] API response received, status:", response.status)
-      } catch (fetchError) {
-        clearTimeout(timeoutId)
-        console.error("[v0] [DRIVER] Fetch error:", fetchError)
-
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          toast({
-            title: "Request Timeout",
-            description: "The upload took too long. Please check your connection and try again.",
-            variant: "destructive",
+        setUploadProgress("Uploading signature...")
+        
+        try {
+          const uploadResponse = await fetch("/api/upload-photo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              photoData: signatureData, 
+              orderId: order.id, 
+              photoIndex: 'signature' 
+            }),
           })
-        } else {
-          toast({
-            title: "Network Error",
-            description: "Failed to connect to server. Please check your internet connection.",
-            variant: "destructive",
-          })
+
+          if (uploadResponse.ok) {
+            const { url } = await uploadResponse.json()
+            signatureUrl = url
+          }
+        } catch (error) {
+          console.error("[v0] [DRIVER] Signature upload failed:", error)
         }
-        setIsSubmitting(false)
-        setUploadProgress("")
-        console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (FETCH ERROR) ==========")
-        return
       }
 
-      // Parse response
+      setUploadProgress("Finalizing...")
+      
+      const response = await fetch("/api/driver/fail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          photoUrls,
+          signatureUrl,
+          notes,
+          location: location || undefined,
+        }),
+      })
+
       const result = await response.json()
-      console.log("[v0] [DRIVER] Parsed result:", result)
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to update status")
       }
 
       console.log("[v0] [DRIVER] ✅ Marked as failed successfully!")
-      console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (SUCCESS) ==========")
-
-      setUploadProgress("Upload complete!")
+      setUploadProgress("Complete!")
+      
       toast({
         title: "Success",
         description: "Delivery marked as failed.",
       })
 
-      // Wait 2 seconds then navigate
       setTimeout(() => {
-        console.log("[v0] [DRIVER] Navigating back to route...")
-        if ('caches' in window) {
-          caches.keys().then(names => {
-            names.forEach(name => caches.delete(name))
-          })
-        }
         window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
-      }, 2000)
+      }, 1500)
     } catch (error) {
-      console.error("[v0] [DRIVER] Error marking as failed:", error)
+      console.error("[v0] [DRIVER] Error:", error)
       toast({
         title: "Error",
-        description: `Failed to update status: ${error instanceof Error ? error.message : "Unknown error"}`,
+        description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       })
       setIsSubmitting(false)
       setUploadProgress("")
-      console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (ERROR) ==========")
     }
   }
 

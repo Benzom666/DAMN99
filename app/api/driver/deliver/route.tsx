@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     const { user } = await requireDriver()
 
     const body = await request.json()
-    const { orderId, photoDataArray, signatureData, recipientName, notes, location } = body
+    const { orderId, photoUrls, signatureUrl, recipientName, notes, location } = body
 
     if (!validateUUID(orderId)) {
       return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 })
@@ -169,40 +169,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
     }
 
-    const photoUrls: string[] = []
-    if (photoDataArray && Array.isArray(photoDataArray) && photoDataArray.length > 0) {
-      console.log("[v0] Uploading", photoDataArray.length, "photos")
-      
-      for (let i = 0; i < Math.min(photoDataArray.length, 4); i++) {
-        const photoData = photoDataArray[i]
-        const photoBlob = base64ToBlob(photoData)
-        const uploaded = await put(`pod-photos/${orderId}-${Date.now()}-${i}.jpg`, photoBlob, {
-          access: "public",
-          contentType: "image/jpeg",
-        })
-        photoUrls.push(uploaded.url)
-        console.log(`[v0] Photo ${i + 1} uploaded:`, uploaded.url)
-      }
-    }
-
-    // Upload signature
-    let signatureUrl = null
-    if (signatureData) {
-      const signatureBlob = base64ToBlob(signatureData)
-      const uploaded = await put(`pod-signatures/${orderId}-${Date.now()}.png`, signatureBlob, {
-        access: "public",
-        contentType: "image/png",
-      })
-      signatureUrl = uploaded.url
-    }
-
     const { data: podData, error: podError } = await supabase
       .from("pods")
       .insert({
         order_id: orderId,
         driver_id: user.id,
-        photo_url: photoUrls[0] || null,
-        signature_url: signatureUrl,
+        photo_url: photoUrls && photoUrls.length > 0 ? photoUrls[0] : null,
+        signature_url: signatureUrl || null,
         recipient_name: sanitizedRecipient,
         notes: sanitizedNotes,
         delivered_at: new Date().toISOString(),
@@ -218,20 +191,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Failed to save POD" }, { status: 500 })
     }
 
-    if (photoUrls.length > 0) {
-      const photosToInsert = photoUrls.map((url, index) => ({
+    if (photoUrls && photoUrls.length > 0) {
+      const photosToInsert = photoUrls.map((url: string, index: number) => ({
         pod_id: podData.id,
         photo_url: url,
         photo_order: index + 1,
       }))
 
-      const { error: photosError } = await supabase
-        .from("pod_photos")
-        .insert(photosToInsert)
-
-      if (photosError) {
-        console.error("[v0] Error saving photos:", photosError)
-      }
+      await supabase.from("pod_photos").insert(photosToInsert)
     }
 
     // Update order status
