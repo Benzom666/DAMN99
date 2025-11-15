@@ -424,7 +424,6 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     multiple
                     onChange={handlePhotoChange}
                     className="hidden"
@@ -435,7 +434,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     <Button variant="outline" className="w-full bg-transparent" asChild disabled={isSubmitting}>
                       <span>
                         <Camera className="h-4 w-4 mr-2" />
-                        Add Photo {photoPreviews.length > 0 && `(${MAX_PHOTOS - photoPreviews.length} remaining)`}
+                        Take Photo or Choose from Gallery {photoPreviews.length > 0 && `(${MAX_PHOTOS - photoPreviews.length} remaining)`}
                       </span>
                     </Button>
                   </label>
