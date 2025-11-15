@@ -108,6 +108,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     console.log("[v0] [DRIVER] GPS Location:", location)
 
     try {
+      // Read all photo files into base64
       const photoDataArray: string[] = []
       
       if (photoFiles.length > 0) {
@@ -118,10 +119,31 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           setUploadProgress(`Reading photo ${i + 1}/${photoFiles.length}...`)
           console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
 
+          // Add file size check for mobile
+          if (file.size > 10 * 1024 * 1024) {
+            console.error(`[v0] [DRIVER] Photo ${i + 1} is too large:`, file.size, "bytes")
+            toast({
+              title: "Photo Too Large",
+              description: `Photo ${i + 1} is too large (max 10MB). Please take a smaller photo.`,
+              variant: "destructive",
+            })
+            setIsSubmitting(false)
+            setUploadProgress("")
+            return
+          }
+
           try {
             const photoData = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader()
+              
+              // Add timeout for reading
+              const timeout = setTimeout(() => {
+                console.error(`[v0] [DRIVER] Photo ${i + 1} read timeout`)
+                reject(new Error(`Timeout reading photo ${i + 1}`))
+              }, 30000) // 30 seconds per photo
+              
               reader.onloadend = () => {
+                clearTimeout(timeout)
                 if (reader.result && typeof reader.result === "string") {
                   console.log(`[v0] [DRIVER] Photo ${i + 1} read successfully, length:`, reader.result.length)
                   resolve(reader.result)
@@ -130,10 +152,13 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                   reject(new Error(`Failed to read photo ${i + 1}`))
                 }
               }
+              
               reader.onerror = () => {
+                clearTimeout(timeout)
                 console.error(`[v0] [DRIVER] Photo ${i + 1} read error:`, reader.error)
                 reject(new Error(`File reading failed for photo ${i + 1}`))
               }
+              
               reader.readAsDataURL(file)
             })
             
@@ -152,22 +177,28 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         }
       }
 
+      // Prepare signature data
       let signatureDataToSend: string | undefined
-
       if (signatureData && signatureData !== existingPod?.signature_url) {
         console.log("[v0] [DRIVER] Using signature data, length:", signatureData.length)
         signatureDataToSend = signatureData
       }
 
+      // Send to API
       setUploadProgress("Uploading to server...")
       console.log("[v0] [DRIVER] Calling delivery API...")
       console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
+      console.log("[v0] [DRIVER] Payload size estimate:", JSON.stringify({
+        orderId: order.id,
+        photoDataArray: photoDataArray.map(p => p.length),
+        signatureData: signatureDataToSend?.length || 0,
+      }))
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 90 seconds")
+        console.error("[v0] [DRIVER] API call timeout after 120 seconds")
         controller.abort()
-      }, 90000)
+      }, 120000) // Increased to 120 seconds
 
       let response: Response
       try {
@@ -187,14 +218,17 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
+        console.log("[v0] [DRIVER] API response received, status:", response.status)
       } catch (fetchError) {
         clearTimeout(timeoutId)
         console.error("[v0] [DRIVER] Fetch error:", fetchError)
+        console.error("[v0] [DRIVER] Fetch error name:", fetchError instanceof Error ? fetchError.name : "unknown")
+        console.error("[v0] [DRIVER] Fetch error message:", fetchError instanceof Error ? fetchError.message : "unknown")
 
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
           toast({
             title: "Request Timeout",
-            description: "The request took too long. Please check your connection and try again.",
+            description: "The upload took too long. Please check your connection and try again.",
             variant: "destructive",
           })
         } else {
@@ -213,11 +247,13 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       console.log("[v0] [DRIVER] API response status:", response.status)
       console.log("[v0] [DRIVER] API response ok:", response.ok)
 
+      // Parse response
       let result: any
       try {
         const responseText = await response.text()
-        console.log("[v0] [DRIVER] API response body:", responseText)
+        console.log("[v0] [DRIVER] API response body:", responseText.substring(0, 500))
         result = JSON.parse(responseText)
+        console.log("[v0] [DRIVER] Parsed result:", result)
       } catch (parseError) {
         console.error("[v0] [DRIVER] Failed to parse response:", parseError)
         toast({
@@ -253,12 +289,15 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         description: "Delivery marked as complete!",
       })
 
+      // Wait 2 seconds then navigate
       setTimeout(() => {
         console.log("[v0] [DRIVER] Navigating back to route...")
         window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
       }, 2000)
     } catch (error) {
       console.error("[v0] [DRIVER] Unexpected error:", error)
+      console.error("[v0] [DRIVER] Error name:", error instanceof Error ? error.name : "unknown")
+      console.error("[v0] [DRIVER] Error message:", error instanceof Error ? error.message : "unknown")
       console.error("[v0] [DRIVER] Error stack:", error instanceof Error ? error.stack : "no stack")
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
@@ -298,6 +337,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     console.log("[v0] [DRIVER] GPS Location:", location)
 
     try {
+      // Read all photo files into base64
       const photoDataArray: string[] = []
       
       if (photoFiles.length > 0) {
@@ -308,10 +348,31 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           setUploadProgress(`Reading photo ${i + 1}/${photoFiles.length}...`)
           console.log(`[v0] [DRIVER] Reading photo ${i + 1}/${photoFiles.length}, size:`, file.size, "bytes")
 
+          // Add file size check for mobile
+          if (file.size > 10 * 1024 * 1024) {
+            console.error(`[v0] [DRIVER] Photo ${i + 1} is too large:`, file.size, "bytes")
+            toast({
+              title: "Photo Too Large",
+              description: `Photo ${i + 1} is too large (max 10MB). Please take a smaller photo.`,
+              variant: "destructive",
+            })
+            setIsSubmitting(false)
+            setUploadProgress("")
+            return
+          }
+
           try {
             const photoData = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader()
+              
+              // Add timeout for reading
+              const timeout = setTimeout(() => {
+                console.error(`[v0] [DRIVER] Photo ${i + 1} read timeout`)
+                reject(new Error(`Timeout reading photo ${i + 1}`))
+              }, 30000) // 30 seconds per photo
+              
               reader.onloadend = () => {
+                clearTimeout(timeout)
                 if (reader.result && typeof reader.result === "string") {
                   console.log(`[v0] [DRIVER] Photo ${i + 1} read successfully, length:`, reader.result.length)
                   resolve(reader.result)
@@ -320,10 +381,13 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                   reject(new Error(`Failed to read photo ${i + 1}`))
                 }
               }
+              
               reader.onerror = () => {
+                clearTimeout(timeout)
                 console.error(`[v0] [DRIVER] Photo ${i + 1} read error:`, reader.error)
                 reject(new Error(`File reading failed for photo ${i + 1}`))
               }
+              
               reader.readAsDataURL(file)
             })
             
@@ -342,36 +406,67 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         }
       }
 
+      // Prepare signature data
       let signatureDataToSend: string | undefined
-
       if (signatureData && signatureData !== existingPod?.signature_url) {
         console.log("[v0] [DRIVER] Using signature data for failed delivery, length:", signatureData.length)
         signatureDataToSend = signatureData
       }
 
+      // Send to API
       setUploadProgress("Uploading to server...")
+      console.log("[v0] [DRIVER] Calling fail API...")
 
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 90000)
+      const timeoutId = setTimeout(() => {
+        console.error("[v0] [DRIVER] API call timeout after 120 seconds")
+        controller.abort()
+      }, 120000) // Increased to 120 seconds
 
-      const response = await fetch("/api/driver/fail", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          photoDataArray,
-          signatureData: signatureDataToSend,
-          notes,
-          location: location || undefined,
-        }),
-        signal: controller.signal,
-      })
+      let response: Response
+      try {
+        response = await fetch("/api/driver/fail", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: order.id,
+            photoDataArray,
+            signatureData: signatureDataToSend,
+            notes,
+            location: location || undefined,
+          }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+        console.log("[v0] [DRIVER] API response received, status:", response.status)
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        console.error("[v0] [DRIVER] Fetch error:", fetchError)
 
-      clearTimeout(timeoutId)
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          toast({
+            title: "Request Timeout",
+            description: "The upload took too long. Please check your connection and try again.",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Network Error",
+            description: "Failed to connect to server. Please check your internet connection.",
+            variant: "destructive",
+          })
+        }
+        setIsSubmitting(false)
+        setUploadProgress("")
+        console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (FETCH ERROR) ==========")
+        return
+      }
 
+      // Parse response
       const result = await response.json()
+      console.log("[v0] [DRIVER] Parsed result:", result)
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to update status")
@@ -386,6 +481,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         description: "Delivery marked as failed.",
       })
 
+      // Wait 2 seconds then navigate
       setTimeout(() => {
         console.log("[v0] [DRIVER] Navigating back to route...")
         window.location.href = `/driver/routes/${routeId}?t=${Date.now()}`
