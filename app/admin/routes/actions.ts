@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { optimizeRouteNearestNeighbor, optimize2Opt } from "@/lib/routing"
-import { optimizeWithHereTourPlanning } from "@/lib/here/tour-planning"
+import { callHereTourPlanning } from "@/lib/here/tour-planning-service"
 import { buildHereProblemV3 } from "@/lib/here/build-problem-v3"
 import type { Order, VehicleConfig, Depot } from "@/lib/here/build-problem-v3"
 import { ensureOrderCoordinates } from "@/lib/ensure-coords"
@@ -151,14 +151,30 @@ export async function createRoute(
   try {
     const { problem, jobPlaceById } = await buildHereProblemV3(orderData, depot, vehicleConfig)
 
-    const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90)
+    const response = await callHereTourPlanning({
+      problem,
+      jobPlaceById,
+      maxSeconds: 90,
+      adminId: user.id,
+      metadata: { route_name: name, driver_id: driverId },
+    })
 
-    if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
-      optimizedRoute = tours[0].orderedStopIds
+    if (response.limitReached) {
+      // Daily limit reached - throw error to inform user
+      throw new Error(response.error || "Daily optimization limit reached")
+    }
+
+    if (response.success && response.tours && response.tours.length > 0 && response.tours[0].orderedStopIds.length > 0) {
+      optimizedRoute = response.tours[0].orderedStopIds
       usedHere = true
+      console.log(`[v0] HERE optimized route with ${optimizedRoute.length} stops (${response.usageInfo?.used}/${response.usageInfo?.limit} daily limit)`)
     }
   } catch (error) {
     console.error("[SERVER] [v0] HERE Tour Planning v3 failed, using fallback:", error)
+    // Error will propagate if it's a limit error, otherwise fall through to fallback
+    if (error instanceof Error && error.message.includes("limit reached")) {
+      throw error
+    }
   }
 
   if (!usedHere) {
@@ -402,36 +418,39 @@ export async function createMultipleRoutes(
       let optimizedRoute: string[] = []
       let usedHere = false
 
-      // Try HERE optimization if batch is not too large
       if (orderData.length <= MAX_ORDERS_PER_HERE_REQUEST) {
         try {
           const { problem, jobPlaceById } = await buildHereProblemV3(orderData, batchDepot, vehicleConfig)
-          const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120)
+          
+          const response = await callHereTourPlanning({
+            problem,
+            jobPlaceById,
+            maxSeconds: 120,
+            adminId: user.id,
+            metadata: {
+              batch_index: batchIndex + 1,
+              total_batches: routeBatches.length,
+              driver_id: driverId,
+            },
+          })
 
-          if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
-            optimizedRoute = tours[0].orderedStopIds
+          if (response.limitReached) {
+            console.warn(`[v0] Daily HERE limit reached at batch ${batchIndex + 1}/${routeBatches.length}. Switching to fallback for remaining routes.`)
+            console.warn(`[v0] ${response.error}`)
+            // Don't throw - continue with fallback for remaining routes
+          } else if (response.success && response.tours && response.tours.length > 0 && response.tours[0].orderedStopIds.length > 0) {
+            optimizedRoute = response.tours[0].orderedStopIds
             usedHere = true
-            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops`)
+            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops (${response.usageInfo?.used}/${response.usageInfo?.limit} daily limit)`)
           }
         } catch (error: any) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           console.error(`[v0] HERE optimization failed for route ${batchIndex + 1}:`, errorMessage)
-
-          if (
-            error?.isRateLimit ||
-            errorMessage.includes("Too Many Requests") ||
-            errorMessage.includes("rate limit") ||
-            errorMessage.includes("429")
-          ) {
-            console.log("[v0] Rate limit detected, waiting 20 seconds before fallback...")
-            await new Promise((resolve) => setTimeout(resolve, 20000))
-          }
         }
       } else {
         console.log(`[v0] Batch ${batchIndex + 1} has ${orderData.length} orders, exceeds HERE limit, using fallback`)
       }
 
-      // Use fallback optimization if HERE failed or wasn't used
       if (!usedHere) {
         console.log(`[v0] Using fallback optimization for route ${batchIndex + 1} with ${orderData.length} orders`)
         const stops = orderData.map((o) => ({
