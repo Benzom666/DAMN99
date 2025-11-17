@@ -139,9 +139,51 @@ export async function buildHereProblemV3(
     tasks: { deliveries: [makeDeliveryTask(o, SOFT_WINDOWS)] },
   }))
 
+  if (vehicle.returnToDepot !== false && depot && depot.lat && depot.lng) {
+    // Add depot start stop (stop 0)
+    const depotStartJob = {
+      id: `depot-start-${vehicle.id}`,
+      tasks: {
+        deliveries: [{
+          places: [{
+            location: { lat: depot.lat, lng: depot.lng },
+            duration: 60, // 1 minute at warehouse to start
+          }],
+          demand: [0], // No capacity used
+        }],
+      },
+      priority: 100, // Highest priority to ensure it's first
+    }
+
+    // Add depot end stop (stop N+1)
+    const depotEndJob = {
+      id: `depot-end-${vehicle.id}`,
+      tasks: {
+        deliveries: [{
+          places: [{
+            location: { lat: depot.lat, lng: depot.lng },
+            duration: 60, // 1 minute at warehouse to end
+          }],
+          demand: [0], // No capacity used
+        }],
+      },
+      priority: 100, // Highest priority
+    }
+
+    // Insert depot stops: start at beginning, end at the end
+    jobs.unshift(depotStartJob)
+    jobs.push(depotEndJob)
+
+    console.log(`[v0] Added warehouse as stops: start (${depot.lat}, ${depot.lng}) and end`)
+  }
+
   const jobPlaceById = new Map<string, { lat: number; lng: number }>()
   for (const o of orders) {
     jobPlaceById.set(o.id, { lat: o.latitude, lng: o.longitude })
+  }
+  if (vehicle.returnToDepot !== false && depot) {
+    jobPlaceById.set(`depot-start-${vehicle.id}`, { lat: depot.lat, lng: depot.lng })
+    jobPlaceById.set(`depot-end-${vehicle.id}`, { lat: depot.lat, lng: depot.lng })
   }
 
   const withTimes = jobs.filter((j) => j.tasks?.deliveries?.some((d: any) => d.places?.[0]?.times))
@@ -157,7 +199,7 @@ export async function buildHereProblemV3(
     }
   }
 
-  console.log(`[v0] Built problem with ${jobs.length} jobs, shift: ${shiftStartTime} - ${shiftEndTime}`)
+  console.log(`[v0] Built problem with ${jobs.length} jobs (including ${vehicle.returnToDepot !== false ? 2 : 0} depot stops), shift: ${shiftStartTime} - ${shiftEndTime}`)
   console.log(`[v0] softWindows=${SOFT_WINDOWS}, jobs with times: ${withTimes.length}`)
   if (jobs.length > 0) {
     console.log(`[v0] first job snippet:`, JSON.stringify(jobs[0], null, 2))

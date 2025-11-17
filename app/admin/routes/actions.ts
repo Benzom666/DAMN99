@@ -154,8 +154,11 @@ export async function createRoute(
     const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90)
 
     if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
-      optimizedRoute = tours[0].orderedStopIds
+      optimizedRoute = tours[0].orderedStopIds.filter(
+        (id: string) => !id.startsWith('depot-start-') && !id.startsWith('depot-end-')
+      )
       usedHere = true
+      console.log(`[v0] HERE optimized route with ${optimizedRoute.length} stops (excluding depot stops)`)
     }
   } catch (error) {
     console.error("[SERVER] [v0] HERE Tour Planning v3 failed, using fallback:", error)
@@ -193,13 +196,9 @@ export async function createRoute(
   for (let i = 0; i < optimizedRoute.length; i++) {
     await supabase
       .from("orders")
-      .update({
-        route_id: route.id,
-        stop_sequence: i + 1,
-        status: "assigned",
-      })
+      .update({ stop_sequence: i + 1 })
       .eq("id", optimizedRoute[i])
-      .or(`admin_id.eq.${user.id},admin_id.is.null`)
+      .eq("admin_id", user.id)
   }
 
   revalidatePath("/admin/routes")
@@ -433,9 +432,11 @@ export async function createMultipleRoutes(
           const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120)
 
           if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
-            optimizedRoute = tours[0].orderedStopIds
+            optimizedRoute = tours[0].orderedStopIds.filter(
+              (id: string) => !id.startsWith('depot-start-') && !id.startsWith('depot-end-')
+            )
             usedHere = true
-            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops`)
+            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops (excluding depot stops)`)
           }
         } catch (error: any) {
           const errorMessage = error instanceof Error ? error.message : String(error)
@@ -476,7 +477,12 @@ export async function createMultipleRoutes(
         const routeName = `Route ${createdRouteIds.length + 1}`
 
         try {
-          const actualOrderIds = optimizedRoute.filter((id) => id !== "departure" && id !== "arrival")
+          const actualOrderIds = optimizedRoute.filter((id) => 
+            id !== "departure" && 
+            id !== "arrival" && 
+            !id.startsWith('depot-start-') && 
+            !id.startsWith('depot-end-')
+          )
 
           const { data: route, error: routeError } = await supabase
             .from("routes")
