@@ -309,6 +309,8 @@ export async function createMultipleRoutes(
       if (coords) {
         sharedDepot = coords
         console.log("[v0] [CREATE_ROUTES] Using shared warehouse depot:", sharedDepot)
+      } else {
+        console.warn("[v0] [CREATE_ROUTES] Failed to parse warehouse location:", optimizationConfig.warehouseLocation)
       }
     }
 
@@ -378,8 +380,16 @@ export async function createMultipleRoutes(
 
       let batchDepot: Depot
       if (sharedDepot) {
+        // Use the warehouse location for ALL routes
         batchDepot = sharedDepot
         console.log(`[v0] Route ${batchIndex + 1}: Using warehouse depot:`, batchDepot)
+      } else if (!createWithoutDrivers && profiles[batchIndex]?.depot_lat && profiles[batchIndex]?.depot_lng) {
+        // Use driver-specific depot if available
+        batchDepot = {
+          lat: profiles[batchIndex].depot_lat,
+          lng: profiles[batchIndex].depot_lng,
+        }
+        console.log(`[v0] Route ${batchIndex + 1}: Using driver depot:`, batchDepot)
       } else {
         // Fallback: Calculate centroid for this batch as depot
         const centroidLat = orderData.reduce((sum, o) => sum + o.latitude, 0) / orderData.length
@@ -391,19 +401,10 @@ export async function createMultipleRoutes(
         console.log(`[v0] Route ${batchIndex + 1}: Using centroid depot:`, batchDepot)
       }
 
-      if (!sharedDepot && profiles[batchIndex] && profiles[batchIndex].depot_lat && profiles[batchIndex].depot_lng) {
-        batchDepot = {
-          lat: profiles[batchIndex].depot_lat,
-          lng: profiles[batchIndex].depot_lng,
-        }
-        console.log(`[v0] Route ${batchIndex + 1}: Using driver depot:`, batchDepot)
-      }
-
       // Get driver for this route (if available)
       const driver = !createWithoutDrivers && profiles[batchIndex] ? profiles[batchIndex] : null
       const driverId = driver?.id || null
 
-      // Build vehicle config
       const vehicleConfig: VehicleConfig = {
         id: driverId || `vehicle-${batchIndex + 1}`,
         capacity: optimizationConfig?.vehicleCapacity || driver?.vehicle_capacity || env.ROUTE_CAPACITY,
