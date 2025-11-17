@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import dynamic from "next/dynamic"
-import { ArrowLeft, User, Package, MapPin, Edit, Trash2, Calculator, Ruler, Clock } from "lucide-react"
+import { ArrowLeft, User, Package, MapPin, Edit, Trash2, Calculator, Ruler, Clock } from 'lucide-react'
 import Link from "next/link"
 import { useState } from "react"
 import {
@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { updateRoute, deleteRoute, recalcRouteMetricsAction } from "../actions"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import { toast } from "sonner"
 import ErrorBoundary from "@/components/error-boundary"
 import { formatDuration } from "@/lib/utils"
@@ -49,9 +49,25 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
   const [isRecalculating, setIsRecalculating] = useState(false)
   const router = useRouter()
 
+  const missingData = orders.filter((o) => !o.latitude || !o.longitude || o.stop_sequence == null)
+  console.log(`[v0] [ROUTE_DETAIL] Total orders: ${orders.length}`)
+  console.log(`[v0] [ROUTE_DETAIL] Orders missing coordinates or sequence: ${missingData.length}`)
+  if (missingData.length > 0) {
+    console.log("[v0] [ROUTE_DETAIL] Missing data breakdown:", missingData.map(o => ({
+      id: o.id.substring(0, 8),
+      address: o.address?.substring(0, 30),
+      hasLat: !!o.latitude,
+      hasLng: !!o.longitude,
+      hasSeq: o.stop_sequence != null,
+      stopSeq: o.stop_sequence
+    })))
+  }
+
   const orderedStops = orders
     .filter((o) => o.latitude && o.longitude && o.stop_sequence != null)
     .sort((a, b) => (a.stop_sequence || 0) - (b.stop_sequence || 0))
+
+  console.log(`[v0] [ROUTE_DETAIL] Markers being displayed: ${orderedStops.length}`)
 
   const markers = orderedStops.map((o) => ({
     lat: o.latitude,
