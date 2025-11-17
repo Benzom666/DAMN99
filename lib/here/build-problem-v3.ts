@@ -152,7 +152,7 @@ export async function buildHereProblemV3(
           demand: [0], // No capacity used
         }],
       },
-      priority: 100, // Highest priority to ensure it's first
+      priority: 5, // Highest valid priority (max is 5)
     }
 
     // Add depot end stop (stop N+1)
@@ -167,7 +167,7 @@ export async function buildHereProblemV3(
           demand: [0], // No capacity used
         }],
       },
-      priority: 100, // Highest priority
+      priority: 5, // Highest valid priority (max is 5)
     }
 
     // Insert depot stops: start at beginning, end at the end
