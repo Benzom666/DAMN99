@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import dynamic from "next/dynamic"
-import { ArrowLeft, User, Package, MapPin, Edit, Trash2, Calculator, Ruler, Clock } from 'lucide-react'
+import { ArrowLeft, User, Package, MapPin, Edit, Trash2, Calculator, Ruler, Clock } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import {
@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { updateRoute, deleteRoute, recalcRouteMetricsAction } from "../actions"
-import { useRouter } from 'next/navigation'
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import ErrorBoundary from "@/components/error-boundary"
 import { formatDuration } from "@/lib/utils"
@@ -49,42 +49,15 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
   const [isRecalculating, setIsRecalculating] = useState(false)
   const router = useRouter()
 
-  const missingData = orders.filter((o) => !o.latitude || !o.longitude || o.stop_sequence == null)
-  console.log(`[v0] [ROUTE_DETAIL] Total orders: ${orders.length}`)
-  console.log(`[v0] [ROUTE_DETAIL] Orders missing coordinates or sequence: ${missingData.length}`)
-  if (missingData.length > 0) {
-    console.log("[v0] [ROUTE_DETAIL] Missing data breakdown:", missingData.map(o => ({
-      id: o.id.substring(0, 8),
-      address: o.address?.substring(0, 30),
-      hasLat: !!o.latitude,
-      hasLng: !!o.longitude,
-      hasSeq: o.stop_sequence != null,
-      stopSeq: o.stop_sequence
-    })))
-  }
+  const orderedStops = orders
+    .filter((o) => o.latitude && o.longitude && o.stop_sequence != null)
+    .sort((a, b) => (a.stop_sequence || 0) - (b.stop_sequence || 0))
 
-  const ordersWithCoords = orders.filter((o) => o.latitude && o.longitude)
-  const ordersWithSequence = ordersWithCoords.filter((o) => o.stop_sequence != null)
-  const ordersWithoutSequence = ordersWithCoords.filter((o) => o.stop_sequence == null)
-  
-  console.log(`[v0] [ROUTE_DETAIL] Total orders: ${orders.length}`)
-  console.log(`[v0] [ROUTE_DETAIL] Orders with coordinates: ${ordersWithCoords.length}`)
-  console.log(`[v0] [ROUTE_DETAIL] Orders with sequence: ${ordersWithSequence.length}`)
-  console.log(`[v0] [ROUTE_DETAIL] Orders without sequence: ${ordersWithoutSequence.length}`)
-  
-  // Sort orders with sequence
-  const orderedStops = ordersWithSequence.sort((a, b) => (a.stop_sequence || 0) - (b.stop_sequence || 0))
-  
-  // Combine: sequenced stops + unsequenced stops at the end
-  const allDisplayableStops = [...orderedStops, ...ordersWithoutSequence]
-
-  console.log(`[v0] [ROUTE_DETAIL] Markers being displayed: ${allDisplayableStops.length}`)
-
-  const markers = allDisplayableStops.map((o) => ({
+  const markers = orderedStops.map((o) => ({
     lat: o.latitude,
     lng: o.longitude,
     label: o.stop_sequence?.toString() || "?",
-    color: o.status === "delivered" ? "#22c55e" : o.status === "failed" ? "#ef4444" : o.stop_sequence == null ? "#f59e0b" : "#3b82f6",
+    color: o.status === "delivered" ? "#22c55e" : o.status === "failed" ? "#ef4444" : "#3b82f6",
     status: o.status,
     address: o.address,
     customerId: o.customer_name,
@@ -385,25 +358,11 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
           <CardTitle>Stops ({orders.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {ordersWithoutSequence.length > 0 && (
-            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                ⚠️ {ordersWithoutSequence.length} order(s) missing stop sequence
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                These orders have coordinates but no delivery sequence. Re-optimize the route to assign sequences.
-              </p>
-            </div>
-          )}
           <div className="space-y-3">
-            {allDisplayableStops.map((order) => (
+            {orders.map((order) => (
               <div key={order.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                  order.stop_sequence == null 
-                    ? 'bg-amber-500 text-white' 
-                    : 'bg-primary text-primary-foreground'
-                }`}>
-                  {order.stop_sequence ?? "?"}
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+                  {order.stop_sequence}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">

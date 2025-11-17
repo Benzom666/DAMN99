@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createRoute, createMultipleRoutes } from "./actions"
 import { useState } from "react"
 import type { Order, Profile } from "@/lib/types"
-import { useRouter } from 'next/navigation'
+import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 
@@ -106,11 +106,6 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
   async function handleCreate() {
     if (selectedOrders.size === 0) return
 
-    if (isLoading) {
-      console.log("[v0] Optimization already in progress, ignoring click")
-      return
-    }
-
     setIsLoading(true)
     try {
       const optimizationConfig: OptimizationConfig = {
@@ -159,14 +154,7 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
       router.refresh()
     } catch (error) {
       console.error("Error creating route:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown error"
-      if (errorMessage.includes("limit reached")) {
-        alert(
-          `Daily Optimization Limit Reached\n\n${errorMessage}\n\nPlease try again tomorrow or contact support to increase your limit.`,
-        )
-      } else {
-        alert(`Error: ${errorMessage}`)
-      }
+      alert(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
     } finally {
       setIsLoading(false)
     }
@@ -491,16 +479,7 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
               (multiRouteMode && !numberOfRoutes)
             }
           >
-            {isLoading ? (
-              <>
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
-                Optimizing...
-              </>
-            ) : multiRouteMode ? (
-              "Create Routes"
-            ) : (
-              "Create Route"
-            )}
+            {isLoading ? "Creating..." : multiRouteMode ? "Create Routes" : "Create Route"}
           </Button>
         </DialogFooter>
       </DialogContent>

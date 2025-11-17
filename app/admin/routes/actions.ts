@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { optimizeRouteNearestNeighbor, optimize2Opt } from "@/lib/routing"
-import { callHereTourPlanning } from "@/lib/here/tour-planning-service"
+import { optimizeWithHereTourPlanning } from "@/lib/here/tour-planning"
 import { buildHereProblemV3 } from "@/lib/here/build-problem-v3"
 import type { Order, VehicleConfig, Depot } from "@/lib/here/build-problem-v3"
 import { ensureOrderCoordinates } from "@/lib/ensure-coords"
@@ -151,28 +151,14 @@ export async function createRoute(
   try {
     const { problem, jobPlaceById } = await buildHereProblemV3(orderData, depot, vehicleConfig)
 
-    const response = await callHereTourPlanning({
-      problem,
-      jobPlaceById,
-      maxSeconds: 90,
-      adminId: user.id,
-      metadata: { route_name: name, driver_id: driverId },
-    })
+    const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90)
 
-    if (response.limitReached) {
-      throw new Error(response.error || "Daily optimization limit reached")
-    }
-
-    if (response.success && response.tours && response.tours.length > 0 && response.tours[0].orderedStopIds.length > 0) {
-      optimizedRoute = response.tours[0].orderedStopIds
+    if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
+      optimizedRoute = tours[0].orderedStopIds
       usedHere = true
-      console.log(`[v0] HERE optimized route with ${optimizedRoute.length} stops (${response.usageInfo?.used}/${response.usageInfo?.limit} daily limit)`)
     }
   } catch (error) {
     console.error("[SERVER] [v0] HERE Tour Planning v3 failed, using fallback:", error)
-    if (error instanceof Error && error.message.includes("limit reached")) {
-      throw error
-    }
   }
 
   if (!usedHere) {
@@ -214,33 +200,6 @@ export async function createRoute(
       })
       .eq("id", optimizedRoute[i])
       .or(`admin_id.eq.${user.id},admin_id.is.null`)
-  }
-
-  const optimizedOrderIds = new Set(optimizedRoute)
-  const unsequencedOrders = validOrdersWithCoords.filter(o => !optimizedOrderIds.has(o.id))
-  
-  if (unsequencedOrders.length > 0) {
-    console.log(`[v0] [CREATE_ROUTE] Found ${unsequencedOrders.length} orders not in optimized route, assigning to end`)
-    
-    // Assign these orders to the route with stop_sequence at the end
-    let nextSequence = optimizedRoute.length + 1
-    for (const order of unsequencedOrders) {
-      await supabase
-        .from("orders")
-        .update({
-          route_id: route.id,
-          stop_sequence: nextSequence++,
-          status: "assigned",
-        })
-        .eq("id", order.id)
-        .or(`admin_id.eq.${user.id},admin_id.is.null`)
-    }
-    
-    // Update route total_stops to include all orders
-    await supabase
-      .from("routes")
-      .update({ total_stops: optimizedRoute.length + unsequencedOrders.length })
-      .eq("id", route.id)
   }
 
   revalidatePath("/admin/routes")
@@ -344,6 +303,15 @@ export async function createMultipleRoutes(
       throw new Error("No orders with valid coordinates")
     }
 
+    let sharedDepot: Depot | null = null
+    if (optimizationConfig?.useWarehouse && optimizationConfig?.warehouseLocation) {
+      const coords = parseWarehouseLocation(optimizationConfig.warehouseLocation)
+      if (coords) {
+        sharedDepot = coords
+        console.log("[v0] [CREATE_ROUTES] Using shared warehouse depot:", sharedDepot)
+      }
+    }
+
     let profiles: any[] = []
     if (!createWithoutDrivers && driverIds.length > 0) {
       const { data } = await supabase
@@ -367,6 +335,7 @@ export async function createMultipleRoutes(
       }
     }
 
+    // Split orders evenly across the requested number of routes
     console.log(`[v0] Distributing ${validOrdersWithCoords.length} orders across ${routeCount} routes`)
 
     const ordersPerRoute = Math.ceil(validOrdersWithCoords.length / routeCount)
@@ -407,17 +376,34 @@ export async function createMultipleRoutes(
         quantity: o.quantity || 1,
       }))
 
-      const centroidLat = orderData.reduce((sum, o) => sum + o.latitude, 0) / orderData.length
-      const centroidLng = orderData.reduce((sum, o) => sum + o.longitude, 0) / orderData.length
-
-      const batchDepot: Depot = {
-        lat: centroidLat,
-        lng: centroidLng,
+      let batchDepot: Depot
+      if (sharedDepot) {
+        batchDepot = sharedDepot
+        console.log(`[v0] Route ${batchIndex + 1}: Using warehouse depot:`, batchDepot)
+      } else {
+        // Fallback: Calculate centroid for this batch as depot
+        const centroidLat = orderData.reduce((sum, o) => sum + o.latitude, 0) / orderData.length
+        const centroidLng = orderData.reduce((sum, o) => sum + o.longitude, 0) / orderData.length
+        batchDepot = {
+          lat: centroidLat,
+          lng: centroidLng,
+        }
+        console.log(`[v0] Route ${batchIndex + 1}: Using centroid depot:`, batchDepot)
       }
 
+      if (!sharedDepot && profiles[batchIndex] && profiles[batchIndex].depot_lat && profiles[batchIndex].depot_lng) {
+        batchDepot = {
+          lat: profiles[batchIndex].depot_lat,
+          lng: profiles[batchIndex].depot_lng,
+        }
+        console.log(`[v0] Route ${batchIndex + 1}: Using driver depot:`, batchDepot)
+      }
+
+      // Get driver for this route (if available)
       const driver = !createWithoutDrivers && profiles[batchIndex] ? profiles[batchIndex] : null
       const driverId = driver?.id || null
 
+      // Build vehicle config
       const vehicleConfig: VehicleConfig = {
         id: driverId || `vehicle-${batchIndex + 1}`,
         capacity: optimizationConfig?.vehicleCapacity || driver?.vehicle_capacity || env.ROUTE_CAPACITY,
@@ -439,38 +425,36 @@ export async function createMultipleRoutes(
       let optimizedRoute: string[] = []
       let usedHere = false
 
+      // Try HERE optimization if batch is not too large
       if (orderData.length <= MAX_ORDERS_PER_HERE_REQUEST) {
         try {
           const { problem, jobPlaceById } = await buildHereProblemV3(orderData, batchDepot, vehicleConfig)
-          
-          const response = await callHereTourPlanning({
-            problem,
-            jobPlaceById,
-            maxSeconds: 120,
-            adminId: user.id,
-            metadata: {
-              batch_index: batchIndex + 1,
-              total_batches: routeBatches.length,
-              driver_id: driverId,
-            },
-          })
+          const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120)
 
-          if (response.limitReached) {
-            console.warn(`[v0] Daily HERE limit reached at batch ${batchIndex + 1}/${routeBatches.length}. Switching to fallback for remaining routes.`)
-            console.warn(`[v0] ${response.error}`)
-          } else if (response.success && response.tours && response.tours.length > 0 && response.tours[0].orderedStopIds.length > 0) {
-            optimizedRoute = response.tours[0].orderedStopIds
+          if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
+            optimizedRoute = tours[0].orderedStopIds
             usedHere = true
-            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops (${response.usageInfo?.used}/${response.usageInfo?.limit} daily limit)`)
+            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops`)
           }
         } catch (error: any) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           console.error(`[v0] HERE optimization failed for route ${batchIndex + 1}:`, errorMessage)
+
+          if (
+            error?.isRateLimit ||
+            errorMessage.includes("Too Many Requests") ||
+            errorMessage.includes("rate limit") ||
+            errorMessage.includes("429")
+          ) {
+            console.log("[v0] Rate limit detected, waiting 20 seconds before fallback...")
+            await new Promise((resolve) => setTimeout(resolve, 20000))
+          }
         }
       } else {
         console.log(`[v0] Batch ${batchIndex + 1} has ${orderData.length} orders, exceeds HERE limit, using fallback`)
       }
 
+      // Use fallback optimization if HERE failed or wasn't used
       if (!usedHere) {
         console.log(`[v0] Using fallback optimization for route ${batchIndex + 1} with ${orderData.length} orders`)
         const stops = orderData.map((o) => ({
@@ -486,6 +470,7 @@ export async function createMultipleRoutes(
         }
       }
 
+      // Create the route
       if (optimizedRoute.length > 0) {
         const routeName = `Route ${createdRouteIds.length + 1}`
 
@@ -517,7 +502,10 @@ export async function createMultipleRoutes(
 
           const { error: updateError } = await supabase
             .from("orders")
-            .update({ route_id: route.id, status: "assigned" })
+            .update({
+              route_id: route.id,
+              status: "assigned",
+            })
             .in("id", actualOrderIds)
             .or(`admin_id.eq.${user.id},admin_id.is.null`)
 
@@ -708,12 +696,14 @@ export async function bulkDeleteRoutes(routeIds: string[]) {
     const batch = routeIds.slice(i, i + BATCH_SIZE)
 
     try {
+      // Reset orders to pending for this batch of routes
       await supabase
         .from("orders")
         .update({ route_id: null, stop_sequence: null, status: "pending" })
         .in("route_id", batch)
         .eq("admin_id", user.id)
 
+      // Delete the routes
       const { error } = await supabase.from("routes").delete().in("id", batch).eq("admin_id", user.id)
 
       if (error) {
@@ -746,6 +736,7 @@ export async function bulkAssignDriver(routeIds: string[], driverId: string | nu
 
   console.log("[v0] [BULK_ASSIGN] Assigning driver", driverId || "unassigned", "to", routeIds.length, "routes")
 
+  // Verify driver belongs to admin if not null
   if (driverId) {
     const { data: driver } = await supabase.from("profiles").select("admin_id").eq("id", driverId).single()
 
