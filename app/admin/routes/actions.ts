@@ -154,11 +154,8 @@ export async function createRoute(
     const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90)
 
     if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
-      optimizedRoute = tours[0].orderedStopIds.filter(
-        (id: string) => !id.startsWith('depot-start-') && !id.startsWith('depot-end-')
-      )
+      optimizedRoute = tours[0].orderedStopIds
       usedHere = true
-      console.log(`[v0] HERE optimized route with ${optimizedRoute.length} stops (excluding depot stops)`)
     }
   } catch (error) {
     console.error("[SERVER] [v0] HERE Tour Planning v3 failed, using fallback:", error)
@@ -196,9 +193,13 @@ export async function createRoute(
   for (let i = 0; i < optimizedRoute.length; i++) {
     await supabase
       .from("orders")
-      .update({ stop_sequence: i + 1 })
+      .update({
+        route_id: route.id,
+        stop_sequence: i + 1,
+        status: "assigned",
+      })
       .eq("id", optimizedRoute[i])
-      .eq("admin_id", user.id)
+      .or(`admin_id.eq.${user.id},admin_id.is.null`)
   }
 
   revalidatePath("/admin/routes")
@@ -302,17 +303,6 @@ export async function createMultipleRoutes(
       throw new Error("No orders with valid coordinates")
     }
 
-    let sharedDepot: Depot | null = null
-    if (optimizationConfig?.useWarehouse && optimizationConfig?.warehouseLocation) {
-      const coords = parseWarehouseLocation(optimizationConfig.warehouseLocation)
-      if (coords) {
-        sharedDepot = coords
-        console.log("[v0] [CREATE_ROUTES] Using shared warehouse depot:", sharedDepot)
-      } else {
-        console.warn("[v0] [CREATE_ROUTES] Failed to parse warehouse location:", optimizationConfig.warehouseLocation)
-      }
-    }
-
     let profiles: any[] = []
     if (!createWithoutDrivers && driverIds.length > 0) {
       const { data } = await supabase
@@ -377,33 +367,20 @@ export async function createMultipleRoutes(
         quantity: o.quantity || 1,
       }))
 
-      let batchDepot: Depot
-      if (sharedDepot) {
-        // Use the warehouse location for ALL routes
-        batchDepot = sharedDepot
-        console.log(`[v0] Route ${batchIndex + 1}: Using warehouse depot:`, batchDepot)
-      } else if (!createWithoutDrivers && profiles[batchIndex]?.depot_lat && profiles[batchIndex]?.depot_lng) {
-        // Use driver-specific depot if available
-        batchDepot = {
-          lat: profiles[batchIndex].depot_lat,
-          lng: profiles[batchIndex].depot_lng,
-        }
-        console.log(`[v0] Route ${batchIndex + 1}: Using driver depot:`, batchDepot)
-      } else {
-        // Fallback: Calculate centroid for this batch as depot
-        const centroidLat = orderData.reduce((sum, o) => sum + o.latitude, 0) / orderData.length
-        const centroidLng = orderData.reduce((sum, o) => sum + o.longitude, 0) / orderData.length
-        batchDepot = {
-          lat: centroidLat,
-          lng: centroidLng,
-        }
-        console.log(`[v0] Route ${batchIndex + 1}: Using centroid depot:`, batchDepot)
+      // Calculate centroid for this batch as depot
+      const centroidLat = orderData.reduce((sum, o) => sum + o.latitude, 0) / orderData.length
+      const centroidLng = orderData.reduce((sum, o) => sum + o.longitude, 0) / orderData.length
+
+      const batchDepot: Depot = {
+        lat: centroidLat,
+        lng: centroidLng,
       }
 
       // Get driver for this route (if available)
       const driver = !createWithoutDrivers && profiles[batchIndex] ? profiles[batchIndex] : null
       const driverId = driver?.id || null
 
+      // Build vehicle config
       const vehicleConfig: VehicleConfig = {
         id: driverId || `vehicle-${batchIndex + 1}`,
         capacity: optimizationConfig?.vehicleCapacity || driver?.vehicle_capacity || env.ROUTE_CAPACITY,
@@ -432,11 +409,9 @@ export async function createMultipleRoutes(
           const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120)
 
           if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
-            optimizedRoute = tours[0].orderedStopIds.filter(
-              (id: string) => !id.startsWith('depot-start-') && !id.startsWith('depot-end-')
-            )
+            optimizedRoute = tours[0].orderedStopIds
             usedHere = true
-            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops (excluding depot stops)`)
+            console.log(`[v0] HERE optimized route ${batchIndex + 1} with ${optimizedRoute.length} stops`)
           }
         } catch (error: any) {
           const errorMessage = error instanceof Error ? error.message : String(error)
@@ -477,12 +452,7 @@ export async function createMultipleRoutes(
         const routeName = `Route ${createdRouteIds.length + 1}`
 
         try {
-          const actualOrderIds = optimizedRoute.filter((id) => 
-            id !== "departure" && 
-            id !== "arrival" && 
-            !id.startsWith('depot-start-') && 
-            !id.startsWith('depot-end-')
-          )
+          const actualOrderIds = optimizedRoute.filter((id) => id !== "departure" && id !== "arrival")
 
           const { data: route, error: routeError } = await supabase
             .from("routes")

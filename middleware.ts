@@ -1,56 +1,66 @@
-import { updateSession } from "@/lib/supabase/middleware"
-import { createClient } from "@supabase/supabase-js"
+import { createServerClient } from "@supabase/ssr"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-  
-  const response = await updateSession(request)
-  
-  const authCookie = response.cookies.get('sb-access-token')
-  if (authCookie) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+        },
+      },
+    },
+  )
+
+  // Get the current user session
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
     try {
-      const payload = JSON.parse(atob(authCookie.value.split('.')[1]))
-      const userId = payload.sub
-      
-      if (userId) {
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('role')
-          .eq('id', userId)
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+
+      if (request.nextUrl.pathname === "/setup-super-admin") {
+        // Check if any super admin already exists
+        const { data: existingSuperAdmin } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("role", "super_admin")
+          .limit(1)
           .single()
 
-        if (request.nextUrl.pathname === '/setup-super-admin') {
-          // Check if any super admin already exists
-          const { data: existingSuperAdmin } = await supabaseAdmin
-            .from('profiles')
-            .select('id')
-            .eq('role', 'super_admin')
-            .limit(1)
-            .single()
-
-          // If a super admin exists and current user is not super admin, redirect to admin
-          if (existingSuperAdmin && profile?.role !== 'super_admin') {
-            return NextResponse.redirect(new URL('/admin/orders', request.url))
-          }
+        // If a super admin exists and current user is not super admin, redirect to admin
+        if (existingSuperAdmin && profile?.role !== "super_admin") {
+          return NextResponse.redirect(new URL("/admin/orders", request.url))
         }
+      }
 
-        if (request.nextUrl.pathname.startsWith('/super-admin')) {
-          if (profile?.role !== 'super_admin') {
-            return NextResponse.redirect(new URL('/admin/orders', request.url))
-          }
+      if (request.nextUrl.pathname.startsWith("/super-admin")) {
+        if (profile?.role !== "super_admin") {
+          return NextResponse.redirect(new URL("/admin/orders", request.url))
         }
       }
     } catch (error) {
-      console.error('Middleware error:', error)
+      console.error("Middleware error:", error)
     }
   }
 
-  return response
+  return supabaseResponse
 }
 
 export const config = {
