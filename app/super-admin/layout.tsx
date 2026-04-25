@@ -1,6 +1,6 @@
 import { requireSuperAdmin } from '@/lib/auth/super-admin'
 import Link from 'next/link'
-import { Shield, Building2, Truck, Package, Activity, Database, FileText } from 'lucide-react'
+import { Shield, Building2, Truck, Package, Activity, Database, FileText, DollarSign } from 'lucide-react'
 
 export default async function SuperAdminLayout({
   children,
@@ -64,7 +64,14 @@ export default async function SuperAdminLayout({
                 <FileText className="h-4 w-4" />
                 Audit
               </Link>
-              <Link 
+              <Link
+                href="/super-admin/costs"
+                className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
+              >
+                <DollarSign className="h-4 w-4" />
+                Costs
+              </Link>
+              <Link
                 href="/super-admin/system" 
                 className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
               >

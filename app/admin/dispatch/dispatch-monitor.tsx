@@ -158,7 +158,7 @@ export function DispatchMonitor({
             <HereMap
               markers={allMarkersWithDrivers}
               polylines={routePolylines}
-              useRoadPolylines={true}
+              useRoadPolylines={false}
               className="h-[500px]"
             />
 

@@ -344,7 +344,7 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
                 polylines={polylines}
                 depot={depot}
                 focusNextStop={hasUnservedStops}
-                useRoadPolylines={true}
+                useRoadPolylines={false}
                 height={384}
                 className="rounded-lg"
               />

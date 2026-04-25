@@ -58,7 +58,7 @@ export function HereMap({
   polylines = [],
   depot,
   focusNextStop = false,
-  useRoadPolylines = true,
+  useRoadPolylines = false,
   height = 420,
   className = "",
 }: {
@@ -108,6 +108,7 @@ export function HereMap({
     async function initMap() {
       try {
         if (!mapRef.current) return
+        if (!apiKey) return
 
         console.log("[v0] [HERE_MAP] Initializing HERE Map...")
 

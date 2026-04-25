@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { geocodeAddress, geocodeBatch } from "@/lib/geocoding"
 import { revalidatePath } from "next/cache"
+import { normalizeAddressKey } from "@/lib/here/cost-control"
 
 function isValidEmail(email: string): boolean {
   return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)
@@ -52,7 +53,7 @@ export async function createOrder(formData: FormData) {
   }
 
   // Geocode the address
-  const geoResult = await geocodeAddress(address, city, state, zip)
+  const geoResult = await geocodeAddress(address, city, state, zip, { adminId: user.id, userId: user.id })
 
   const orderData: any = {
     customer_name: customerName,
@@ -64,6 +65,10 @@ export async function createOrder(formData: FormData) {
     notes: notes || null,
     latitude: geoResult?.latitude || null,
     longitude: geoResult?.longitude || null,
+    geocode_at: new Date().toISOString(),
+    geocode_label: geoResult?.formattedAddress || null,
+    geocode_status: geoResult ? "success" : "failed",
+    geocode_error: geoResult ? null : "No geocoding result",
     status: "pending",
     order_number: generateOrderNumber(),
     admin_id: user.id, // Add admin_id for multi-tenancy
@@ -108,14 +113,22 @@ export async function updateOrder(orderId: string, formData: FormData) {
     }
   }
 
-  // Geocode the address
-  const geoResult = await geocodeAddress(address, city, state, zip)
-
-  const { data: existingOrder } = await supabase.from("orders").select("admin_id").eq("id", orderId).single()
+  const { data: existingOrder } = await supabase
+    .from("orders")
+    .select("admin_id,address,city,state,zip,latitude,longitude")
+    .eq("id", orderId)
+    .single()
 
   if (!existingOrder || existingOrder.admin_id !== user.id) {
     throw new Error("Unauthorized: Order not found or access denied")
   }
+
+  const oldAddressKey = normalizeAddressKey([existingOrder.address, existingOrder.city, existingOrder.state, existingOrder.zip])
+  const newAddressKey = normalizeAddressKey([address, city, state, zip])
+  const addressChanged = oldAddressKey !== newAddressKey
+  const geoResult = addressChanged
+    ? await geocodeAddress(address, city, state, zip, { adminId: user.id, userId: user.id, orderId })
+    : null
 
   const updateData: any = {
     customer_name: customerName,
@@ -125,8 +138,15 @@ export async function updateOrder(orderId: string, formData: FormData) {
     zip: zip || null,
     phone: phone || null,
     notes: notes || null,
-    latitude: geoResult?.latitude || null,
-    longitude: geoResult?.longitude || null,
+    latitude: addressChanged ? geoResult?.latitude || null : existingOrder.latitude,
+    longitude: addressChanged ? geoResult?.longitude || null : existingOrder.longitude,
+  }
+
+  if (addressChanged) {
+    updateData.geocode_at = new Date().toISOString()
+    updateData.geocode_label = geoResult?.formattedAddress || null
+    updateData.geocode_status = geoResult ? "success" : "failed"
+    updateData.geocode_error = geoResult ? null : "No geocoding result"
   }
 
   if (hasEmailColumn && customerEmail) {
@@ -304,7 +324,8 @@ export async function importOrdersFromCSV(csvData: string) {
       state: o.state,
       zip: o.zip,
     })),
-    25,
+    Number(process.env.HERE_GEOCODING_BATCH_SIZE || 5),
+    { adminId: user.id, userId: user.id },
   )
 
   // Build final orders array with geocoding results
@@ -330,6 +351,10 @@ export async function importOrdersFromCSV(csvData: string) {
       notes: order.notes || null,
       latitude: geoResult?.latitude || null,
       longitude: geoResult?.longitude || null,
+      geocode_at: new Date().toISOString(),
+      geocode_label: geoResult?.formattedAddress || null,
+      geocode_status: geoResult ? "success" : "failed",
+      geocode_error: geoResult ? null : "No geocoding result",
       status: "pending",
       order_number: order.order_number || generateOrderNumber(),
       admin_id: user.id, // Add admin_id for multi-tenancy

@@ -1,14 +1,14 @@
 import { requireSuperAdmin } from '@/lib/auth/super-admin'
-import { getSystemStats } from './actions'
+import { getHereCostAnalytics, getSystemStats } from './actions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Building2, Truck, Package, Ban, Activity, CheckCircle2 } from 'lucide-react'
+import { Building2, Truck, Package, Ban, Activity, CheckCircle2, DollarSign } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
 export default async function SuperAdminDashboard() {
   await requireSuperAdmin()
   
-  const stats = await getSystemStats()
+  const [stats, hereCosts] = await Promise.all([getSystemStats(), getHereCostAnalytics()])
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -77,6 +77,21 @@ export default async function SuperAdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{stats.suspendedAccounts}</div>
             <p className="text-xs text-muted-foreground mt-1">Suspended accounts</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-emerald-200 bg-emerald-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">HERE Cost 24h</CardTitle>
+            <DollarSign className="h-4 w-4 text-emerald-700" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-700">
+              ${(hereCosts.last24h.costCents / 100).toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {hereCosts.last24h.requests} paid requests logged
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -176,6 +191,22 @@ export default async function SuperAdminDashboard() {
               <CardContent>
                 <p className="text-sm text-muted-foreground">
                   Monitor performance, database stats, and system status
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/super-admin/costs">
+            <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Cost Analytics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Monitor HERE API usage, budget blocks, cache hits, and estimated spend
                 </p>
               </CardContent>
             </Card>

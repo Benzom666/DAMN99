@@ -54,10 +54,10 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
 
   const ottawaBias = { lat: 45.4215, lng: -75.6972 }
 
-  const BATCH_SIZE = 10 // Process 10 orders at a time
-  const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between batches
-  const DELAY_BETWEEN_REQUESTS = 100 // 100ms delay between individual requests
-  const MAX_RETRIES = 3
+  const BATCH_SIZE = Math.max(1, Math.min(Number(process.env.HERE_GEOCODING_BATCH_SIZE || 5), 10))
+  const DELAY_BETWEEN_BATCHES = Number(process.env.HERE_GEOCODING_BATCH_DELAY_MS || 1000)
+  const DELAY_BETWEEN_REQUESTS = Number(process.env.HERE_GEOCODING_REQUEST_DELAY_MS || 250)
+  const MAX_RETRIES = Math.max(0, Math.min(Number(process.env.HERE_GEOCODING_RETRIES || 1), 2))
 
   for (let i = 0; i < ordersToGeocode.length; i += BATCH_SIZE) {
     const batch = ordersToGeocode.slice(i, i + BATCH_SIZE)
@@ -84,9 +84,13 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
       let g = null
       let lastError = ""
 
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-          g = await geocodeAddress(fullAddress, apiKey, ottawaBias)
+          g = await geocodeAddress(fullAddress, apiKey, ottawaBias, {
+            adminId: o.admin_id,
+            orderId: o.id,
+            operation: "ensure_order_coordinates",
+          })
           if (g) break // Success!
 
           lastError = "Geocoding failed - no results"
@@ -94,7 +98,7 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
           if (error instanceof Error && error.message === "RATE_LIMIT_EXCEEDED") {
             lastError = "Rate limit exceeded"
             const backoffDelay = 2000 * Math.pow(2, attempt) // 2s, 4s, 8s
-            console.warn(`[v0] Rate limit hit, waiting ${backoffDelay}ms before retry ${attempt + 1}/${MAX_RETRIES}`)
+            console.warn(`[v0] Rate limit hit, waiting ${backoffDelay}ms before retry ${attempt + 1}/${MAX_RETRIES + 1}`)
             await new Promise((resolve) => setTimeout(resolve, backoffDelay))
             continue
           }
@@ -102,7 +106,7 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
         }
 
         // If not rate limited, wait a bit before retry
-        if (attempt < MAX_RETRIES - 1) {
+        if (attempt < MAX_RETRIES) {
           await new Promise((resolve) => setTimeout(resolve, 500))
         }
       }
@@ -122,6 +126,10 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
           .update({
             latitude: g.lat,
             longitude: g.lng,
+            geocode_at: new Date().toISOString(),
+            geocode_label: g.label || null,
+            geocode_status: "success",
+            geocode_error: null,
           })
           .eq("id", o.id)
 

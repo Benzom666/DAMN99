@@ -11,15 +11,17 @@ async function logAuditAction(action: string, targetTable: string, targetId: str
   
   if (user) {
     // Note: Requires super_admin_audit_log table from migration
-    await supabase.from('super_admin_audit_log').insert({
-      super_admin_id: user.id,
-      action,
-      target_table: targetTable,
-      target_id: targetId,
-      details
-    }).catch(() => {
+    try {
+      await supabase.from('super_admin_audit_log').insert({
+        super_admin_id: user.id,
+        action,
+        target_table: targetTable,
+        target_id: targetId,
+        details
+      })
+    } catch {
       // Silently fail if audit log table doesn't exist yet
-    })
+    }
   }
 }
 
@@ -176,13 +178,14 @@ export async function bulkDeleteOrders(orderIds: string[]) {
   const supabase = await getSupabaseAdmin()
   
   for (const orderId of orderIds) {
-    await supabase
-      .from('orders')
-      .delete()
-      .eq('id', orderId)
-      .catch(() => {
-        // Silently fail if order deletion fails
-      })
+    try {
+      await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId)
+    } catch {
+      // Silently fail if order deletion fails
+    }
   }
   
   await logAuditAction('bulk_delete_orders', 'orders', orderIds.join(','), {})
@@ -263,5 +266,73 @@ export async function getSystemStats() {
     suspendedAccounts: 0, // Will be available after migration
     activeRoutes: activeRoutes || 0,
     completedOrders: completedOrders || 0
+  }
+}
+
+export async function getHereCostAnalytics() {
+  const supabase = await getSupabaseAdmin()
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const [last24h, last7d, recent] = await Promise.all([
+    (supabase as any)
+      .from('here_api_usage')
+      .select('service, request_count, unit_count, estimated_cost_cents, status, cache_hit')
+      .gte('created_at', since24h)
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    (supabase as any)
+      .from('here_api_usage')
+      .select('service, request_count, unit_count, estimated_cost_cents, status, cache_hit')
+      .gte('created_at', since7d)
+      .order('created_at', { ascending: false })
+      .limit(20000),
+    (supabase as any)
+      .from('here_api_usage')
+      .select('created_at, service, operation, request_count, unit_count, estimated_cost_cents, status, cache_hit, error_message')
+      .order('created_at', { ascending: false })
+      .limit(25)
+  ])
+
+  const aggregate = (rows: any[] = []) => {
+    const byService: Record<string, { requests: number; units: number; costCents: number; errors: number; blocked: number; cacheHits: number }> = {}
+    let requests = 0
+    let units = 0
+    let costCents = 0
+    let errors = 0
+    let blocked = 0
+    let cacheHits = 0
+
+    for (const row of rows) {
+      const service = row.service || 'unknown'
+      byService[service] ||= { requests: 0, units: 0, costCents: 0, errors: 0, blocked: 0, cacheHits: 0 }
+      const requestCount = Number(row.request_count || 0)
+      const unitCount = Number(row.unit_count || 0)
+      const cost = Number(row.estimated_cost_cents || 0)
+
+      requests += requestCount
+      units += unitCount
+      costCents += cost
+      if (row.status === 'error') errors++
+      if (row.status === 'blocked') blocked++
+      if (row.cache_hit) cacheHits++
+
+      byService[service].requests += requestCount
+      byService[service].units += unitCount
+      byService[service].costCents += cost
+      if (row.status === 'error') byService[service].errors++
+      if (row.status === 'blocked') byService[service].blocked++
+      if (row.cache_hit) byService[service].cacheHits++
+    }
+
+    return { requests, units, costCents, errors, blocked, cacheHits, byService }
+  }
+
+  return {
+    last24h: aggregate(last24h.data || []),
+    last7d: aggregate(last7d.data || []),
+    recent: recent.data || [],
+    unavailable: Boolean(last24h.error || last7d.error || recent.error),
+    error: last24h.error?.message || last7d.error?.message || recent.error?.message || null
   }
 }

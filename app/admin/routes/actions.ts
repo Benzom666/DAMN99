@@ -102,7 +102,7 @@ export async function createRoute(
       }
     }
 
-    vehicleConfig.returnToDepot = optimizationConfig.returnToDepot
+    vehicleConfig.returnToDepot = optimizationConfig.returnToWarehouse
     vehicleConfig.capacity = optimizationConfig.vehicleCapacity || vehicleConfig.capacity
 
     if (optimizationConfig.timeStart && optimizationConfig.timeEnd) {
@@ -132,7 +132,7 @@ export async function createRoute(
         shiftEnd:
           vehicleConfig.shiftEnd ||
           (profile.shift_end ? `${new Date().toISOString().split("T")[0]}T${profile.shift_end}Z` : undefined),
-        returnToDepot: optimizationConfig?.returnToDepot ?? true,
+        returnToDepot: optimizationConfig?.returnToWarehouse ?? true,
       }
     }
   }
@@ -151,7 +151,7 @@ export async function createRoute(
   try {
     const { problem, jobPlaceById } = await buildHereProblemV3(orderData, depot, vehicleConfig)
 
-    const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90)
+    const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90, user.id)
 
     if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
       optimizedRoute = tours[0].orderedStopIds
@@ -406,7 +406,7 @@ export async function createMultipleRoutes(
       if (orderData.length <= MAX_ORDERS_PER_HERE_REQUEST) {
         try {
           const { problem, jobPlaceById } = await buildHereProblemV3(orderData, batchDepot, vehicleConfig)
-          const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120)
+          const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120, user.id)
 
           if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
             optimizedRoute = tours[0].orderedStopIds

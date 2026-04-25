@@ -73,17 +73,27 @@ export async function recalcRouteMetrics(
     lng: Number(o.longitude),
   }))
 
-  // Call HERE Routing API to get distance and duration
-  const routingResult = await getRoutePolylineInOrder(coords)
+  const useHereRouting = process.env.HERE_ROUTING_METRICS_ENABLED === "true"
+  const routingResult = useHereRouting ? await getRoutePolylineInOrder(coords) : null
 
-  if (!routingResult) {
-    console.error("[v0] [METRICS] HERE Routing API failed")
-    return null
+  if (useHereRouting && !routingResult) {
+    console.warn("[v0] [METRICS] HERE Routing API failed, falling back to straight-line estimate")
   }
 
   // Calculate metrics
-  const distance_km = routingResult.totalDistance / 1000 // Convert meters to km
-  const drive_time_sec = routingResult.totalDuration
+  const straightLineKm = coords.slice(1).reduce((sum, coord, index) => {
+    const prev = coords[index]
+    const r = 6371
+    const dLat = ((coord.lat - prev.lat) * Math.PI) / 180
+    const dLng = ((coord.lng - prev.lng) * Math.PI) / 180
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((prev.lat * Math.PI) / 180) * Math.cos((coord.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+    return sum + 2 * r * Math.asin(Math.sqrt(a))
+  }, 0)
+  const distance_km = routingResult ? routingResult.totalDistance / 1000 : straightLineKm * 1.25
+  const averageKmh = Number(process.env.ROUTE_METRICS_FALLBACK_SPEED_KMH || 35)
+  const drive_time_sec = routingResult ? routingResult.totalDuration : Math.round((distance_km / averageKmh) * 3600)
   const service_time_sec = orders.length * serviceTimePerStopSec
   const duration_sec = drive_time_sec + service_time_sec
 

@@ -1,4 +1,6 @@
 import { getHereAccessToken } from "./oauth"
+import { checkTourPlanningRateLimit } from "@/lib/rate-limiter"
+import { assertHereBudget, recordHereUsage } from "@/lib/here/cost-control"
 
 const BASE_URL = "https://tourplanning.hereapi.com/v3"
 
@@ -55,7 +57,16 @@ function deepStripTimes(x: any): void {
   Object.values(x).forEach(deepStripTimes)
 }
 
-export async function submitOrPoll(problem: any, maxSeconds = 120): Promise<HereSolution> {
+export async function submitOrPoll(problem: any, maxSeconds = 60, userId?: string): Promise<HereSolution> {
+  // Check rate limit before making expensive HERE API call
+  if (userId) {
+    const rateLimit = checkTourPlanningRateLimit(userId)
+    if (!rateLimit.allowed) {
+      console.warn(`[SERVER] [v0] Tour Planning rate limit exceeded for user ${userId}`)
+      throw new Error(`HERE Tour Planning rate limit: ${rateLimit.error}`)
+    }
+  }
+
   try {
     deepStripTimes(problem.plan)
 
@@ -84,6 +95,14 @@ export async function submitOrPoll(problem: any, maxSeconds = 120): Promise<Here
 
     const { headers, params } = await getAuthHeaders()
     const url = `${BASE_URL}/problems?${params.toString()}`
+    const jobCount = problem.plan?.jobs?.length || 0
+
+    await assertHereBudget({
+      service: "tour_planning",
+      operation: "submit_problem",
+      userId,
+      projectedRequests: 1,
+    })
 
     console.log("[SERVER] [v0] HERE Tour Planning Optimization Started...")
     console.log("[SERVER] [v0] Submitting to URL:", url)
@@ -100,8 +119,26 @@ export async function submitOrPoll(problem: any, maxSeconds = 120): Promise<Here
     if (!response.ok) {
       const errorText = await response.text()
       console.error("[SERVER] [v0] Tour Planning submit error:", errorText)
+      await recordHereUsage({
+        service: "tour_planning",
+        operation: "submit_problem",
+        userId,
+        status: "error",
+        httpStatus: response.status,
+        errorMessage: errorText.slice(0, 500),
+        metadata: { jobs: jobCount },
+      })
       throw new Error(`Tour Planning submit error ${response.status}: ${errorText}`)
     }
+
+    await recordHereUsage({
+      service: "tour_planning",
+      operation: "submit_problem",
+      userId,
+      status: "success",
+      httpStatus: response.status,
+      metadata: { jobs: jobCount },
+    })
 
     let body: any = null
     try {
@@ -178,19 +215,34 @@ export async function submitOrPoll(problem: any, maxSeconds = 120): Promise<Here
 
     console.log(`[SERVER] [v0] Problem submitted with ID: ${problemId}, starting polling...`)
 
-    return await pollSolution(problemId, maxSeconds)
+    return await pollSolution(problemId, maxSeconds, userId)
   } catch (error) {
     console.error("[SERVER] [v0] Tour Planning error:", error)
+    await recordHereUsage({
+      service: "tour_planning",
+      operation: "submit_problem",
+      userId,
+      status: "error",
+      errorMessage: error instanceof Error ? error.message : "Tour Planning error",
+      metadata: { jobs: problem.plan?.jobs?.length || 0 },
+    })
     throw error
   }
 }
 
-async function pollSolution(problemId: string, maxSeconds: number): Promise<HereSolution> {
+async function pollSolution(problemId: string, maxSeconds: number, userId?: string): Promise<HereSolution> {
   const startTime = Date.now()
   const { headers, params } = await getAuthHeaders()
 
   while (Date.now() - startTime < maxSeconds * 1000) {
     const url = `${BASE_URL}/problems/${problemId}?${params.toString()}`
+
+    await assertHereBudget({
+      service: "tour_planning",
+      operation: "poll_solution",
+      userId,
+      projectedRequests: 1,
+    })
 
     const response = await fetch(url, {
       headers,
@@ -199,8 +251,26 @@ async function pollSolution(problemId: string, maxSeconds: number): Promise<Here
 
     if (!response.ok) {
       const errorText = await response.text()
+      await recordHereUsage({
+        service: "tour_planning",
+        operation: "poll_solution",
+        userId,
+        status: "error",
+        httpStatus: response.status,
+        errorMessage: errorText.slice(0, 500),
+        metadata: { problemId },
+      })
       throw new Error(`Poll failed ${response.status}: ${errorText}`)
     }
+
+    await recordHereUsage({
+      service: "tour_planning",
+      operation: "poll_solution",
+      userId,
+      status: "success",
+      httpStatus: response.status,
+      metadata: { problemId },
+    })
 
     const data = await response.json()
 
@@ -228,10 +298,11 @@ export interface OptimizedTour {
 export async function optimizeWithHereTourPlanning(
   problem: any,
   jobPlaceById: Map<string, { lat: number; lng: number }>,
-  maxSeconds = 120,
+  maxSeconds = 60,
+  userId?: string,
 ): Promise<OptimizedTour[]> {
   try {
-    const solution = await submitOrPoll(problem, maxSeconds)
+    const solution = await submitOrPoll(problem, maxSeconds, userId)
 
     if (solution.unassigned && solution.unassigned.length > 0) {
       console.log(`[SERVER] [v0] Warning: ${solution.unassigned.length} jobs unassigned:`)
