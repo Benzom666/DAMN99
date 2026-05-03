@@ -11,9 +11,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Ban } from 'lucide-react'
 import Link from "next/link"
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -164,5 +164,19 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-svh w-full items-center justify-center">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   )
 }

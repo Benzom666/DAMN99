@@ -11,6 +11,8 @@ import type { OptimizationConfig } from "./create-route-dialog"
 import { env } from "@/lib/env"
 import { recalcRouteMetrics } from "./metrics"
 
+const hereTourPlanningEnabled = () => process.env.HERE_TOUR_PLANNING_ENABLED === "true"
+
 // Helper function to parse warehouse location
 function parseWarehouseLocation(location: string): Depot | null {
   // Try to parse as "lat,lng"
@@ -148,17 +150,21 @@ export async function createRoute(
   let optimizedRoute: string[] = []
   let usedHere = false
 
-  try {
-    const { problem, jobPlaceById } = await buildHereProblemV3(orderData, depot, vehicleConfig)
+  if (hereTourPlanningEnabled()) {
+    try {
+      const { problem, jobPlaceById } = await buildHereProblemV3(orderData, depot, vehicleConfig)
 
-    const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90, user.id)
+      const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 90, user.id)
 
-    if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
-      optimizedRoute = tours[0].orderedStopIds
-      usedHere = true
+      if (tours.length > 0 && tours[0].orderedStopIds.length > 0) {
+        optimizedRoute = tours[0].orderedStopIds
+        usedHere = true
+      }
+    } catch (error) {
+      console.error("[SERVER] [v0] HERE Tour Planning v3 failed, using fallback:", error)
     }
-  } catch (error) {
-    console.error("[SERVER] [v0] HERE Tour Planning v3 failed, using fallback:", error)
+  } else {
+    console.log("[SERVER] [v0] HERE Tour Planning disabled; using local route optimization")
   }
 
   if (!usedHere) {
@@ -402,8 +408,8 @@ export async function createMultipleRoutes(
       let optimizedRoute: string[] = []
       let usedHere = false
 
-      // Try HERE optimization if batch is not too large
-      if (orderData.length <= MAX_ORDERS_PER_HERE_REQUEST) {
+      // Try HERE optimization only when explicitly enabled and batch is not too large.
+      if (hereTourPlanningEnabled() && orderData.length <= MAX_ORDERS_PER_HERE_REQUEST) {
         try {
           const { problem, jobPlaceById } = await buildHereProblemV3(orderData, batchDepot, vehicleConfig)
           const tours = await optimizeWithHereTourPlanning(problem, jobPlaceById, 120, user.id)
@@ -427,8 +433,10 @@ export async function createMultipleRoutes(
             await new Promise((resolve) => setTimeout(resolve, 20000))
           }
         }
-      } else {
+      } else if (orderData.length > MAX_ORDERS_PER_HERE_REQUEST) {
         console.log(`[v0] Batch ${batchIndex + 1} has ${orderData.length} orders, exceeds HERE limit, using fallback`)
+      } else {
+        console.log(`[v0] HERE Tour Planning disabled, using fallback for route ${batchIndex + 1}`)
       }
 
       // Use fallback optimization if HERE failed or wasn't used

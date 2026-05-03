@@ -1,5 +1,3 @@
-"use server"
-
 /**
  * HERE API Rate Limiter
  * Prevents runaway API calls that rack up charges

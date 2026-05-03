@@ -4,6 +4,7 @@
 "use server"
 
 import { assertHereBudget, normalizeAddressKey, recordHereUsage } from "@/lib/here/cost-control"
+import { createServiceRoleClient } from "@/lib/supabase/server"
 
 export interface GeocodeResult {
   lat: number
@@ -23,6 +24,68 @@ function normalizeAddr(s: string): string {
 }
 
 const geocodeCache = new Map<string, GeocodeResult | null>()
+
+function canUsePersistentCache(): boolean {
+  return (
+    process.env.HERE_GEOCODING_PERSISTENT_CACHE !== "false" &&
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  )
+}
+
+async function readPersistentCache(cacheKey: string): Promise<{ hit: boolean; result: GeocodeResult | null }> {
+  if (!canUsePersistentCache()) return { hit: false, result: null }
+
+  try {
+    const supabase = createServiceRoleClient() as any
+    const { data, error } = await supabase
+      .from("here_geocode_cache")
+      .select("latitude, longitude, formatted_address, result_found")
+      .eq("cache_key", cacheKey)
+      .maybeSingle()
+
+    if (error || !data) return { hit: false, result: null }
+
+    await supabase
+      .from("here_geocode_cache")
+      .update({ last_hit_at: new Date().toISOString() })
+      .eq("cache_key", cacheKey)
+
+    if (!data.result_found || data.latitude == null || data.longitude == null) {
+      return { hit: true, result: null }
+    }
+
+    return {
+      hit: true,
+      result: {
+        lat: Number(data.latitude),
+        lng: Number(data.longitude),
+        label: data.formatted_address || undefined,
+        quality: "cache",
+      },
+    }
+  } catch {
+    return { hit: false, result: null }
+  }
+}
+
+async function writePersistentCache(cacheKey: string, query: string, result: GeocodeResult | null): Promise<void> {
+  if (!canUsePersistentCache()) return
+
+  try {
+    const supabase = createServiceRoleClient() as any
+    await supabase.from("here_geocode_cache").upsert({
+      cache_key: cacheKey,
+      query,
+      latitude: result?.lat ?? null,
+      longitude: result?.lng ?? null,
+      formatted_address: result?.label ?? null,
+      result_found: Boolean(result),
+      updated_at: new Date().toISOString(),
+    })
+  } catch {
+    // Cache failures must never block routing.
+  }
+}
 
 /**
  * Geocode a single address using HERE Geocoding API v1 with free-text query
@@ -60,6 +123,22 @@ export async function geocodeAddress(
         metadata: { source: "memory" },
       })
       return geocodeCache.get(cacheKey) ?? null
+    }
+
+    const persistentCached = await readPersistentCache(cacheKey)
+    if (persistentCached.hit) {
+      geocodeCache.set(cacheKey, persistentCached.result)
+      await recordHereUsage({
+        service: "geocoding",
+        operation: context.operation || "geocode_address",
+        ...context,
+        requestCount: 0,
+        unitCount: 0,
+        status: "cache_hit",
+        cacheHit: true,
+        metadata: { source: "persistent" },
+      })
+      return persistentCached.result
     }
 
     await assertHereBudget({
@@ -118,6 +197,7 @@ export async function geocodeAddress(
     if (!data.items || data.items.length === 0) {
       console.warn("[v0] No geocoding results found for:", q)
       geocodeCache.set(cacheKey, null)
+      await writePersistentCache(cacheKey, q, null)
       await recordHereUsage({
         service: "geocoding",
         operation: context.operation || "geocode_address",
@@ -152,6 +232,7 @@ export async function geocodeAddress(
       quality: result.resultType,
     }
     geocodeCache.set(cacheKey, geocoded)
+    await writePersistentCache(cacheKey, q, geocoded)
     await recordHereUsage({
       service: "geocoding",
       operation: context.operation || "geocode_address",
@@ -203,16 +284,32 @@ export async function geocodeBatch(
 ): Promise<Array<{ result: GeocodeResult | null; error?: string }>> {
   const { batchSize = Number(process.env.HERE_GEOCODING_BATCH_SIZE || 5), retries = 1, bias } = options
   const effectiveBatchSize = Math.max(1, Math.min(batchSize, 10))
-  const results: Array<{ result: GeocodeResult | null; error?: string }> = []
+  const results: Array<{ result: GeocodeResult | null; error?: string }> = new Array(addresses.length).fill({
+    result: null,
+  })
+  const unique = new Map<string, { address: string; indexes: number[] }>()
 
-  for (let i = 0; i < addresses.length; i += effectiveBatchSize) {
-    const batch = addresses.slice(i, i + effectiveBatchSize)
+  addresses.forEach((address, index) => {
+    const q = normalizeAddr(address)
+    const cacheKey = normalizeAddressKey([q, bias ? `${bias.lat},${bias.lng}` : null])
+    const existing = unique.get(cacheKey)
+    if (existing) {
+      existing.indexes.push(index)
+    } else {
+      unique.set(cacheKey, { address, indexes: [index] })
+    }
+  })
+
+  const uniqueAddresses = Array.from(unique.values())
+
+  for (let i = 0; i < uniqueAddresses.length; i += effectiveBatchSize) {
+    const batch = uniqueAddresses.slice(i, i + effectiveBatchSize)
     console.log(
-      `[v0] Geocoding batch ${Math.floor(i / effectiveBatchSize) + 1}/${Math.ceil(addresses.length / effectiveBatchSize)}...`,
+      `[v0] Geocoding batch ${Math.floor(i / effectiveBatchSize) + 1}/${Math.ceil(uniqueAddresses.length / effectiveBatchSize)}...`,
     )
 
     const batchResults = await Promise.all(
-      batch.map(async (addr) => {
+      batch.map(async ({ address: addr }) => {
         let lastError: string | undefined
 
         for (let attempt = 0; attempt <= retries; attempt++) {
@@ -238,10 +335,14 @@ export async function geocodeBatch(
       }),
     )
 
-    results.push(...batchResults)
+    batchResults.forEach((result, batchIndex) => {
+      for (const originalIndex of batch[batchIndex].indexes) {
+        results[originalIndex] = result
+      }
+    })
 
     // Rate limiting between batches
-    if (i + effectiveBatchSize < addresses.length) {
+    if (i + effectiveBatchSize < uniqueAddresses.length) {
       await new Promise((resolve) => setTimeout(resolve, Number(process.env.HERE_GEOCODING_BATCH_DELAY_MS || 1000)))
     }
   }

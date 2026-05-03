@@ -33,6 +33,18 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
+  const routeHref = `/driver/routes/${routeId}`
+
+  const returnToRoute = () => {
+    router.replace(routeHref)
+    router.refresh()
+
+    window.setTimeout(() => {
+      if (window.location.pathname !== routeHref) {
+        window.location.assign(routeHref)
+      }
+    }, 1200)
+  }
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -197,10 +209,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         description: "Delivery marked as complete!",
       })
 
-      setTimeout(() => {
-        router.push(`/driver/routes/${routeId}`)
-        router.refresh()
-      }, 500)
+      setTimeout(returnToRoute, 250)
     } catch (error) {
       console.error("[v0] [DRIVER] Unexpected error:", error)
       console.error("[v0] [DRIVER] Error stack:", error instanceof Error ? error.stack : "no stack")
@@ -268,10 +277,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         description: "Delivery marked as failed.",
       })
 
-      setTimeout(() => {
-        router.push(`/driver/routes/${routeId}`)
-        router.refresh()
-      }, 500)
+      setTimeout(returnToRoute, 250)
     } catch (error) {
       console.error("[v0] [DRIVER] Error marking as failed:", error)
       toast({

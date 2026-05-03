@@ -51,6 +51,7 @@
     "fs": "latest",
     "input-otp": "latest",
     "isomorphic-dompurify": "latest",
+    "jsdom": "^27.2.0",
     "lucide-react": "^0.454.0",
     "next": "16.0.0",
     "next-themes": "latest",

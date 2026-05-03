@@ -1,5 +1,7 @@
 "use server"
 
+import { recordHereUsage } from "@/lib/here/cost-control"
+
 /**
  * Returns the HERE Maps API key securely from the server.
  * Uses server-side HERE_API_KEY environment variable only.
@@ -14,5 +16,11 @@ export async function getHereApiKey(): Promise<string> {
   }
 
   console.log("[v0] [HERE_KEY] API key loaded successfully")
+  await recordHereUsage({
+    service: "maps_js",
+    operation: "load_map_sdk",
+    metadata: { source: "get_here_api_key" },
+  })
+
   return apiKey
 }
