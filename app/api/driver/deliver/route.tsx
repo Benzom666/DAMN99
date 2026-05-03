@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { put } from "@vercel/blob"
 import { validateUUID, sanitizeNotes } from "@/lib/security/input-validation"
 import { requireDriver } from "@/lib/security/authorization"
-import { createServiceRoleClient } from "@/lib/supabase/server"
 
 async function sendPODEmail(orderId: string, podId: string) {
   try {
@@ -201,7 +200,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
 
 export async function POST(request: Request) {
   try {
-    const { user } = await requireDriver()
+    const { user, supabase } = await requireDriver()
 
     const { orderId, photoData, photoFile, signatureData, recipientName, notes } = await parseDeliveryPayload(request)
 
@@ -211,28 +210,6 @@ export async function POST(request: Request) {
 
     const sanitizedNotes = notes ? sanitizeNotes(notes) : null
     const sanitizedRecipient = recipientName ? sanitizeNotes(recipientName) : null
-
-    const supabaseAdmin = createServiceRoleClient()
-
-    const { data: order, error: orderLookupError } = await supabaseAdmin
-      .from("orders")
-      .select("id, route_id")
-      .eq("id", orderId)
-      .maybeSingle()
-
-    if (orderLookupError || !order?.route_id) {
-      return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 })
-    }
-
-    const { data: route, error: routeLookupError } = await supabaseAdmin
-      .from("routes")
-      .select("driver_id")
-      .eq("id", order.route_id)
-      .maybeSingle()
-
-    if (routeLookupError || !route || route.driver_id !== user.id) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
-    }
 
     if (photoFile && !photoFile.type.startsWith("image/")) {
       return NextResponse.json({ success: false, error: "Photo must be an image file" }, { status: 400 })
@@ -248,18 +225,25 @@ export async function POST(request: Request) {
     const warnings: string[] = []
 
     // Update order status first. This is the critical delivery action and must not depend on POD/media schema.
-    const { error: orderError } = await supabaseAdmin
+    const { data: updatedOrder, error: orderError } = await supabase
       .from("orders")
       .update({
         status: "delivered",
         updated_at: new Date().toISOString(),
       })
       .eq("id", orderId)
+      .select("id")
+      .maybeSingle()
 
-    if (orderError) {
+    if (orderError || !updatedOrder) {
       return NextResponse.json(
-        { success: false, error: `Failed to update order status: ${orderError.message}` },
-        { status: 500 },
+        {
+          success: false,
+          error: orderError
+            ? `Failed to update order status: ${orderError.message}`
+            : "Order was not available for this driver.",
+        },
+        { status: orderError ? 500 : 403 },
       )
     }
 
@@ -274,7 +258,7 @@ export async function POST(request: Request) {
       delivered_at: new Date().toISOString(),
     }
 
-    const { data: podData, error: podError } = await supabaseAdmin.from("pods").insert(podInsert).select("id").single()
+    const { data: podData, error: podError } = await supabase.from("pods").insert(podInsert).select("id").single()
 
     if (podError) {
       console.error("[v0] [DRIVER_DELIVER] Full POD insert failed after delivery was saved:", podError)
@@ -283,7 +267,7 @@ export async function POST(request: Request) {
         ? [`Recipient: ${sanitizedRecipient}`, sanitizedNotes].filter(Boolean).join("\n")
         : sanitizedNotes
 
-      const { data: fallbackPod, error: fallbackPodError } = await supabaseAdmin
+      const { data: fallbackPod, error: fallbackPodError } = await supabase
         .from("pods")
         .insert({
           order_id: orderId,
@@ -356,7 +340,7 @@ export async function POST(request: Request) {
     }
 
     if (podId && Object.keys(mediaUpdates).length > 0) {
-      const { error: mediaUpdateError } = await supabaseAdmin.from("pods").update(mediaUpdates).eq("id", podId)
+      const { error: mediaUpdateError } = await supabase.from("pods").update(mediaUpdates).eq("id", podId)
 
       if (mediaUpdateError) {
         console.error("[v0] [DRIVER_DELIVER] Failed to attach POD media:", mediaUpdateError)
