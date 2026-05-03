@@ -1,4 +1,3 @@
-import { createServerClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { put } from "@vercel/blob"
 import { validateUUID, sanitizeNotes } from "@/lib/security/input-validation"
@@ -13,6 +12,7 @@ async function sendPODEmail(orderId: string, podId: string) {
       return { success: false, error: "Email not configured" }
     }
 
+    const { createServerClient } = await import("@/lib/supabase/server")
     const supabase = await createServerClient()
 
     const { data: order } = await supabase
@@ -140,9 +140,17 @@ function base64ToBlob(base64Data: string): Blob {
   return new Blob([bytes], { type: contentType })
 }
 
+function getJoinedDriverId(route: unknown): string | null {
+  if (!route) return null
+  if (Array.isArray(route)) {
+    return route[0]?.driver_id ?? null
+  }
+  return (route as { driver_id?: string | null }).driver_id ?? null
+}
+
 export async function POST(request: Request) {
   try {
-    const { user } = await requireDriver()
+    const { user, supabase } = await requireDriver()
 
     const body = await request.json()
     const { orderId, photoData, signatureData, recipientName, notes } = body
@@ -154,15 +162,13 @@ export async function POST(request: Request) {
     const sanitizedNotes = notes ? sanitizeNotes(notes) : null
     const sanitizedRecipient = recipientName ? sanitizeNotes(recipientName) : null
 
-    const supabase = await createServerClient()
-
     const { data: order } = await supabase
       .from("orders")
       .select("id, route_id, routes!inner(driver_id)")
       .eq("id", orderId)
       .maybeSingle()
 
-    if (!order || order.routes.driver_id !== user.id) {
+    if (!order || getJoinedDriverId(order.routes) !== user.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
     }
 
@@ -172,7 +178,7 @@ export async function POST(request: Request) {
       const photoBlob = base64ToBlob(photoData)
       const uploaded = await put(`pod-photos/${orderId}-${Date.now()}.jpg`, photoBlob, {
         access: "public",
-        contentType: "image/jpeg",
+        contentType: photoBlob.type || "image/jpeg",
       })
       photoUrl = uploaded.url
     }
@@ -221,7 +227,9 @@ export async function POST(request: Request) {
     }
 
     if (process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
-      await sendPODEmail(orderId, podData.id)
+      sendPODEmail(orderId, podData.id).catch((error) => {
+        console.error("[v0] [POD_EMAIL] Failed to send POD email:", error)
+      })
     }
 
     return NextResponse.json({ success: true })

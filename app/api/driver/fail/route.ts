@@ -1,11 +1,18 @@
-import { createServerClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { validateUUID, sanitizeNotes } from "@/lib/security/input-validation"
 import { requireDriver } from "@/lib/security/authorization"
 
+function getJoinedDriverId(route: unknown): string | null {
+  if (!route) return null
+  if (Array.isArray(route)) {
+    return route[0]?.driver_id ?? null
+  }
+  return (route as { driver_id?: string | null }).driver_id ?? null
+}
+
 export async function POST(request: Request) {
   try {
-    const { user } = await requireDriver()
+    const { user, supabase } = await requireDriver()
 
     const body = await request.json()
     const { orderId, notes } = body
@@ -16,15 +23,13 @@ export async function POST(request: Request) {
 
     const sanitizedNotes = notes ? sanitizeNotes(notes) : null
 
-    const supabase = await createServerClient()
-
     const { data: order } = await supabase
       .from("orders")
       .select("id, route_id, routes!inner(driver_id)")
       .eq("id", orderId)
       .maybeSingle()
 
-    if (!order || order.routes.driver_id !== user.id) {
+    if (!order || getJoinedDriverId(order.routes) !== user.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
     }
 

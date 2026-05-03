@@ -58,6 +58,64 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
   }
 
+  const readPhotoForUpload = async (file: File): Promise<string> => {
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Please upload an image file.")
+    }
+
+    const imageUrl = URL.createObjectURL(file)
+
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.onerror = () => reject(new Error("Failed to load photo. Please take it again."))
+        img.src = imageUrl
+      })
+
+      const maxDimension = 1400
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+      const width = Math.max(1, Math.round(image.naturalWidth * scale))
+      const height = Math.max(1, Math.round(image.naturalHeight * scale))
+      const canvas = document.createElement("canvas")
+      canvas.width = width
+      canvas.height = height
+
+      const context = canvas.getContext("2d")
+      if (!context) {
+        throw new Error("Photo compression is not available on this device.")
+      }
+
+      context.drawImage(image, 0, 0, width, height)
+
+      return await new Promise<string>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Failed to prepare photo. Please try again."))
+              return
+            }
+
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              if (typeof reader.result === "string") {
+                resolve(reader.result)
+              } else {
+                reject(new Error("Failed to read prepared photo."))
+              }
+            }
+            reader.onerror = () => reject(new Error("Failed to read prepared photo."))
+            reader.readAsDataURL(blob)
+          },
+          "image/jpeg",
+          0.72,
+        )
+      })
+    } finally {
+      URL.revokeObjectURL(imageUrl)
+    }
+  }
+
   const handleSignatureSave = (dataUrl: string) => {
     setSignatureData(dataUrl)
     setShowSignaturePad(false)
@@ -87,23 +145,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         console.log("[v0] [DRIVER] Photo file type:", photoFile.type)
 
         try {
-          photoData = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-              if (reader.result && typeof reader.result === "string") {
-                console.log("[v0] [DRIVER] Photo read successfully, length:", reader.result.length)
-                resolve(reader.result)
-              } else {
-                console.error("[v0] [DRIVER] Photo read failed: invalid result")
-                reject(new Error("Failed to read photo file"))
-              }
-            }
-            reader.onerror = () => {
-              console.error("[v0] [DRIVER] Photo read error:", reader.error)
-              reject(new Error("File reading failed"))
-            }
-            reader.readAsDataURL(photoFile)
-          })
+          photoData = await readPhotoForUpload(photoFile)
+          console.log("[v0] [DRIVER] Photo prepared successfully, length:", photoData.length)
         } catch (photoError) {
           console.error("[v0] [DRIVER] Photo processing error:", photoError)
           toast({

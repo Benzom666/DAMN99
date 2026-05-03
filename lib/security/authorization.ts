@@ -66,7 +66,10 @@ export async function canAccessOrder(orderId: string, userId: string, userRole: 
       .eq("id", orderId)
       .maybeSingle()
 
-    return order?.routes?.driver_id === userId
+    const route = order?.routes as { driver_id?: string | null } | Array<{ driver_id?: string | null }> | null
+    const driverId = Array.isArray(route) ? route[0]?.driver_id : route?.driver_id
+
+    return driverId === userId
   }
 
   return false
