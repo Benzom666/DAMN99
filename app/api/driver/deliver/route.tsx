@@ -245,26 +245,9 @@ export async function POST(request: Request) {
       )
     }
 
-    // Save POD first so Blob/storage issues can never block delivery completion.
-    const { data: podData, error: podError } = await supabaseAdmin
-      .from("pods")
-      .insert({
-        order_id: orderId,
-        driver_id: user.id,
-        photo_url: null,
-        signature_url: null,
-        recipient_name: sanitizedRecipient,
-        notes: sanitizedNotes,
-        delivered_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    const warnings: string[] = []
 
-    if (podError) {
-      return NextResponse.json({ success: false, error: "Failed to save POD" }, { status: 500 })
-    }
-
-    // Update order status before file storage work. This is the critical delivery action.
+    // Update order status first. This is the critical delivery action and must not depend on POD/media schema.
     const { error: orderError } = await supabaseAdmin
       .from("orders")
       .update({
@@ -280,8 +263,51 @@ export async function POST(request: Request) {
       )
     }
 
+    let podId: string | null = null
+    const podInsert = {
+      order_id: orderId,
+      driver_id: user.id,
+      photo_url: null,
+      signature_url: null,
+      recipient_name: sanitizedRecipient,
+      notes: sanitizedNotes,
+      delivered_at: new Date().toISOString(),
+    }
+
+    const { data: podData, error: podError } = await supabaseAdmin.from("pods").insert(podInsert).select("id").single()
+
+    if (podError) {
+      console.error("[v0] [DRIVER_DELIVER] Full POD insert failed after delivery was saved:", podError)
+
+      const fallbackNotes = sanitizedRecipient
+        ? [`Recipient: ${sanitizedRecipient}`, sanitizedNotes].filter(Boolean).join("\n")
+        : sanitizedNotes
+
+      const { data: fallbackPod, error: fallbackPodError } = await supabaseAdmin
+        .from("pods")
+        .insert({
+          order_id: orderId,
+          driver_id: user.id,
+          photo_url: null,
+          signature_url: null,
+          notes: fallbackNotes,
+          delivered_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single()
+
+      if (fallbackPodError) {
+        console.error("[v0] [DRIVER_DELIVER] Fallback POD insert failed after delivery was saved:", fallbackPodError)
+        warnings.push("Delivery was completed, but proof of delivery details could not be saved.")
+      } else {
+        podId = fallbackPod.id
+        warnings.push("Delivery was completed. Recipient name was saved in notes because the POD schema is outdated.")
+      }
+    } else {
+      podId = podData.id
+    }
+
     const mediaUpdates: { photo_url?: string; signature_url?: string } = {}
-    const warnings: string[] = []
 
     try {
       if (photoFile) {
@@ -329,8 +355,8 @@ export async function POST(request: Request) {
       warnings.push("Delivery was completed, but the signature could not be uploaded.")
     }
 
-    if (Object.keys(mediaUpdates).length > 0) {
-      const { error: mediaUpdateError } = await supabaseAdmin.from("pods").update(mediaUpdates).eq("id", podData.id)
+    if (podId && Object.keys(mediaUpdates).length > 0) {
+      const { error: mediaUpdateError } = await supabaseAdmin.from("pods").update(mediaUpdates).eq("id", podId)
 
       if (mediaUpdateError) {
         console.error("[v0] [DRIVER_DELIVER] Failed to attach POD media:", mediaUpdateError)
@@ -338,8 +364,8 @@ export async function POST(request: Request) {
       }
     }
 
-    if (process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
-      sendPODEmail(orderId, podData.id).catch((error) => {
+    if (podId && process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
+      sendPODEmail(orderId, podId).catch((error) => {
         console.error("[v0] [POD_EMAIL] Failed to send POD email:", error)
       })
     }
