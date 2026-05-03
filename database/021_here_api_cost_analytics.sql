@@ -75,10 +75,42 @@ begin
   end if;
 end $$;
 
-create index if not exists idx_here_api_usage_created_at on public.here_api_usage(created_at desc);
-create index if not exists idx_here_api_usage_service_created_at on public.here_api_usage(service, created_at desc);
-create index if not exists idx_here_api_usage_admin_created_at on public.here_api_usage(admin_id, created_at desc);
-create index if not exists idx_here_api_usage_route_id on public.here_api_usage(route_id) where route_id is not null;
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'here_api_usage' and column_name = 'created_at'
+  ) then
+    execute 'create index if not exists idx_here_api_usage_created_at on public.here_api_usage(created_at desc)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'here_api_usage' and column_name = 'service'
+  ) and exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'here_api_usage' and column_name = 'created_at'
+  ) then
+    execute 'create index if not exists idx_here_api_usage_service_created_at on public.here_api_usage(service, created_at desc)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'here_api_usage' and column_name = 'admin_id'
+  ) and exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'here_api_usage' and column_name = 'created_at'
+  ) then
+    execute 'create index if not exists idx_here_api_usage_admin_created_at on public.here_api_usage(admin_id, created_at desc)';
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'here_api_usage' and column_name = 'route_id'
+  ) then
+    execute 'create index if not exists idx_here_api_usage_route_id on public.here_api_usage(route_id) where route_id is not null';
+  end if;
+end $$;
 
 alter table public.here_api_usage enable row level security;
 
