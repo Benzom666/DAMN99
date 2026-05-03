@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { put } from "@vercel/blob"
 import { validateUUID, sanitizeNotes } from "@/lib/security/input-validation"
 import { requireDriver } from "@/lib/security/authorization"
+import { createServiceRoleClient } from "@/lib/supabase/server"
 
 async function sendPODEmail(orderId: string, podId: string) {
   try {
@@ -140,17 +141,9 @@ function base64ToBlob(base64Data: string): Blob {
   return new Blob([bytes], { type: contentType })
 }
 
-function getJoinedDriverId(route: unknown): string | null {
-  if (!route) return null
-  if (Array.isArray(route)) {
-    return route[0]?.driver_id ?? null
-  }
-  return (route as { driver_id?: string | null }).driver_id ?? null
-}
-
 export async function POST(request: Request) {
   try {
-    const { user, supabase } = await requireDriver()
+    const { user } = await requireDriver()
 
     const body = await request.json()
     const { orderId, photoData, signatureData, recipientName, notes } = body
@@ -162,13 +155,25 @@ export async function POST(request: Request) {
     const sanitizedNotes = notes ? sanitizeNotes(notes) : null
     const sanitizedRecipient = recipientName ? sanitizeNotes(recipientName) : null
 
-    const { data: order } = await supabase
+    const supabaseAdmin = createServiceRoleClient()
+
+    const { data: order, error: orderLookupError } = await supabaseAdmin
       .from("orders")
-      .select("id, route_id, routes!inner(driver_id)")
+      .select("id, route_id")
       .eq("id", orderId)
       .maybeSingle()
 
-    if (!order || getJoinedDriverId(order.routes) !== user.id) {
+    if (orderLookupError || !order?.route_id) {
+      return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 })
+    }
+
+    const { data: route, error: routeLookupError } = await supabaseAdmin
+      .from("routes")
+      .select("driver_id")
+      .eq("id", order.route_id)
+      .maybeSingle()
+
+    if (routeLookupError || !route || route.driver_id !== user.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
     }
 
@@ -195,7 +200,7 @@ export async function POST(request: Request) {
     }
 
     // Save POD
-    const { data: podData, error: podError } = await supabase
+    const { data: podData, error: podError } = await supabaseAdmin
       .from("pods")
       .insert({
         order_id: orderId,
@@ -214,7 +219,7 @@ export async function POST(request: Request) {
     }
 
     // Update order status
-    const { error: orderError } = await supabase
+    const { error: orderError } = await supabaseAdmin
       .from("orders")
       .update({
         status: "delivered",
@@ -223,7 +228,10 @@ export async function POST(request: Request) {
       .eq("id", orderId)
 
     if (orderError) {
-      return NextResponse.json({ success: false, error: "Failed to update order status" }, { status: 500 })
+      return NextResponse.json(
+        { success: false, error: `Failed to update order status: ${orderError.message}` },
+        { status: 500 },
+      )
     }
 
     if (process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {

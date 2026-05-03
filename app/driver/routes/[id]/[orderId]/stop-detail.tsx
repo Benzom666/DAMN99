@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle } from "lucide-react"
+import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle, Upload } from "lucide-react"
 import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
 import { useToast } from "@/hooks/use-toast"
@@ -55,6 +55,20 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         setPhotoPreview(reader.result as string)
       }
       reader.readAsDataURL(file)
+    }
+  }
+
+  const readJsonResponse = async (response: Response) => {
+    const responseText = await response.text()
+    console.log("[v0] [DRIVER] API response body:", responseText)
+
+    try {
+      return responseText ? JSON.parse(responseText) : {}
+    } catch {
+      return {
+        success: false,
+        error: response.ok ? "Server returned an invalid response." : responseText || "Request failed.",
+      }
     }
   }
 
@@ -215,22 +229,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       console.log("[v0] [DRIVER] API response status:", response.status)
       console.log("[v0] [DRIVER] API response ok:", response.ok)
 
-      let result: any
-      try {
-        const responseText = await response.text()
-        console.log("[v0] [DRIVER] API response body:", responseText)
-        result = JSON.parse(responseText)
-      } catch (parseError) {
-        console.error("[v0] [DRIVER] Failed to parse response:", parseError)
-        toast({
-          title: "Server Error",
-          description: "Received invalid response from server. Please try again.",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (PARSE ERROR) ==========")
-        return
-      }
+      const result = await readJsonResponse(response)
 
       if (!response.ok || !result.success) {
         console.error("[v0] [DRIVER] API error:", result.error)
@@ -306,7 +305,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
       clearTimeout(timeoutId)
 
-      const result = await response.json()
+      const result = await readJsonResponse(response)
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to update status")
@@ -407,20 +406,35 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                   </Button>
                 </div>
               ) : (
-                <div>
+                <div className="space-y-3">
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
                     onChange={handlePhotoChange}
                     className="hidden"
-                    id="photo-input"
+                    id="photo-camera-input"
                   />
-                  <label htmlFor="photo-input">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                    id="photo-upload-input"
+                  />
+                  <label htmlFor="photo-camera-input">
                     <Button variant="outline" className="w-full bg-transparent" asChild>
                       <span>
                         <Camera className="h-4 w-4 mr-2" />
                         Take Photo
+                      </span>
+                    </Button>
+                  </label>
+                  <label htmlFor="photo-upload-input">
+                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                      <span>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Photo
                       </span>
                     </Button>
                   </label>
