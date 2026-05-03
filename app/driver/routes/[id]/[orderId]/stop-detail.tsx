@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { upload } from "@vercel/blob/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -74,6 +75,88 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     setShowSignaturePad(false)
   }
 
+  const getFileExtension = (file: File) => {
+    const fromName = file.name.split(".").pop()?.toLowerCase()
+    if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName
+
+    if (file.type === "image/png") return "png"
+    if (file.type === "image/webp") return "webp"
+    if (file.type === "image/heic" || file.type === "image/heif") return "heic"
+    return "jpg"
+  }
+
+  const dataUrlToBlob = (dataUrl: string) => {
+    const [header, data] = dataUrl.split(",")
+    const contentType = header.match(/:(.*?);/)?.[1] || "image/png"
+    const binary = atob(data)
+    const bytes = new Uint8Array(binary.length)
+
+    for (let index = 0; index < binary.length; index++) {
+      bytes[index] = binary.charCodeAt(index)
+    }
+
+    return new Blob([bytes], { type: contentType })
+  }
+
+  const withTimeout = async <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
+    })
+
+    try {
+      return await Promise.race([promise, timeout])
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }
+
+  const uploadPodMedia = async (podId: string) => {
+    const media: { photoUrl?: string; signatureUrl?: string } = {}
+
+    if (photoFile) {
+      const uploadedPhoto = await upload(`pod-photos/${order.id}-${Date.now()}.${getFileExtension(photoFile)}`, photoFile, {
+        access: "public",
+        contentType: photoFile.type || "application/octet-stream",
+        handleUploadUrl: "/api/driver/pod-media/upload",
+        clientPayload: JSON.stringify({ podId, mediaKind: "photo" }),
+        multipart: photoFile.size > 8 * 1024 * 1024,
+      })
+
+      media.photoUrl = uploadedPhoto.url
+    }
+
+    if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
+      const signatureBlob = dataUrlToBlob(signatureData)
+      const uploadedSignature = await upload(`pod-signatures/${order.id}-${Date.now()}.png`, signatureBlob, {
+        access: "public",
+        contentType: signatureBlob.type || "image/png",
+        handleUploadUrl: "/api/driver/pod-media/upload",
+        clientPayload: JSON.stringify({ podId, mediaKind: "signature" }),
+      })
+
+      media.signatureUrl = uploadedSignature.url
+    }
+
+    if (Object.keys(media).length === 0) return
+
+    const response = await fetch("/api/driver/pod-media/attach", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        podId,
+        ...media,
+      }),
+    })
+
+    const result = await readJsonResponse(response)
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "Failed to attach proof media")
+    }
+  }
+
   const handleDeliver = async () => {
     if (isSubmitting) {
       console.log("[v0] [DRIVER] Already submitting, ignoring click")
@@ -90,16 +173,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     console.log("[v0] [DRIVER] Notes:", notes || "none")
 
     try {
-      const formData = new FormData()
-      formData.append("orderId", order.id)
-      if (notes) formData.append("notes", notes)
-      if (recipientName) formData.append("recipientName", recipientName)
-      if (signatureData && signatureData !== existingPod?.signature_url) formData.append("signatureData", signatureData)
-      if (photoFile) formData.append("photo", photoFile)
-
       console.log("[v0] [DRIVER] Calling delivery API...")
       console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
-      setSubmitStatus(photoFile ? "Uploading photo..." : "Saving delivery...")
+      setSubmitStatus("Saving delivery...")
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
@@ -111,7 +187,14 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       try {
         response = await fetch("/api/driver/deliver", {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: order.id,
+            notes,
+            recipientName,
+          }),
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
@@ -157,13 +240,36 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       }
 
       console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
+      if (result.podId && (photoFile || (signatureData && signatureData.startsWith("data:")))) {
+        setSubmitStatus(photoFile ? "Uploading photo..." : "Uploading proof...")
+
+        try {
+          await withTimeout(uploadPodMedia(result.podId), 30000, "Proof media upload")
+        } catch (mediaError) {
+          console.error("[v0] [DRIVER] Delivery was saved, but POD media upload failed:", mediaError)
+          toast({
+            title: "Delivered with warning",
+            description:
+              "Delivery was completed, but the proof photo could not be attached. You can retry from a stronger connection.",
+            variant: "destructive",
+          })
+        }
+      }
+
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
 
-      toast({
-        title: result.warning ? "Delivered with warning" : "Success",
-        description: result.warning || "Delivery marked as complete!",
-        variant: result.warning ? "destructive" : undefined,
-      })
+      if (result.warning) {
+        toast({
+          title: "Delivered with warning",
+          description: result.warning,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Success",
+          description: "Delivery marked as complete!",
+        })
+      }
 
       setTimeout(returnToRoute, 250)
     } catch (error) {

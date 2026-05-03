@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { put } from "@vercel/blob"
 import { validateUUID, sanitizeNotes } from "@/lib/security/input-validation"
 import { requireDriver } from "@/lib/security/authorization"
 
@@ -128,25 +127,10 @@ async function sendPODEmail(orderId: string, podId: string) {
   }
 }
 
-function base64ToBlob(base64Data: string): Blob {
-  const parts = base64Data.split(",")
-  const contentType = parts[0].match(/:(.*?);/)?.[1] || "application/octet-stream"
-  const base64 = parts[1]
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-  return new Blob([bytes], { type: contentType })
-}
-
 type DeliveryPayload = {
   orderId: string
   notes?: string | null
   recipientName?: string | null
-  signatureData?: string | null
-  photoData?: string | null
-  photoFile?: File | null
 }
 
 async function parseDeliveryPayload(request: Request): Promise<DeliveryPayload> {
@@ -154,14 +138,11 @@ async function parseDeliveryPayload(request: Request): Promise<DeliveryPayload> 
 
   if (contentType.includes("multipart/form-data")) {
     const form = await request.formData()
-    const photo = form.get("photo")
 
     return {
       orderId: String(form.get("orderId") || ""),
       notes: form.get("notes") ? String(form.get("notes")) : null,
       recipientName: form.get("recipientName") ? String(form.get("recipientName")) : null,
-      signatureData: form.get("signatureData") ? String(form.get("signatureData")) : null,
-      photoFile: photo instanceof File && photo.size > 0 ? photo : null,
     }
   }
 
@@ -170,31 +151,6 @@ async function parseDeliveryPayload(request: Request): Promise<DeliveryPayload> 
     orderId: body.orderId,
     notes: body.notes,
     recipientName: body.recipientName,
-    signatureData: body.signatureData,
-    photoData: body.photoData,
-  }
-}
-
-function filenameExtension(file: File): string {
-  const fromName = file.name.split(".").pop()?.toLowerCase()
-  if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName
-
-  if (file.type === "image/png") return "png"
-  if (file.type === "image/webp") return "webp"
-  if (file.type === "image/heic" || file.type === "image/heif") return "heic"
-  return "jpg"
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
-  })
-
-  try {
-    return await Promise.race([promise, timeout])
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId)
   }
 }
 
@@ -202,7 +158,7 @@ export async function POST(request: Request) {
   try {
     const { user, supabase } = await requireDriver()
 
-    const { orderId, photoData, photoFile, signatureData, recipientName, notes } = await parseDeliveryPayload(request)
+    const { orderId, recipientName, notes } = await parseDeliveryPayload(request)
 
     if (!validateUUID(orderId)) {
       return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 })
@@ -210,17 +166,6 @@ export async function POST(request: Request) {
 
     const sanitizedNotes = notes ? sanitizeNotes(notes) : null
     const sanitizedRecipient = recipientName ? sanitizeNotes(recipientName) : null
-
-    if (photoFile && !photoFile.type.startsWith("image/")) {
-      return NextResponse.json({ success: false, error: "Photo must be an image file" }, { status: 400 })
-    }
-
-    if (photoFile && photoFile.size > 20 * 1024 * 1024) {
-      return NextResponse.json(
-        { success: false, error: "Photo is too large. Please upload a photo under 20 MB." },
-        { status: 413 },
-      )
-    }
 
     const warnings: string[] = []
 
@@ -291,70 +236,13 @@ export async function POST(request: Request) {
       podId = podData.id
     }
 
-    const mediaUpdates: { photo_url?: string; signature_url?: string } = {}
-
-    try {
-      if (photoFile) {
-        const uploaded = await withTimeout(
-          put(`pod-photos/${orderId}-${Date.now()}.${filenameExtension(photoFile)}`, photoFile, {
-            access: "public",
-            contentType: photoFile.type || "application/octet-stream",
-          }),
-          12000,
-          "Photo upload",
-        )
-        mediaUpdates.photo_url = uploaded.url
-      } else if (photoData) {
-        const photoBlob = base64ToBlob(photoData)
-        const uploaded = await withTimeout(
-          put(`pod-photos/${orderId}-${Date.now()}.jpg`, photoBlob, {
-            access: "public",
-            contentType: photoBlob.type || "image/jpeg",
-          }),
-          12000,
-          "Photo upload",
-        )
-        mediaUpdates.photo_url = uploaded.url
-      }
-    } catch (error) {
-      console.error("[v0] [DRIVER_DELIVER] Photo upload failed after delivery was saved:", error)
-      warnings.push("Delivery was completed, but the photo could not be uploaded.")
-    }
-
-    try {
-      if (signatureData) {
-        const signatureBlob = base64ToBlob(signatureData)
-        const uploaded = await withTimeout(
-          put(`pod-signatures/${orderId}-${Date.now()}.png`, signatureBlob, {
-            access: "public",
-            contentType: "image/png",
-          }),
-          8000,
-          "Signature upload",
-        )
-        mediaUpdates.signature_url = uploaded.url
-      }
-    } catch (error) {
-      console.error("[v0] [DRIVER_DELIVER] Signature upload failed after delivery was saved:", error)
-      warnings.push("Delivery was completed, but the signature could not be uploaded.")
-    }
-
-    if (podId && Object.keys(mediaUpdates).length > 0) {
-      const { error: mediaUpdateError } = await supabase.from("pods").update(mediaUpdates).eq("id", podId)
-
-      if (mediaUpdateError) {
-        console.error("[v0] [DRIVER_DELIVER] Failed to attach POD media:", mediaUpdateError)
-        warnings.push("Delivery was completed, but proof media could not be attached.")
-      }
-    }
-
     if (podId && process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
       sendPODEmail(orderId, podId).catch((error) => {
         console.error("[v0] [POD_EMAIL] Failed to send POD email:", error)
       })
     }
 
-    return NextResponse.json({ success: true, warning: warnings[0] || null })
+    return NextResponse.json({ success: true, podId, warning: warnings[0] || null })
   } catch (error) {
     if (error instanceof Error && error.message.includes("required")) {
       return NextResponse.json({ success: false, error: error.message }, { status: 401 })

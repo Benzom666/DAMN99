@@ -174,6 +174,18 @@ create policy "Drivers can view their own PODs"
   on public.pods for select
   using (driver_id = auth.uid());
 
+drop policy if exists "Drivers can update their own POD media" on public.pods;
+create policy "Drivers can update their own POD media"
+  on public.pods for update
+  using (
+    driver_id = auth.uid() and
+    public.get_user_role() = 'driver'
+  )
+  with check (
+    driver_id = auth.uid() and
+    public.get_user_role() = 'driver'
+  );
+
 -- Stop events policies
 drop policy if exists "Admins can view all stop events" on public.stop_events;
 create policy "Admins can view all stop events"
