@@ -186,6 +186,19 @@ function filenameExtension(file: File): string {
   return "jpg"
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
+  })
+
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { user } = await requireDriver()
@@ -221,53 +234,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
     }
 
-    // Upload photo
-    let photoUrl = null
-    if (photoFile) {
-      if (!photoFile.type.startsWith("image/")) {
-        return NextResponse.json({ success: false, error: "Photo must be an image file" }, { status: 400 })
-      }
-
-      if (photoFile.size > 20 * 1024 * 1024) {
-        return NextResponse.json(
-          { success: false, error: "Photo is too large. Please upload a photo under 20 MB." },
-          { status: 413 },
-        )
-      }
-
-      const uploaded = await put(`pod-photos/${orderId}-${Date.now()}.${filenameExtension(photoFile)}`, photoFile, {
-        access: "public",
-        contentType: photoFile.type || "application/octet-stream",
-      })
-      photoUrl = uploaded.url
-    } else if (photoData) {
-      const photoBlob = base64ToBlob(photoData)
-      const uploaded = await put(`pod-photos/${orderId}-${Date.now()}.jpg`, photoBlob, {
-        access: "public",
-        contentType: photoBlob.type || "image/jpeg",
-      })
-      photoUrl = uploaded.url
+    if (photoFile && !photoFile.type.startsWith("image/")) {
+      return NextResponse.json({ success: false, error: "Photo must be an image file" }, { status: 400 })
     }
 
-    // Upload signature
-    let signatureUrl = null
-    if (signatureData) {
-      const signatureBlob = base64ToBlob(signatureData)
-      const uploaded = await put(`pod-signatures/${orderId}-${Date.now()}.png`, signatureBlob, {
-        access: "public",
-        contentType: "image/png",
-      })
-      signatureUrl = uploaded.url
+    if (photoFile && photoFile.size > 20 * 1024 * 1024) {
+      return NextResponse.json(
+        { success: false, error: "Photo is too large. Please upload a photo under 20 MB." },
+        { status: 413 },
+      )
     }
 
-    // Save POD
+    // Save POD first so Blob/storage issues can never block delivery completion.
     const { data: podData, error: podError } = await supabaseAdmin
       .from("pods")
       .insert({
         order_id: orderId,
         driver_id: user.id,
-        photo_url: photoUrl,
-        signature_url: signatureUrl,
+        photo_url: null,
+        signature_url: null,
         recipient_name: sanitizedRecipient,
         notes: sanitizedNotes,
         delivered_at: new Date().toISOString(),
@@ -279,7 +264,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Failed to save POD" }, { status: 500 })
     }
 
-    // Update order status
+    // Update order status before file storage work. This is the critical delivery action.
     const { error: orderError } = await supabaseAdmin
       .from("orders")
       .update({
@@ -295,13 +280,71 @@ export async function POST(request: Request) {
       )
     }
 
+    const mediaUpdates: { photo_url?: string; signature_url?: string } = {}
+    const warnings: string[] = []
+
+    try {
+      if (photoFile) {
+        const uploaded = await withTimeout(
+          put(`pod-photos/${orderId}-${Date.now()}.${filenameExtension(photoFile)}`, photoFile, {
+            access: "public",
+            contentType: photoFile.type || "application/octet-stream",
+          }),
+          12000,
+          "Photo upload",
+        )
+        mediaUpdates.photo_url = uploaded.url
+      } else if (photoData) {
+        const photoBlob = base64ToBlob(photoData)
+        const uploaded = await withTimeout(
+          put(`pod-photos/${orderId}-${Date.now()}.jpg`, photoBlob, {
+            access: "public",
+            contentType: photoBlob.type || "image/jpeg",
+          }),
+          12000,
+          "Photo upload",
+        )
+        mediaUpdates.photo_url = uploaded.url
+      }
+    } catch (error) {
+      console.error("[v0] [DRIVER_DELIVER] Photo upload failed after delivery was saved:", error)
+      warnings.push("Delivery was completed, but the photo could not be uploaded.")
+    }
+
+    try {
+      if (signatureData) {
+        const signatureBlob = base64ToBlob(signatureData)
+        const uploaded = await withTimeout(
+          put(`pod-signatures/${orderId}-${Date.now()}.png`, signatureBlob, {
+            access: "public",
+            contentType: "image/png",
+          }),
+          8000,
+          "Signature upload",
+        )
+        mediaUpdates.signature_url = uploaded.url
+      }
+    } catch (error) {
+      console.error("[v0] [DRIVER_DELIVER] Signature upload failed after delivery was saved:", error)
+      warnings.push("Delivery was completed, but the signature could not be uploaded.")
+    }
+
+    if (Object.keys(mediaUpdates).length > 0) {
+      const { error: mediaUpdateError } = await supabaseAdmin.from("pods").update(mediaUpdates).eq("id", podData.id)
+
+      if (mediaUpdateError) {
+        console.error("[v0] [DRIVER_DELIVER] Failed to attach POD media:", mediaUpdateError)
+        warnings.push("Delivery was completed, but proof media could not be attached.")
+      }
+    }
+
     if (process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
       sendPODEmail(orderId, podData.id).catch((error) => {
         console.error("[v0] [POD_EMAIL] Failed to send POD email:", error)
       })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, warning: warnings[0] || null })
   } catch (error) {
     if (error instanceof Error && error.message.includes("required")) {
       return NextResponse.json({ success: false, error: error.message }, { status: 401 })

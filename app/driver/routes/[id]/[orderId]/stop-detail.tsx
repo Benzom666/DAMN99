@@ -160,8 +160,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
 
       toast({
-        title: "Success",
-        description: "Delivery marked as complete!",
+        title: result.warning ? "Delivered with warning" : "Success",
+        description: result.warning || "Delivery marked as complete!",
+        variant: result.warning ? "destructive" : undefined,
       })
 
       setTimeout(returnToRoute, 250)
