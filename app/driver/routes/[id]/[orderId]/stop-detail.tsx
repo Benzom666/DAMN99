@@ -31,6 +31,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<string | null>(null)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
   const routeHref = `/driver/routes/${routeId}`
@@ -50,11 +51,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     const file = e.target.files?.[0]
     if (file) {
       setPhotoFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+      setPhotoPreview(URL.createObjectURL(file))
     }
   }
 
@@ -72,64 +69,6 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
   }
 
-  const readPhotoForUpload = async (file: File): Promise<string> => {
-    if (!file.type.startsWith("image/")) {
-      throw new Error("Please upload an image file.")
-    }
-
-    const imageUrl = URL.createObjectURL(file)
-
-    try {
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image()
-        img.onload = () => resolve(img)
-        img.onerror = () => reject(new Error("Failed to load photo. Please take it again."))
-        img.src = imageUrl
-      })
-
-      const maxDimension = 1400
-      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
-      const width = Math.max(1, Math.round(image.naturalWidth * scale))
-      const height = Math.max(1, Math.round(image.naturalHeight * scale))
-      const canvas = document.createElement("canvas")
-      canvas.width = width
-      canvas.height = height
-
-      const context = canvas.getContext("2d")
-      if (!context) {
-        throw new Error("Photo compression is not available on this device.")
-      }
-
-      context.drawImage(image, 0, 0, width, height)
-
-      return await new Promise<string>((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error("Failed to prepare photo. Please try again."))
-              return
-            }
-
-            const reader = new FileReader()
-            reader.onloadend = () => {
-              if (typeof reader.result === "string") {
-                resolve(reader.result)
-              } else {
-                reject(new Error("Failed to read prepared photo."))
-              }
-            }
-            reader.onerror = () => reject(new Error("Failed to read prepared photo."))
-            reader.readAsDataURL(blob)
-          },
-          "image/jpeg",
-          0.72,
-        )
-      })
-    } finally {
-      URL.revokeObjectURL(imageUrl)
-    }
-  }
-
   const handleSignatureSave = (dataUrl: string) => {
     setSignatureData(dataUrl)
     setShowSignaturePad(false)
@@ -142,6 +81,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
+    setSubmitStatus("Preparing delivery...")
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Has photo:", !!photoFile)
@@ -150,57 +90,28 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     console.log("[v0] [DRIVER] Notes:", notes || "none")
 
     try {
-      let photoData: string | undefined
-      let signatureDataToSend: string | undefined
-
-      if (photoFile) {
-        console.log("[v0] [DRIVER] Reading photo file...")
-        console.log("[v0] [DRIVER] Photo file size:", photoFile.size, "bytes")
-        console.log("[v0] [DRIVER] Photo file type:", photoFile.type)
-
-        try {
-          photoData = await readPhotoForUpload(photoFile)
-          console.log("[v0] [DRIVER] Photo prepared successfully, length:", photoData.length)
-        } catch (photoError) {
-          console.error("[v0] [DRIVER] Photo processing error:", photoError)
-          toast({
-            title: "Photo Error",
-            description: "Failed to process photo. Please try again.",
-            variant: "destructive",
-          })
-          setIsSubmitting(false)
-          return
-        }
-      }
-
-      if (signatureData && signatureData !== existingPod?.signature_url) {
-        console.log("[v0] [DRIVER] Using signature data, length:", signatureData.length)
-        signatureDataToSend = signatureData
-      }
+      const formData = new FormData()
+      formData.append("orderId", order.id)
+      if (notes) formData.append("notes", notes)
+      if (recipientName) formData.append("recipientName", recipientName)
+      if (signatureData && signatureData !== existingPod?.signature_url) formData.append("signatureData", signatureData)
+      if (photoFile) formData.append("photo", photoFile)
 
       console.log("[v0] [DRIVER] Calling delivery API...")
       console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
+      setSubmitStatus(photoFile ? "Uploading photo..." : "Saving delivery...")
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 30 seconds")
+        console.error("[v0] [DRIVER] API call timeout after 90 seconds")
         controller.abort()
-      }, 30000) // 30 second timeout
+      }, 90000)
 
       let response: Response
       try {
         response = await fetch("/api/driver/deliver", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            photoData,
-            signatureData: signatureDataToSend,
-            notes: notes || undefined,
-            recipientName: recipientName || undefined,
-          }),
+          body: formData,
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
@@ -222,6 +133,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           })
         }
         setIsSubmitting(false)
+        setSubmitStatus(null)
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (FETCH ERROR) ==========")
         return
       }
@@ -239,6 +151,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           variant: "destructive",
         })
         setIsSubmitting(false)
+        setSubmitStatus(null)
         console.log("[v0] [DRIVER] ========== POD SUBMISSION END (API ERROR) ==========")
         return
       }
@@ -263,6 +176,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         variant: "destructive",
       })
       setIsSubmitting(false)
+      setSubmitStatus(null)
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (EXCEPTION) ==========")
     }
   }
@@ -283,13 +197,14 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }
 
     setIsSubmitting(true)
+    setSubmitStatus("Saving failed delivery...")
     console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
     console.log("[v0] [DRIVER] Notes:", notes)
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const timeoutId = setTimeout(() => controller.abort(), 45000)
 
       const response = await fetch("/api/driver/fail", {
         method: "POST",
@@ -328,6 +243,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         variant: "destructive",
       })
       setIsSubmitting(false)
+      setSubmitStatus(null)
       console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (ERROR) ==========")
     }
   }
@@ -400,6 +316,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     onClick={() => {
                       setPhotoFile(null)
                       setPhotoPreview(null)
+                      setSubmitStatus(null)
                     }}
                   >
                     Remove Photo
@@ -493,11 +410,11 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
             <div className="flex gap-3">
               <Button variant="destructive" className="flex-1" size="lg" onClick={handleFail} disabled={isSubmitting}>
                 <XCircle className="h-5 w-5 mr-2" />
-                {isSubmitting ? "Processing..." : "Failed"}
+                {isSubmitting ? submitStatus || "Processing..." : "Failed"}
               </Button>
               <Button className="flex-1" size="lg" onClick={handleDeliver} disabled={isSubmitting}>
                 <CheckCircle className="h-5 w-5 mr-2" />
-                {isSubmitting ? "Processing..." : "Delivered"}
+                {isSubmitting ? submitStatus || "Processing..." : "Delivered"}
               </Button>
             </div>
           </>

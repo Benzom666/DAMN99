@@ -141,12 +141,56 @@ function base64ToBlob(base64Data: string): Blob {
   return new Blob([bytes], { type: contentType })
 }
 
+type DeliveryPayload = {
+  orderId: string
+  notes?: string | null
+  recipientName?: string | null
+  signatureData?: string | null
+  photoData?: string | null
+  photoFile?: File | null
+}
+
+async function parseDeliveryPayload(request: Request): Promise<DeliveryPayload> {
+  const contentType = request.headers.get("content-type") || ""
+
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData()
+    const photo = form.get("photo")
+
+    return {
+      orderId: String(form.get("orderId") || ""),
+      notes: form.get("notes") ? String(form.get("notes")) : null,
+      recipientName: form.get("recipientName") ? String(form.get("recipientName")) : null,
+      signatureData: form.get("signatureData") ? String(form.get("signatureData")) : null,
+      photoFile: photo instanceof File && photo.size > 0 ? photo : null,
+    }
+  }
+
+  const body = await request.json()
+  return {
+    orderId: body.orderId,
+    notes: body.notes,
+    recipientName: body.recipientName,
+    signatureData: body.signatureData,
+    photoData: body.photoData,
+  }
+}
+
+function filenameExtension(file: File): string {
+  const fromName = file.name.split(".").pop()?.toLowerCase()
+  if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName
+
+  if (file.type === "image/png") return "png"
+  if (file.type === "image/webp") return "webp"
+  if (file.type === "image/heic" || file.type === "image/heif") return "heic"
+  return "jpg"
+}
+
 export async function POST(request: Request) {
   try {
     const { user } = await requireDriver()
 
-    const body = await request.json()
-    const { orderId, photoData, signatureData, recipientName, notes } = body
+    const { orderId, photoData, photoFile, signatureData, recipientName, notes } = await parseDeliveryPayload(request)
 
     if (!validateUUID(orderId)) {
       return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 })
@@ -179,7 +223,24 @@ export async function POST(request: Request) {
 
     // Upload photo
     let photoUrl = null
-    if (photoData) {
+    if (photoFile) {
+      if (!photoFile.type.startsWith("image/")) {
+        return NextResponse.json({ success: false, error: "Photo must be an image file" }, { status: 400 })
+      }
+
+      if (photoFile.size > 20 * 1024 * 1024) {
+        return NextResponse.json(
+          { success: false, error: "Photo is too large. Please upload a photo under 20 MB." },
+          { status: 413 },
+        )
+      }
+
+      const uploaded = await put(`pod-photos/${orderId}-${Date.now()}.${filenameExtension(photoFile)}`, photoFile, {
+        access: "public",
+        contentType: photoFile.type || "application/octet-stream",
+      })
+      photoUrl = uploaded.url
+    } else if (photoData) {
       const photoBlob = base64ToBlob(photoData)
       const uploaded = await put(`pod-photos/${orderId}-${Date.now()}.jpg`, photoBlob, {
         access: "public",
