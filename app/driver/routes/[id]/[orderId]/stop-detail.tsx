@@ -26,7 +26,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const { toast } = useToast()
   const [notes, setNotes] = useState("")
   const [recipientName, setRecipientName] = useState("")
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
+  const [photoFileName, setPhotoFileName] = useState<string>("")
   const [photoPreview, setPhotoPreview] = useState<string | null>(existingPod?.photo_url || null)
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
@@ -47,7 +48,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }, 1200)
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     console.log("[v0] [DRIVER] Photo selected:", file ? {
       name: file.name,
@@ -55,8 +56,11 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       type: file.type
     } : "none")
     if (file) {
-      setPhotoFile(file)
-      setPhotoPreview(URL.createObjectURL(file))
+      // Convert to Blob immediately to prevent mobile state loss
+      const blob = new Blob([await file.arrayBuffer()], { type: file.type || "image/jpeg" })
+      setPhotoBlob(blob)
+      setPhotoFileName(file.name)
+      setPhotoPreview(URL.createObjectURL(blob))
     }
   }
 
@@ -116,14 +120,14 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   }
 
   const uploadPodMedia = async (podId: string) => {
-    console.log("[v0] [DRIVER] uploadPodMedia called - podId:", podId, "photoFile:", !!photoFile, "signatureData:", !!signatureData)
+    console.log("[v0] [DRIVER] uploadPodMedia called - podId:", podId, "photoBlob:", !!photoBlob, "signatureData:", !!signatureData)
     
     const formData = new FormData()
     formData.append("podId", podId)
     
-    if (photoFile) {
-      console.log("[v0] [DRIVER] Appending photo to FormData:", photoFile.name, photoFile.size, photoFile.type)
-      formData.append("photo", photoFile)
+    if (photoBlob) {
+      console.log("[v0] [DRIVER] Appending photo to FormData:", photoFileName, photoBlob.size, photoBlob.type)
+      formData.append("photo", photoBlob, photoFileName || "photo.jpg")
     }
     
     if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
@@ -230,10 +234,10 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       }
 
       console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
-      console.log("[v0] [DRIVER] Checking media upload - podId:", result.podId, "photoFile:", !!photoFile, "signatureData:", !!signatureData)
+      console.log("[v0] [DRIVER] Checking media upload - podId:", result.podId, "photoBlob:", !!photoBlob, "signatureData:", !!signatureData)
       
-      if (result.podId && (photoFile || (signatureData && signatureData.startsWith("data:")))) {
-        setSubmitStatus(photoFile ? "Uploading photo..." : "Uploading proof...")
+      if (result.podId && (photoBlob || (signatureData && signatureData.startsWith("data:")))) {
+        setSubmitStatus(photoBlob ? "Uploading photo..." : "Uploading proof...")
         console.log("[v0] [DRIVER] Starting media upload...")
 
         try {
@@ -428,7 +432,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     variant="outline"
                     className="w-full bg-transparent"
                     onClick={() => {
-                      setPhotoFile(null)
+                      setPhotoBlob(null)
+                      setPhotoFileName("")
                       setPhotoPreview(null)
                       setSubmitStatus(null)
                     }}
