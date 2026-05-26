@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState } from "react"
-import { upload } from "@vercel/blob/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -33,7 +32,6 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<string | null>(null)
-  const [blobStorageAvailable, setBlobStorageAvailable] = useState<boolean | null>(null)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
   const routeHref = `/driver/routes/${routeId}`
@@ -113,68 +111,26 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   }
 
   const uploadPodMedia = async (podId: string) => {
-    const media: { photoUrl?: string; signatureUrl?: string } = {}
-
+    const formData = new FormData()
+    formData.append("podId", podId)
+    
     if (photoFile) {
-      try {
-        const uploadedPhoto = await upload(`pod-photos/${order.id}-${Date.now()}.${getFileExtension(photoFile)}`, photoFile, {
-          access: "public",
-          contentType: photoFile.type || "application/octet-stream",
-          handleUploadUrl: "/api/driver/pod-media/upload",
-          clientPayload: JSON.stringify({ podId, mediaKind: "photo" }),
-          multipart: photoFile.size > 8 * 1024 * 1024,
-        })
-
-        media.photoUrl = uploadedPhoto.url
-      } catch (uploadError) {
-        console.error("[v0] [DRIVER] Photo upload failed:", uploadError)
-        const errorMsg = uploadError instanceof Error ? uploadError.message : String(uploadError)
-        
-        if (errorMsg.includes("BLOB_READ_WRITE_TOKEN") || errorMsg.includes("not configured")) {
-          throw new Error("Photo upload is not configured. Contact your administrator to enable Vercel Blob storage.")
-        }
-        throw new Error(`Photo upload failed: ${errorMsg}`)
-      }
+      formData.append("photo", photoFile)
     }
-
+    
     if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
-      try {
-        const signatureBlob = dataUrlToBlob(signatureData)
-        const uploadedSignature = await upload(`pod-signatures/${order.id}-${Date.now()}.png`, signatureBlob, {
-          access: "public",
-          contentType: signatureBlob.type || "image/png",
-          handleUploadUrl: "/api/driver/pod-media/upload",
-          clientPayload: JSON.stringify({ podId, mediaKind: "signature" }),
-        })
-
-        media.signatureUrl = uploadedSignature.url
-      } catch (uploadError) {
-        console.error("[v0] [DRIVER] Signature upload failed:", uploadError)
-        const errorMsg = uploadError instanceof Error ? uploadError.message : String(uploadError)
-        
-        if (errorMsg.includes("BLOB_READ_WRITE_TOKEN") || errorMsg.includes("not configured")) {
-          throw new Error("Signature upload is not configured. Contact your administrator to enable Vercel Blob storage.")
-        }
-        throw new Error(`Signature upload failed: ${errorMsg}`)
-      }
+      const signatureBlob = dataUrlToBlob(signatureData)
+      formData.append("signature", signatureBlob, "signature.png")
     }
 
-    if (Object.keys(media).length === 0) return
-
-    const response = await fetch("/api/driver/pod-media/attach", {
+    const response = await fetch("/api/driver/pod-media/upload", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        podId,
-        ...media,
-      }),
+      body: formData,
     })
 
     const result = await readJsonResponse(response)
     if (!response.ok || !result.success) {
-      throw new Error(result.error || "Failed to attach proof media")
+      throw new Error(result.error || "Failed to upload proof media")
     }
   }
 
@@ -271,14 +227,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           console.error("[v0] [DRIVER] Delivery was saved, but POD media upload failed:", mediaError)
           const errorMsg = mediaError instanceof Error ? mediaError.message : String(mediaError)
           
-          if (errorMsg.includes("not configured") || errorMsg.includes("BLOB_READ_WRITE_TOKEN")) {
-            setBlobStorageAvailable(false)
-            toast({
-              title: "Delivery Completed",
-              description: "Delivery was saved successfully. Photo upload is not available - contact your administrator to enable it.",
-              variant: "default",
-            })
-          } else if (errorMsg.includes("timed out")) {
+          if (errorMsg.includes("timed out")) {
             toast({
               title: "Delivery Completed",
               description: "Delivery was saved, but photo upload timed out. Check your connection and try again later.",
@@ -455,12 +404,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           <>
             {/* Photo Capture */}
             <Card className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Photo (Optional)</Label>
-                {blobStorageAvailable === false && (
-                  <span className="text-xs text-muted-foreground">Upload not available</span>
-                )}
-              </div>
+              <Label>Photo (Optional)</Label>
               {photoPreview ? (
                 <div className="space-y-2">
                   <img src={photoPreview || "/placeholder.svg"} alt="Delivery proof" className="w-full rounded-lg" />

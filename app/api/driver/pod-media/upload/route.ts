@@ -1,75 +1,112 @@
-import { type HandleUploadBody, handleUpload } from "@vercel/blob/client"
 import { NextResponse } from "next/server"
 import { requireDriver } from "@/lib/security/authorization"
 import { validateUUID } from "@/lib/security/input-validation"
 
-type ClientPayload = {
-  podId?: string
-  mediaKind?: "photo" | "signature"
-}
-
-function parseClientPayload(payload: string | null): ClientPayload {
-  if (!payload) return {}
-
-  try {
-    const parsed = JSON.parse(payload)
-    return {
-      podId: typeof parsed.podId === "string" ? parsed.podId : undefined,
-      mediaKind: parsed.mediaKind === "signature" ? "signature" : "photo",
-    }
-  } catch {
-    return {}
-  }
-}
-
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as HandleUploadBody
+    const { user, supabase } = await requireDriver()
+    const formData = await request.formData()
+    
+    const podId = formData.get("podId") as string
+    if (!validateUUID(podId)) {
+      return NextResponse.json({ success: false, error: "Invalid POD ID" }, { status: 400 })
+    }
 
-    const response = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async (_pathname, clientPayload) => {
-        const { user, supabase } = await requireDriver()
-        const payload = parseClientPayload(clientPayload)
-        const expectedPrefix = payload.mediaKind === "signature" ? "pod-signatures/" : "pod-photos/"
+    // Verify POD belongs to this driver
+    const { data: pod, error: podError } = await supabase
+      .from("pods")
+      .select("id")
+      .eq("id", podId)
+      .eq("driver_id", user.id)
+      .maybeSingle()
 
-        if (!payload.podId || !validateUUID(payload.podId)) {
-          throw new Error("Invalid POD ID")
-        }
+    if (podError || !pod) {
+      return NextResponse.json(
+        { success: false, error: "POD not found or unauthorized" },
+        { status: 403 }
+      )
+    }
 
-        if (!_pathname.startsWith(expectedPrefix)) {
-          throw new Error("Invalid upload path")
-        }
+    const updates: { photo_url?: string; signature_url?: string } = {}
 
-        const { data: pod, error } = await supabase
-          .from("pods")
-          .select("id")
-          .eq("id", payload.podId)
-          .eq("driver_id", user.id)
-          .maybeSingle()
+    // Upload photo if provided
+    const photoFile = formData.get("photo") as File | null
+    if (photoFile) {
+      const photoExt = photoFile.name.split(".").pop() || "jpg"
+      const photoPath = `pod-photos/${podId}-${Date.now()}.${photoExt}`
+      
+      const { data: photoData, error: photoError } = await supabase.storage
+        .from("pod-media")
+        .upload(photoPath, photoFile, {
+          contentType: photoFile.type,
+          upsert: false,
+        })
 
-        if (error || !pod) {
-          throw new Error("POD was not available for this driver")
-        }
+      if (photoError) {
+        console.error("[POD_UPLOAD] Photo upload failed:", photoError)
+        return NextResponse.json(
+          { success: false, error: `Photo upload failed: ${photoError.message}` },
+          { status: 500 }
+        )
+      }
 
-        return {
-          allowedContentTypes:
-            payload.mediaKind === "signature"
-              ? ["image/png", "image/jpeg", "image/webp"]
-              : ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
-          maximumSizeInBytes: payload.mediaKind === "signature" ? 3 * 1024 * 1024 : 20 * 1024 * 1024,
-          tokenPayload: JSON.stringify(payload),
-        }
-      },
-    })
+      const { data: { publicUrl } } = supabase.storage
+        .from("pod-media")
+        .getPublicUrl(photoData.path)
 
-    return NextResponse.json(response)
+      updates.photo_url = publicUrl
+    }
+
+    // Upload signature if provided
+    const signatureFile = formData.get("signature") as File | null
+    if (signatureFile) {
+      const signaturePath = `pod-signatures/${podId}-${Date.now()}.png`
+      
+      const { data: signatureData, error: signatureError } = await supabase.storage
+        .from("pod-media")
+        .upload(signaturePath, signatureFile, {
+          contentType: "image/png",
+          upsert: false,
+        })
+
+      if (signatureError) {
+        console.error("[POD_UPLOAD] Signature upload failed:", signatureError)
+        return NextResponse.json(
+          { success: false, error: `Signature upload failed: ${signatureError.message}` },
+          { status: 500 }
+        )
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("pod-media")
+        .getPublicUrl(signatureData.path)
+
+      updates.signature_url = publicUrl
+    }
+
+    // Update POD with URLs
+    if (Object.keys(updates).length > 0) {
+      const { error: updateError } = await supabase
+        .from("pods")
+        .update(updates)
+        .eq("id", podId)
+        .eq("driver_id", user.id)
+
+      if (updateError) {
+        console.error("[POD_UPLOAD] Failed to update POD:", updateError)
+        return NextResponse.json(
+          { success: false, error: `Failed to save media URLs: ${updateError.message}` },
+          { status: 500 }
+        )
+      }
+    }
+
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("[v0] [POD_MEDIA_UPLOAD] Failed to handle upload token request:", error)
+    console.error("[POD_UPLOAD] Unexpected error:", error)
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Failed to prepare upload" },
-      { status: 400 },
+      { success: false, error: error instanceof Error ? error.message : "Upload failed" },
+      { status: 500 }
     )
   }
 }
