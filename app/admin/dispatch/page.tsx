@@ -60,7 +60,7 @@ export default async function DispatchPage() {
   if (orderIds.length > 0) {
     const { data: allPods, error: podsError } = await supabase
       .from("pods")
-      .select("id, order_id, driver_id, photo_url, signature_url, recipient_name, notes, delivered_at, created_at")
+      .select("id, order_id, driver_id, photo_url, signature_url, recipient_name, notes, delivered_at")
       .in("order_id", orderIds)
 
     if (podsError) {
