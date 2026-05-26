@@ -55,6 +55,15 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
         const dataUrl = reader.result as string
         setPhotoDataUrl(dataUrl)
         setPhotoPreview(dataUrl)
+        console.log("[v0] [DRIVER] Photo converted to base64, length:", dataUrl.length)
+      }
+      reader.onerror = () => {
+        console.error("[v0] [DRIVER] Failed to read photo file")
+        toast({
+          title: "Error",
+          description: "Failed to read photo. Please try again.",
+          variant: "destructive",
+        })
       }
       reader.readAsDataURL(file)
     }
@@ -116,37 +125,42 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   }
 
   const uploadPodMedia = async (podId: string) => {
-    console.log("[v0] [DRIVER] uploadPodMedia starting - podId:", podId)
-    console.log("[v0] [DRIVER] photoDataUrl exists:", !!photoDataUrl, "length:", photoDataUrl?.length)
-    console.log("[v0] [DRIVER] signatureData exists:", !!signatureData, "length:", signatureData?.length)
-    
-    const formData = new FormData()
-    formData.append("podId", podId)
-    
-    if (photoDataUrl) {
-      const photoBlob = dataUrlToBlob(photoDataUrl)
-      console.log("[v0] [DRIVER] Photo blob created - size:", photoBlob.size, "type:", photoBlob.type)
-      formData.append("photo", photoBlob, "photo.jpg")
-    }
-    
-    if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
-      const signatureBlob = dataUrlToBlob(signatureData)
-      console.log("[v0] [DRIVER] Signature blob created - size:", signatureBlob.size, "type:", signatureBlob.type)
-      formData.append("signature", signatureBlob, "signature.png")
-    }
+    try {
+      console.log("[v0] [DRIVER] uploadPodMedia starting - podId:", podId)
+      console.log("[v0] [DRIVER] photoDataUrl exists:", !!photoDataUrl, "length:", photoDataUrl?.length)
+      console.log("[v0] [DRIVER] signatureData exists:", !!signatureData, "length:", signatureData?.length)
+      
+      const formData = new FormData()
+      formData.append("podId", podId)
+      
+      if (photoDataUrl) {
+        const photoBlob = dataUrlToBlob(photoDataUrl)
+        console.log("[v0] [DRIVER] Photo blob created - size:", photoBlob.size, "type:", photoBlob.type)
+        formData.append("photo", photoBlob, "photo.jpg")
+      }
+      
+      if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
+        const signatureBlob = dataUrlToBlob(signatureData)
+        console.log("[v0] [DRIVER] Signature blob created - size:", signatureBlob.size, "type:", signatureBlob.type)
+        formData.append("signature", signatureBlob, "signature.png")
+      }
 
-    console.log("[v0] [DRIVER] Sending FormData to /api/driver/pod-media/upload")
-    const response = await fetch("/api/driver/pod-media/upload", {
-      method: "POST",
-      body: formData,
-    })
+      console.log("[v0] [DRIVER] Sending FormData to /api/driver/pod-media/upload")
+      const response = await fetch("/api/driver/pod-media/upload", {
+        method: "POST",
+        body: formData,
+      })
 
-    console.log("[v0] [DRIVER] Upload response status:", response.status, "ok:", response.ok)
-    const result = await readJsonResponse(response)
-    console.log("[v0] [DRIVER] Upload result:", result)
-    
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || "Failed to upload proof media")
+      console.log("[v0] [DRIVER] Upload response status:", response.status, "ok:", response.ok)
+      const result = await readJsonResponse(response)
+      console.log("[v0] [DRIVER] Upload result:", result)
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to upload proof media")
+      }
+    } catch (error) {
+      console.error("[v0] [DRIVER] uploadPodMedia error:", error)
+      throw error
     }
   }
 
