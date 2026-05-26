@@ -156,11 +156,15 @@ async function parseDeliveryPayload(request: Request): Promise<DeliveryPayload> 
 
 export async function POST(request: Request) {
   try {
+    console.log("[DELIVER] Starting delivery request")
     const { user, supabase } = await requireDriver()
+    console.log("[DELIVER] Driver authenticated:", user.id)
 
     const { orderId, recipientName, notes } = await parseDeliveryPayload(request)
+    console.log("[DELIVER] Payload parsed:", { orderId, hasRecipient: !!recipientName, hasNotes: !!notes })
 
     if (!validateUUID(orderId)) {
+      console.error("[DELIVER] Invalid order ID:", orderId)
       return NextResponse.json({ success: false, error: "Invalid order ID" }, { status: 400 })
     }
 
@@ -170,6 +174,7 @@ export async function POST(request: Request) {
     const warnings: string[] = []
 
     // Update order status first. This is the critical delivery action and must not depend on POD/media schema.
+    console.log("[DELIVER] Updating order status to delivered:", orderId)
     const { data: updatedOrder, error: orderError } = await supabase
       .from("orders")
       .update({
@@ -181,6 +186,7 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (orderError || !updatedOrder) {
+      console.error("[DELIVER] Order update failed:", orderError)
       return NextResponse.json(
         {
           success: false,
@@ -191,6 +197,7 @@ export async function POST(request: Request) {
         { status: orderError ? 500 : 403 },
       )
     }
+    console.log("[DELIVER] Order status updated successfully")
 
     let podId: string | null = null
     const podInsert = {
@@ -203,15 +210,17 @@ export async function POST(request: Request) {
       delivered_at: new Date().toISOString(),
     }
 
+    console.log("[DELIVER] Creating POD record")
     const { data: podData, error: podError } = await supabase.from("pods").insert(podInsert).select("id").single()
 
     if (podError) {
-      console.error("[v0] [DRIVER_DELIVER] Full POD insert failed after delivery was saved:", podError)
+      console.error("[DELIVER] Full POD insert failed after delivery was saved:", podError)
 
       const fallbackNotes = sanitizedRecipient
         ? [`Recipient: ${sanitizedRecipient}`, sanitizedNotes].filter(Boolean).join("\n")
         : sanitizedNotes
 
+      console.log("[DELIVER] Attempting fallback POD insert")
       const { data: fallbackPod, error: fallbackPodError } = await supabase
         .from("pods")
         .insert({
@@ -226,24 +235,29 @@ export async function POST(request: Request) {
         .single()
 
       if (fallbackPodError) {
-        console.error("[v0] [DRIVER_DELIVER] Fallback POD insert failed after delivery was saved:", fallbackPodError)
+        console.error("[DELIVER] Fallback POD insert failed after delivery was saved:", fallbackPodError)
         warnings.push("Delivery was completed, but proof of delivery details could not be saved.")
       } else {
         podId = fallbackPod.id
+        console.log("[DELIVER] Fallback POD created:", podId)
         warnings.push("Delivery was completed. Recipient name was saved in notes because the POD schema is outdated.")
       }
     } else {
       podId = podData.id
+      console.log("[DELIVER] POD created successfully:", podId)
     }
 
     if (podId && process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
+      console.log("[DELIVER] Sending POD email")
       sendPODEmail(orderId, podId).catch((error) => {
-        console.error("[v0] [POD_EMAIL] Failed to send POD email:", error)
+        console.error("[DELIVER] Failed to send POD email:", error)
       })
     }
 
+    console.log("[DELIVER] Delivery completed successfully")
     return NextResponse.json({ success: true, podId, warning: warnings[0] || null })
   } catch (error) {
+    console.error("[DELIVER] Unexpected error:", error)
     if (error instanceof Error && error.message.includes("required")) {
       return NextResponse.json({ success: false, error: error.message }, { status: 401 })
     }
