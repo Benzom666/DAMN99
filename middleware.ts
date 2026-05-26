@@ -4,8 +4,13 @@ import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  // If env vars not set, just pass through
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return await updateSession(request)
+  }
   
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
   

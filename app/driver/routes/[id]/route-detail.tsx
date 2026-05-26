@@ -108,7 +108,7 @@ export function RouteDetail({ route, orders }: RouteDetailProps) {
 
       {showMap && markers.length > 0 && (
         <div className="max-w-2xl mx-auto px-4 pt-4 min-h-[420px]">
-          <HereMap markers={markers} className="h-96 rounded-lg border" showToggle />
+          <HereMap markers={markers} className="h-96 rounded-lg border" />
         </div>
       )}
 

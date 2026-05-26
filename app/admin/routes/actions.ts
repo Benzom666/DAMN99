@@ -7,7 +7,6 @@ import { buildHereProblemV3 } from "@/lib/here/build-problem-v3"
 import type { Order, VehicleConfig, Depot } from "@/lib/here/build-problem-v3"
 import { ensureOrderCoordinates } from "@/lib/ensure-coords"
 import { revalidatePath } from "next/cache"
-import type { OptimizationConfig } from "./create-route-dialog"
 import { env } from "@/lib/env"
 import { recalcRouteMetrics } from "./metrics"
 
@@ -31,7 +30,6 @@ export async function createRoute(
   orderIds: string[],
   driverId: string | null,
   use2Opt: boolean,
-  optimizationConfig?: OptimizationConfig,
 ) {
   const supabase = await createClient()
 
@@ -96,29 +94,11 @@ export async function createRoute(
     returnToDepot: true,
   }
 
-  if (optimizationConfig) {
-    if (optimizationConfig.useWarehouse && optimizationConfig.warehouseLocation) {
-      const coords = parseWarehouseLocation(optimizationConfig.warehouseLocation)
-      if (coords) {
-        depot = coords
-      }
-    }
-
-    vehicleConfig.returnToDepot = optimizationConfig.returnToWarehouse
-    vehicleConfig.capacity = optimizationConfig.vehicleCapacity || vehicleConfig.capacity
-
-    if (optimizationConfig.timeStart && optimizationConfig.timeEnd) {
-      const today = new Date().toISOString().split("T")[0]
-      vehicleConfig.shiftStart = `${today}T${optimizationConfig.timeStart}:00Z`
-      vehicleConfig.shiftEnd = `${today}T${optimizationConfig.timeEnd}:00Z`
-    }
-  }
-
   if (driverId) {
     const { data: profile } = await supabase.from("profiles").select("*").eq("id", driverId).single()
 
     if (profile) {
-      if (!optimizationConfig?.useWarehouse && profile.depot_lat && profile.depot_lng) {
+      if (profile.depot_lat && profile.depot_lng) {
         depot = {
           lat: profile.depot_lat,
           lng: profile.depot_lng,
@@ -127,14 +107,10 @@ export async function createRoute(
 
       vehicleConfig = {
         id: profile.id,
-        capacity: optimizationConfig?.vehicleCapacity || profile.vehicle_capacity || 50,
-        shiftStart:
-          vehicleConfig.shiftStart ||
-          (profile.shift_start ? `${new Date().toISOString().split("T")[0]}T${profile.shift_start}Z` : undefined),
-        shiftEnd:
-          vehicleConfig.shiftEnd ||
-          (profile.shift_end ? `${new Date().toISOString().split("T")[0]}T${profile.shift_end}Z` : undefined),
-        returnToDepot: optimizationConfig?.returnToWarehouse ?? true,
+        capacity: profile.vehicle_capacity || 50,
+        shiftStart: profile.shift_start ? `${new Date().toISOString().split("T")[0]}T${profile.shift_start}Z` : undefined,
+        shiftEnd: profile.shift_end ? `${new Date().toISOString().split("T")[0]}T${profile.shift_end}Z` : undefined,
+        returnToDepot: true,
       }
     }
   }
@@ -217,7 +193,6 @@ export async function createMultipleRoutes(
   driverIds: string[],
   numberOfRoutes: number,
   use2Opt: boolean,
-  optimizationConfig?: OptimizationConfig,
 ) {
   try {
     const supabase = await createClient()
@@ -389,20 +364,12 @@ export async function createMultipleRoutes(
       // Build vehicle config
       const vehicleConfig: VehicleConfig = {
         id: driverId || `vehicle-${batchIndex + 1}`,
-        capacity: optimizationConfig?.vehicleCapacity || driver?.vehicle_capacity || env.ROUTE_CAPACITY,
-        shiftStart:
-          optimizationConfig?.useTimeConstraints && optimizationConfig?.timeStart
-            ? `${new Date().toISOString().split("T")[0]}T${optimizationConfig.timeStart}:00Z`
-            : driver?.shift_start
-              ? `${new Date().toISOString().split("T")[0]}T${driver.shift_start}Z`
-              : undefined,
-        shiftEnd:
-          optimizationConfig?.useTimeConstraints && optimizationConfig?.timeEnd
-            ? `${new Date().toISOString().split("T")[0]}T${optimizationConfig.timeEnd}:00Z`
-            : driver?.shift_end
-              ? `${new Date().toISOString().split("T")[0]}T${driver.shift_end}Z`
-              : undefined,
-        returnToDepot: optimizationConfig?.returnToWarehouse ?? true,
+        capacity: driver?.vehicle_capacity || env.ROUTE_CAPACITY,
+        shiftStart: driver?.shift_start
+          ? `${new Date().toISOString().split("T")[0]}T${driver.shift_start}Z`
+          : undefined,
+        shiftEnd: driver?.shift_end ? `${new Date().toISOString().split("T")[0]}T${driver.shift_end}Z` : undefined,
+        returnToDepot: true,
       }
 
       let optimizedRoute: string[] = []

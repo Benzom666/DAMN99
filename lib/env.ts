@@ -18,8 +18,8 @@ export const env = {
   HERE_TOUR_PLANNING_AUTH: getEnvVar("HERE_TOUR_PLANNING_AUTH", false) || "apikey",
 
   // Supabase (server-side)
-  SUPABASE_URL: getEnvVar("SUPABASE_URL"),
-  SUPABASE_ANON_KEY: getEnvVar("SUPABASE_ANON_KEY"),
+  SUPABASE_URL: getEnvVar("NEXT_PUBLIC_SUPABASE_URL", false),
+  SUPABASE_ANON_KEY: getEnvVar("NEXT_PUBLIC_SUPABASE_ANON_KEY", false),
 
   // Vercel Blob
   BLOB_READ_WRITE_TOKEN: getEnvVar("BLOB_READ_WRITE_TOKEN", false),
@@ -39,7 +39,7 @@ if (!env.HERE_API_KEY) {
 }
 
 if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-  throw new Error("[env] Supabase configuration is incomplete")
+  console.warn("[env] Supabase configuration is incomplete - database operations will fail")
 }
 
 console.log("[env] Environment validated successfully")

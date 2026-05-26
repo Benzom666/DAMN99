@@ -24,11 +24,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Maximum 100 orders per request" }, { status: 400 })
     }
 
-    const result = await ensureOrderCoordinates(orderIds)
+    const supabase = await createClient()
+    const { data: orders, error: fetchError } = await supabase
+      .from("orders")
+      .select("*")
+      .in("id", orderIds)
+
+    if (fetchError) {
+      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+    }
+
+    const result = await ensureOrderCoordinates(orders || [])
 
     return NextResponse.json({
       success: true,
-      geocoded: result.success.length,
+      geocoded: result.orders.length,
       failed: result.failed.length,
       failures: result.failed,
     })

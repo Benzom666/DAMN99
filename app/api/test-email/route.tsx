@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 export const runtime = "nodejs"
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.searchParams
+  const searchParams = request.nextUrl.searchParams
   const testEmail = searchParams.get("to")
 
   if (!testEmail) {

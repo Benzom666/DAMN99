@@ -1,3 +1,8 @@
+// Minimal Database type for Supabase generics.
+// Using `any` for table schemas allows Supabase client to work without generated types.
+// Replace with `supabase gen types typescript` output for full type safety.
+export type Database = Record<string, any>
+
 export type UserRole = "admin" | "driver"
 
 export type OrderStatus = "pending" | "assigned" | "in_transit" | "delivered" | "failed"
@@ -11,6 +16,7 @@ export interface Profile {
   email: string
   role: UserRole
   display_name: string | null
+  vehicle_capacity: number | null
   created_at: string
 }
 

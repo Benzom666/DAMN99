@@ -38,7 +38,7 @@ type Route = {
   total_stops: number | null
   completed_stops: number | null
   created_at: string
-  driver: { email: string; display_name: string | null } | null
+  driver: { id: string; email: string; display_name: string | null } | null
   admin: { email: string; display_name: string | null } | null
 }
 

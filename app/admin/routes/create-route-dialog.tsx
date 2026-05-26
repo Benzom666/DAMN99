@@ -27,17 +27,6 @@ interface CreateRouteDialogProps {
   drivers: Profile[]
 }
 
-export interface OptimizationConfig {
-  useWarehouse: boolean
-  warehouseLocation: string
-  returnToWarehouse: boolean
-  maxOrders: number | null
-  vehicleCapacity: number | null
-  timeStart: string | null
-  timeEnd: string | null
-  useTimeConstraints: boolean
-}
-
 export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: CreateRouteDialogProps) {
   const [name, setName] = useState("")
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set())
@@ -46,34 +35,14 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
   const [numberOfRoutes, setNumberOfRoutes] = useState("2")
   const [selectedDrivers, setSelectedDrivers] = useState<Set<string>>(new Set())
   const [assignDriversLater, setAssignDriversLater] = useState(true)
-  const [use2Opt, setUse2Opt] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const [useWarehouse, setUseWarehouse] = useState(false)
-  const [warehouseLocation, setWarehouseLocation] = useState("")
-  const [returnToWarehouse, setReturnToWarehouse] = useState(true)
-  const [maxOrders, setMaxOrders] = useState("")
-  const [vehicleCapacity, setVehicleCapacity] = useState("")
-  const [useTimeConstraints, setUseTimeConstraints] = useState(false)
-  const [timeStart, setTimeStart] = useState("09:00")
-  const [timeEnd, setTimeEnd] = useState("17:00")
-
-  console.log("[v0] [DIALOG] Total orders received:", orders.length)
-  console.log(
-    "[v0] [DIALOG] Order statuses:",
-    orders
-      .slice(0, 5)
-      .map((o) => ({ id: o.id.slice(0, 8), status: o.status, hasCoords: !!(o.latitude && o.longitude) })),
-  )
-
   const availableOrders = orders.filter((o) => {
-    const validStatus = !o.status || o.status === "pending" || o.status === "unassigned"
+    const validStatus = !o.status || o.status === "pending"
     const hasCoords = o.latitude && o.longitude
     return validStatus && hasCoords
   })
-
-  console.log("[v0] [DIALOG] Available orders after filtering:", availableOrders.length)
 
   function toggleOrder(orderId: string) {
     const newSelected = new Set(selectedOrders)
@@ -108,29 +77,17 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
 
     setIsLoading(true)
     try {
-      const optimizationConfig: OptimizationConfig = {
-        useWarehouse,
-        warehouseLocation,
-        returnToWarehouse,
-        maxOrders: maxOrders ? Number.parseInt(maxOrders) : null,
-        vehicleCapacity: vehicleCapacity ? Number.parseInt(vehicleCapacity) : null,
-        useTimeConstraints,
-        timeStart: useTimeConstraints ? timeStart : null,
-        timeEnd: useTimeConstraints ? timeEnd : null,
-      }
-
       if (multiRouteMode) {
         const routeCount = Number.parseInt(numberOfRoutes) || 2
         const driversToUse = assignDriversLater ? [] : Array.from(selectedDrivers)
-
-        await createMultipleRoutes(Array.from(selectedOrders), driversToUse, routeCount, use2Opt, optimizationConfig)
+        await createMultipleRoutes(Array.from(selectedOrders), driversToUse, routeCount, false)
       } else {
         if (!name) {
           alert("Please enter a route name")
           setIsLoading(false)
           return
         }
-        await createRoute(name, Array.from(selectedOrders), driverId, use2Opt, optimizationConfig)
+        await createRoute(name, Array.from(selectedOrders), driverId, false)
       }
 
       // Reset form
@@ -141,15 +98,6 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
       setMultiRouteMode(false)
       setNumberOfRoutes("2")
       setAssignDriversLater(true)
-      setUse2Opt(false)
-      setUseWarehouse(false)
-      setWarehouseLocation("")
-      setReturnToWarehouse(true)
-      setMaxOrders("")
-      setVehicleCapacity("")
-      setUseTimeConstraints(false)
-      setTimeStart("09:00")
-      setTimeEnd("17:00")
       onOpenChange(false)
       router.refresh()
     } catch (error) {
@@ -167,8 +115,8 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
           <DialogTitle>Create Route</DialogTitle>
           <DialogDescription>
             {multiRouteMode
-              ? "Create multiple optimized routes from selected orders"
-              : "Select orders and configure route optimization"}
+              ? "Create multiple routes and distribute orders automatically"
+              : "Select orders and assign a driver"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -188,7 +136,7 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
               }}
             />
             <Label htmlFor="multi-route" className="text-sm font-normal">
-              Create multiple routes (distribute orders across multiple routes automatically)
+              Create multiple routes
             </Label>
           </div>
 
@@ -207,7 +155,7 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
           {multiRouteMode ? (
             <div className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="num-routes">Number of Routes to Create</Label>
+                <Label htmlFor="num-routes">Number of Routes</Label>
                 <Input
                   id="num-routes"
                   type="number"
@@ -218,7 +166,7 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
                   onChange={(e) => setNumberOfRoutes(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Orders will be geographically clustered and distributed across this many routes
+                  Orders will be distributed evenly across routes
                 </p>
               </div>
 
@@ -234,7 +182,7 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
                   }}
                 />
                 <Label htmlFor="assign-later" className="text-sm font-normal">
-                  Assign drivers later (create routes without driver assignment)
+                  Assign drivers later
                 </Label>
               </div>
 
@@ -254,9 +202,6 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
                             />
                             <div className="flex-1 text-sm">
                               <div className="font-medium">{driver.display_name || driver.email}</div>
-                              {driver.vehicle_capacity && (
-                                <div className="text-xs text-muted-foreground">Capacity: {driver.vehicle_capacity}</div>
-                              )}
                             </div>
                           </div>
                         ))}
@@ -268,7 +213,7 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
 
               {assignDriversLater && (
                 <Badge variant="secondary" className="mt-2">
-                  {numberOfRoutes} routes will be created without driver assignments
+                  {numberOfRoutes} routes will be created without drivers
                 </Badge>
               )}
             </div>
@@ -294,136 +239,6 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
             </div>
           )}
 
-          <div className="flex items-center space-x-2">
-            <Checkbox id="use-2opt" checked={use2Opt} onCheckedChange={(checked) => setUse2Opt(checked === true)} />
-            <Label htmlFor="use-2opt" className="text-sm font-normal">
-              Use 2-opt optimization fallback (if HERE fails)
-            </Label>
-          </div>
-
-          <Separator className="my-4" />
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-3">Optimization Configuration</h3>
-              <p className="text-xs text-muted-foreground mb-4">
-                Configure depot location, vehicle constraints, and time windows for route optimization
-              </p>
-            </div>
-
-            <div className="grid gap-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="use-warehouse"
-                  checked={useWarehouse}
-                  onCheckedChange={(checked) => setUseWarehouse(checked === true)}
-                />
-                <Label htmlFor="use-warehouse" className="text-sm font-normal">
-                  Start from warehouse/depot
-                </Label>
-              </div>
-
-              {useWarehouse && (
-                <div className="ml-6 space-y-2">
-                  <Label htmlFor="warehouse-location" className="text-xs">
-                    Warehouse Location
-                  </Label>
-                  <Input
-                    id="warehouse-location"
-                    placeholder="Enter address or lat,lng (e.g., 45.4215,-75.6972)"
-                    value={warehouseLocation}
-                    onChange={(e) => setWarehouseLocation(e.target.value)}
-                    className="text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Leave empty to use driver's default depot or system default (Ottawa)
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="return-to-warehouse"
-                  checked={returnToWarehouse}
-                  onCheckedChange={(checked) => setReturnToWarehouse(checked === true)}
-                />
-                <Label htmlFor="return-to-warehouse" className="text-sm font-normal">
-                  Return to warehouse/depot at end
-                </Label>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="max-orders" className="text-xs">
-                    Max Orders per Route
-                  </Label>
-                  <Input
-                    id="max-orders"
-                    type="number"
-                    placeholder="e.g., 25"
-                    value={maxOrders}
-                    onChange={(e) => setMaxOrders(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="vehicle-capacity" className="text-xs">
-                    Vehicle Capacity
-                  </Label>
-                  <Input
-                    id="vehicle-capacity"
-                    type="number"
-                    placeholder="e.g., 50"
-                    value={vehicleCapacity}
-                    onChange={(e) => setVehicleCapacity(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="use-time-constraints"
-                    checked={useTimeConstraints}
-                    onCheckedChange={(checked) => setUseTimeConstraints(checked === true)}
-                  />
-                  <Label htmlFor="use-time-constraints" className="text-sm font-normal">
-                    Set shift time window (leave unchecked for unlimited duration)
-                  </Label>
-                </div>
-
-                {useTimeConstraints && (
-                  <div className="ml-6 grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="time-start" className="text-xs text-muted-foreground">
-                        Start Time
-                      </Label>
-                      <Input
-                        id="time-start"
-                        type="time"
-                        value={timeStart}
-                        onChange={(e) => setTimeStart(e.target.value)}
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="time-end" className="text-xs text-muted-foreground">
-                        End Time
-                      </Label>
-                      <Input
-                        id="time-end"
-                        type="time"
-                        value={timeEnd}
-                        onChange={(e) => setTimeEnd(e.target.value)}
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
           <Separator className="my-4" />
 
           <div className="space-y-2">

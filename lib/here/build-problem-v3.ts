@@ -67,8 +67,8 @@ function makeDeliveryTask(o: Order, softWindows: boolean) {
 
   // Only attach times when softWindows is false AND both windows are present and valid
   if (!softWindows && (o.window_start || o.tw_start) && (o.window_end || o.tw_end)) {
-    const windowStart = o.window_start || o.tw_start
-    const windowEnd = o.window_end || o.tw_end
+    const windowStart = (o.window_start || o.tw_start)!
+    const windowEnd = (o.window_end || o.tw_end)!
     const from = toISOZLocal(windowStart)
     const to = toISOZLocal(windowEnd)
     if (new Date(from) < new Date(to)) {
@@ -126,8 +126,8 @@ export async function buildHereProblemV3(
   const endLocal = new Date()
   endLocal.setHours(23, 59, 0, 0)
 
-  const shiftStartTime = toISOZLocal(startLocal)
-  const shiftEndTime = toISOZLocal(endLocal)
+  const shiftStartTime = vehicle.shiftStart ?? toISOZLocal(startLocal)
+  const shiftEndTime = vehicle.shiftEnd ?? toISOZLocal(endLocal)
 
   const shift = {
     start: { time: shiftStartTime, location: loc(depotLocation) },
@@ -230,12 +230,15 @@ export async function buildMultiVehicleProblemV3(
   const endLocal = new Date()
   endLocal.setHours(23, 59, 0, 0)
 
-  const shiftStartTime = toISOZLocal(startLocal)
-  const shiftEndTime = toISOZLocal(endLocal)
+  const defaultShiftStart = toISOZLocal(startLocal)
+  const defaultShiftEnd = toISOZLocal(endLocal)
 
   const fleetTypes = vehicles.map((v) => {
     // Use vehicle-specific depot if available, otherwise use shared depot
     const vehicleDepot = depotLocation // TODO: Add per-vehicle depot support
+
+    const shiftStartTime = v.shiftStart ?? defaultShiftStart
+    const shiftEndTime = v.shiftEnd ?? defaultShiftEnd
 
     const shift = {
       start: { time: shiftStartTime, location: loc(vehicleDepot) },
@@ -283,7 +286,7 @@ export async function buildMultiVehicleProblemV3(
   console.log(`  - Jobs: ${jobs.length}`)
   console.log(`  - Vehicles: ${vehicles.length}`)
   console.log(`  - Depot: ${depotLocation.lat.toFixed(4)}, ${depotLocation.lng.toFixed(4)} (${depotChoice.source})`)
-  console.log(`  - Shift: ${shiftStartTime} to ${shiftEndTime}`)
+  console.log(`  - Shift: ${defaultShiftStart} to ${defaultShiftEnd}`)
   console.log(`  - Capacity per vehicle: ${env.ROUTE_CAPACITY}`)
   console.log(`  - Soft windows: ${SOFT_WINDOWS}`)
 
