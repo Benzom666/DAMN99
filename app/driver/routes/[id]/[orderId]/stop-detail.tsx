@@ -26,7 +26,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const { toast } = useToast()
   const [notes, setNotes] = useState("")
   const [recipientName, setRecipientName] = useState("")
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(existingPod?.photo_url || null)
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
@@ -50,8 +50,13 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      setPhotoFile(file)
-      setPhotoPreview(URL.createObjectURL(file))
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string
+        setPhotoDataUrl(dataUrl)
+        setPhotoPreview(dataUrl)
+      }
+      reader.readAsDataURL(file)
     }
   }
 
@@ -114,8 +119,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     const formData = new FormData()
     formData.append("podId", podId)
     
-    if (photoFile) {
-      formData.append("photo", photoFile)
+    if (photoDataUrl) {
+      const photoBlob = dataUrlToBlob(photoDataUrl)
+      formData.append("photo", photoBlob, "photo.jpg")
     }
     
     if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
@@ -217,8 +223,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       }
 
       console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
-      if (result.podId && (photoFile || (signatureData && signatureData.startsWith("data:")))) {
-        setSubmitStatus(photoFile ? "Uploading photo..." : "Uploading proof...")
+      if (result.podId && (photoDataUrl || (signatureData && signatureData.startsWith("data:")))) {
+        setSubmitStatus(photoDataUrl ? "Uploading photo..." : "Uploading proof...")
 
         try {
           await withTimeout(uploadPodMedia(result.podId), 30000, "Proof media upload")
@@ -412,7 +418,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     variant="outline"
                     className="w-full bg-transparent"
                     onClick={() => {
-                      setPhotoFile(null)
+                      setPhotoDataUrl(null)
                       setPhotoPreview(null)
                       setSubmitStatus(null)
                     }}
