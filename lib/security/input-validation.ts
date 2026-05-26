@@ -1,8 +1,8 @@
 // Input validation and sanitization utilities
-import DOMPurify from "isomorphic-dompurify"
 
-export function sanitizeHtml(input: string): string {
-  return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] })
+function sanitizeHtml(input: string): string {
+  // Simple HTML sanitization - strip all HTML tags
+  return input.replace(/<[^>]*>/g, '').trim()
 }
 
 export function validateEmail(email: string): boolean {
