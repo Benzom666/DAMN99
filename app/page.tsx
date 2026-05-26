@@ -68,98 +68,96 @@ function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-white to-blue-50" />
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9IjAuMDMiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-40" />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-50" />
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9IjAuMDMiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30" />
         
-        <div className="relative mx-auto max-w-7xl px-6 py-24 sm:py-32">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-            <div className="space-y-8">
-              <Badge className="inline-flex items-center gap-2 border-emerald-200 bg-emerald-50 text-emerald-700 px-4 py-1.5">
-                <Zap className="h-3.5 w-3.5" />
-                Enterprise-Grade Delivery Platform
-              </Badge>
+        <div className="relative mx-auto max-w-7xl px-6 py-20 sm:py-28">
+          <div className="grid gap-16 lg:grid-cols-[1.1fr_1fr] lg:gap-20 items-center">
+            <div className="space-y-10">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-900">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Production-Ready Delivery Platform
+              </div>
               
-              <h1 className="text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
-                <span className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 bg-clip-text text-transparent">
-                  Last-Mile Delivery
-                </span>
-                <br />
-                <span className="bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">
-                  Without the Chaos
-                </span>
+              <h1 className="text-5xl font-bold leading-[1.1] tracking-tight sm:text-6xl lg:text-7xl text-slate-950">
+                Last-Mile Delivery<br />
+                <span className="text-emerald-600">Without the Chaos</span>
               </h1>
               
-              <p className="text-xl leading-relaxed text-slate-600 max-w-2xl">
-                Complete delivery management platform with intelligent route optimization, real-time tracking, 
-                and cost-controlled API usage. Built for scale, priced for growth.
+              <p className="text-lg leading-relaxed text-slate-600 max-w-[55ch]">
+                Complete delivery operations platform with intelligent route optimization, real-time tracking, 
+                and cost-controlled API usage. Built for logistics teams who need reliability at scale.
               </p>
               
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Link href="/auth/sign-up">
-                  <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-xl shadow-emerald-500/30 text-lg h-14 px-8">
+                  <Button size="lg" className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-12 px-8 font-medium">
                     Start Free Trial
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
                 <Link href="/auth/login">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto border-2 text-lg h-14 px-8">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto h-12 px-8 font-medium border-slate-300">
                     View Demo
                   </Button>
                 </Link>
               </div>
               
-              <div className="flex items-center gap-8 pt-4">
+              <div className="flex items-center gap-6 pt-2 text-sm text-slate-600">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  <span className="text-sm font-medium text-slate-700">No credit card required</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span>No credit card</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  <span className="text-sm font-medium text-slate-700">14-day free trial</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span>14-day trial</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span>Cancel anytime</span>
                 </div>
               </div>
             </div>
 
-            {/* Hero Visual */}
+            {/* Hero Visual - Simplified */}
             <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-3xl opacity-20 blur-3xl" />
-              <div className="relative rounded-2xl border-2 border-slate-200 bg-white p-6 shadow-2xl">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b pb-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-lg">
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                     <div>
-                      <div className="text-sm text-slate-500">Active Routes</div>
-                      <div className="text-3xl font-bold text-slate-900">247</div>
+                      <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Active Routes</div>
+                      <div className="text-4xl font-bold text-slate-950 mt-1">247</div>
                     </div>
-                    <div className="rounded-full bg-emerald-100 p-3">
-                      <Route className="h-8 w-8 text-emerald-600" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="rounded-lg bg-emerald-50 p-4">
-                      <div className="text-2xl font-bold text-emerald-700">89%</div>
-                      <div className="text-xs text-emerald-600">On-Time</div>
-                    </div>
-                    <div className="rounded-lg bg-blue-50 p-4">
-                      <div className="text-2xl font-bold text-blue-700">1.2k</div>
-                      <div className="text-xs text-blue-600">Deliveries</div>
-                    </div>
-                    <div className="rounded-lg bg-purple-50 p-4">
-                      <div className="text-2xl font-bold text-purple-700">$0.12</div>
-                      <div className="text-xs text-purple-600">Cost/Stop</div>
+                    <div className="rounded-lg bg-emerald-50 p-3">
+                      <Route className="h-7 w-7 text-emerald-600" />
                     </div>
                   </div>
-                  <div className="space-y-2 pt-2">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-slate-50 p-4 border border-slate-100">
+                      <div className="text-2xl font-bold text-slate-950">89%</div>
+                      <div className="text-xs text-slate-600 mt-1">On-Time</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-4 border border-slate-100">
+                      <div className="text-2xl font-bold text-slate-950">1.2k</div>
+                      <div className="text-xs text-slate-600 mt-1">Today</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-4 border border-slate-100">
+                      <div className="text-2xl font-bold text-slate-950">$0.12</div>
+                      <div className="text-xs text-slate-600 mt-1">Per Stop</div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 pt-1">
                     {[
-                      { driver: "Sarah M.", stops: "24/32", status: "active" },
-                      { driver: "Mike R.", stops: "18/28", status: "active" },
-                      { driver: "Alex K.", stops: "31/31", status: "complete" }
+                      { driver: "Sarah M.", stops: "24/32", pct: 75 },
+                      { driver: "Mike R.", stops: "18/28", pct: 64 },
+                      { driver: "Alex K.", stops: "31/31", pct: 100 }
                     ].map((d, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-lg border bg-slate-50 p-3">
+                      <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3">
                         <div className="flex items-center gap-3">
-                          <div className={`h-2 w-2 rounded-full ${d.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                          <span className="font-medium text-sm">{d.driver}</span>
+                          <div className={`h-2 w-2 rounded-full ${d.pct === 100 ? 'bg-slate-400' : 'bg-emerald-500'}`} />
+                          <span className="font-medium text-sm text-slate-950">{d.driver}</span>
                         </div>
-                        <span className="text-sm text-slate-600">{d.stops}</span>
+                        <span className="text-sm text-slate-600 font-mono">{d.stops}</span>
                       </div>
                     ))}
                   </div>
@@ -171,21 +169,18 @@ function LandingPage() {
       </section>
 
       {/* Stats Bar */}
-      <section className="border-y bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-12">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+      <section className="border-y border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-16">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-4">
             {[
-              { value: "99.8%", label: "Uptime SLA", icon: Shield },
-              { value: "<100ms", label: "API Response", icon: Zap },
-              { value: "50k+", label: "Daily Deliveries", icon: Package },
-              { value: "$0.08", label: "Avg Cost/Stop", icon: DollarSign }
+              { value: "99.8%", label: "Uptime SLA" },
+              { value: "<100ms", label: "API Response" },
+              { value: "50k+", label: "Daily Deliveries" },
+              { value: "$0.08", label: "Avg Cost/Stop" }
             ].map((stat, i) => (
               <div key={i} className="text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100">
-                  <stat.icon className="h-6 w-6 text-emerald-600" />
-                </div>
-                <div className="text-3xl font-bold text-slate-900">{stat.value}</div>
-                <div className="text-sm text-slate-600">{stat.label}</div>
+                <div className="text-4xl font-bold text-slate-950 tracking-tight">{stat.value}</div>
+                <div className="text-sm text-slate-600 mt-2">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -205,55 +200,55 @@ function LandingPage() {
             </p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 icon: Package,
                 title: "Smart Order Management",
-                description: "CSV batch import, automatic geocoding with persistent cache, address validation, and customer email verification",
+                description: "CSV batch import with automatic geocoding, persistent cache, address validation, and customer email verification.",
                 features: ["Batch CSV import", "Auto-geocoding", "Duplicate detection", "Email validation"]
               },
               {
                 icon: Route,
                 title: "Intelligent Route Optimization",
-                description: "Multi-algorithm optimization with cost controls. Local nearest-neighbor by default, HERE Tour Planning on-demand",
+                description: "Multi-algorithm optimization with cost controls. Local nearest-neighbor by default, HERE Tour Planning on-demand.",
                 features: ["Multi-route creation", "Geographic clustering", "Driver assignment", "Cost-aware optimization"]
               },
               {
                 icon: Smartphone,
                 title: "Mobile Driver App",
-                description: "Native mobile experience with offline support, photo compression, digital signatures, and real-time GPS tracking",
+                description: "Native mobile experience with offline support, photo compression, digital signatures, and real-time GPS tracking.",
                 features: ["Turn-by-turn navigation", "Photo POD", "Digital signatures", "Offline mode"]
               },
               {
                 icon: MapPinned,
                 title: "Real-Time Dispatch",
-                description: "Live driver tracking, route progress monitoring, exception alerts, and interactive map visualization",
+                description: "Live driver tracking, route progress monitoring, exception alerts, and interactive map visualization.",
                 features: ["Live GPS tracking", "Route progress", "Exception alerts", "Map visualization"]
               },
               {
                 icon: BarChart3,
                 title: "Advanced Analytics",
-                description: "Route metrics, driver performance, delivery success rates, cost per stop, and API usage tracking",
+                description: "Route metrics, driver performance, delivery success rates, cost per stop, and API usage tracking.",
                 features: ["Performance metrics", "Cost analytics", "Success rates", "API monitoring"]
               },
               {
                 icon: Shield,
                 title: "Enterprise Security",
-                description: "Multi-tenant isolation, role-based access control, audit logging, and account suspension controls",
+                description: "Multi-tenant isolation, role-based access control, audit logging, and account suspension controls.",
                 features: ["Multi-tenancy", "RBAC", "Audit logs", "Account controls"]
               }
             ].map((feature, i) => (
-              <div key={i} className="group relative rounded-2xl border-2 border-slate-200 bg-white p-8 transition-all hover:border-emerald-300 hover:shadow-xl">
-                <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30">
-                  <feature.icon className="h-7 w-7" />
+              <div key={i} className="rounded-lg border border-slate-200 bg-white p-8 hover:border-emerald-200 hover:shadow-sm transition-all">
+                <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                  <feature.icon className="h-6 w-6" strokeWidth={1.5} />
                 </div>
-                <h3 className="mb-3 text-xl font-bold text-slate-900">{feature.title}</h3>
-                <p className="mb-4 text-slate-600 leading-relaxed">{feature.description}</p>
-                <ul className="space-y-2">
+                <h3 className="mb-3 text-lg font-bold text-slate-950">{feature.title}</h3>
+                <p className="mb-5 text-slate-600 leading-relaxed text-[15px]">{feature.description}</p>
+                <ul className="space-y-2.5">
                   {feature.features.map((f, j) => (
-                    <li key={j} className="flex items-center gap-2 text-sm text-slate-700">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                    <li key={j} className="flex items-center gap-2.5 text-sm text-slate-700">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" strokeWidth={2} />
                       {f}
                     </li>
                   ))}
@@ -265,72 +260,77 @@ function LandingPage() {
       </section>
 
       {/* Cost Control Section */}
-      <section className="bg-gradient-to-br from-slate-900 to-slate-800 py-24 text-white">
+      <section className="border-y border-slate-200 bg-slate-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="grid gap-12 lg:grid-cols-2 items-center">
+          <div className="grid gap-16 lg:grid-cols-2 items-center">
             <div>
-              <Badge className="mb-4 border-emerald-400/30 bg-emerald-500/20 text-emerald-300">Cost Intelligence</Badge>
-              <h2 className="text-4xl font-bold mb-6">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-900 mb-6">
+                <DollarSign className="h-3.5 w-3.5" />
+                Cost Intelligence
+              </div>
+              <h2 className="text-4xl font-bold mb-6 text-slate-950 tracking-tight">
                 API Costs Under Control
               </h2>
-              <p className="text-xl text-slate-300 mb-8 leading-relaxed">
-                Unlike other platforms that let API costs spiral out of control, DAMN99 treats external APIs 
+              <p className="text-lg text-slate-600 mb-10 leading-relaxed max-w-[55ch]">
+                Unlike other platforms that let API costs spiral, DAMN99 treats external APIs 
                 as billable infrastructure with built-in budget guards and intelligent caching.
               </p>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {[
-                  { label: "Persistent Geocode Cache", value: "95% cache hit rate" },
+                  { label: "Persistent Geocode Cache", value: "95% hit rate" },
                   { label: "Daily Budget Caps", value: "Per-service limits" },
-                  { label: "Request Rate Limiting", value: "Automatic throttling" },
+                  { label: "Request Rate Limiting", value: "Auto throttling" },
                   { label: "Real-Time Cost Tracking", value: "Live dashboard" }
                 ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                    <span className="font-medium">{item.label}</span>
-                    <span className="text-emerald-400">{item.value}</span>
+                  <div key={i} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
+                    <span className="font-medium text-slate-950">{item.label}</span>
+                    <span className="text-emerald-600 font-medium">{item.value}</span>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-8">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-2xl font-bold">Cost Analytics</h3>
-                <DollarSign className="h-8 w-8 text-emerald-400" />
+            <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="mb-8 flex items-center justify-between">
+                <h3 className="text-xl font-bold text-slate-950">Cost Analytics</h3>
+                <div className="rounded-lg bg-emerald-50 p-2">
+                  <BarChart3 className="h-5 w-5 text-emerald-600" />
+                </div>
               </div>
               <div className="space-y-6">
                 <div>
                   <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Geocoding API</span>
-                    <span className="text-emerald-400">$2.34</span>
+                    <span className="text-slate-600">Geocoding API</span>
+                    <span className="font-mono font-medium text-slate-950">$2.34</span>
                   </div>
-                  <div className="h-2 rounded-full bg-slate-700">
-                    <div className="h-2 w-[23%] rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400" />
-                  </div>
-                </div>
-                <div>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Routing API</span>
-                    <span className="text-emerald-400">$0.89</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-700">
-                    <div className="h-2 w-[9%] rounded-full bg-gradient-to-r from-blue-500 to-blue-400" />
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 w-[23%] rounded-full bg-emerald-500" />
                   </div>
                 </div>
                 <div>
                   <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Tour Planning</span>
-                    <span className="text-emerald-400">$0.00</span>
+                    <span className="text-slate-600">Routing API</span>
+                    <span className="font-mono font-medium text-slate-950">$0.89</span>
                   </div>
-                  <div className="h-2 rounded-full bg-slate-700">
-                    <div className="h-2 w-[0%] rounded-full bg-gradient-to-r from-purple-500 to-purple-400" />
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 w-[9%] rounded-full bg-emerald-500" />
                   </div>
                 </div>
-                <div className="border-t border-slate-700 pt-4">
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="text-slate-600">Tour Planning</span>
+                    <span className="font-mono font-medium text-slate-950">$0.00</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 w-[0%] rounded-full bg-emerald-500" />
+                  </div>
+                </div>
+                <div className="border-t border-slate-200 pt-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-lg font-semibold">Total (24h)</span>
-                    <span className="text-2xl font-bold text-emerald-400">$3.23</span>
+                    <span className="text-base font-semibold text-slate-950">Total (24h)</span>
+                    <span className="text-3xl font-bold text-emerald-600">$3.23</span>
                   </div>
-                  <div className="mt-2 text-sm text-slate-400">
-                    <span className="text-emerald-400">↓ 67%</span> vs. unoptimized
+                  <div className="mt-3 text-sm text-slate-600">
+                    <span className="text-emerald-600 font-medium">↓ 67%</span> vs. unoptimized
                   </div>
                 </div>
               </div>
