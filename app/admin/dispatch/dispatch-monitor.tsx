@@ -359,7 +359,7 @@ export function DispatchMonitor({
                 <div>
                   <p className="text-sm font-medium mb-2">Photo</p>
                   <img
-                    src={selectedPOD.photo_url || "/placeholder.svg"}
+                    src={selectedPOD.photo_url}
                     alt="Delivery proof"
                     className="w-full rounded-lg border"
                   />
@@ -369,7 +369,7 @@ export function DispatchMonitor({
                 <div>
                   <p className="text-sm font-medium mb-2">Signature</p>
                   <img
-                    src={selectedPOD.signature_url || "/placeholder.svg"}
+                    src={selectedPOD.signature_url}
                     alt="Signature"
                     className="w-full rounded-lg border bg-white"
                   />
@@ -387,10 +387,12 @@ export function DispatchMonitor({
                   <p className="text-base">{selectedPOD.notes}</p>
                 </div>
               )}
-              <div>
-                <p className="text-sm font-medium mb-1">Captured At</p>
-                <p className="text-base">{new Date(selectedPOD.captured_at).toLocaleString()}</p>
-              </div>
+              {selectedPOD.delivered_at && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Delivered At</p>
+                  <p className="text-base">{new Date(selectedPOD.delivered_at).toLocaleString()}</p>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-muted-foreground">No proof of delivery available</p>
