@@ -275,6 +275,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           console.log("[v0] [DRIVER] ========== POD SUBMISSION END (MEDIA ERROR) ==========")
           return
         }
+      } else {
+        console.log("[v0] [DRIVER] ⚠️ Skipping media upload - no photo or signature")
+        console.log("[v0] [DRIVER] photoDataUrl:", !!photoDataUrl, "signatureData:", !!signatureData)
       }
 
       console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
