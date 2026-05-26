@@ -49,6 +49,11 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    console.log("[v0] [DRIVER] Photo selected:", file ? {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    } : "none")
     if (file) {
       setPhotoFile(file)
       setPhotoPreview(URL.createObjectURL(file))
@@ -111,24 +116,32 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   }
 
   const uploadPodMedia = async (podId: string) => {
+    console.log("[v0] [DRIVER] uploadPodMedia called - podId:", podId, "photoFile:", !!photoFile, "signatureData:", !!signatureData)
+    
     const formData = new FormData()
     formData.append("podId", podId)
     
     if (photoFile) {
+      console.log("[v0] [DRIVER] Appending photo to FormData:", photoFile.name, photoFile.size, photoFile.type)
       formData.append("photo", photoFile)
     }
     
     if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
+      console.log("[v0] [DRIVER] Appending signature to FormData")
       const signatureBlob = dataUrlToBlob(signatureData)
       formData.append("signature", signatureBlob, "signature.png")
     }
 
+    console.log("[v0] [DRIVER] Sending upload request to /api/driver/pod-media/upload")
     const response = await fetch("/api/driver/pod-media/upload", {
       method: "POST",
       body: formData,
     })
 
+    console.log("[v0] [DRIVER] Upload response status:", response.status)
     const result = await readJsonResponse(response)
+    console.log("[v0] [DRIVER] Upload result:", result)
+    
     if (!response.ok || !result.success) {
       throw new Error(result.error || "Failed to upload proof media")
     }
@@ -217,8 +230,11 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       }
 
       console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
+      console.log("[v0] [DRIVER] Checking media upload - podId:", result.podId, "photoFile:", !!photoFile, "signatureData:", !!signatureData)
+      
       if (result.podId && (photoFile || (signatureData && signatureData.startsWith("data:")))) {
         setSubmitStatus(photoFile ? "Uploading photo..." : "Uploading proof...")
+        console.log("[v0] [DRIVER] Starting media upload...")
 
         try {
           await withTimeout(uploadPodMedia(result.podId), 30000, "Proof media upload")
