@@ -56,8 +56,8 @@ export default async function DispatchPage() {
   // Get PODs for all delivered orders (not just active routes)
   const { data: allPods } = await supabase
     .from("pods")
-    .select("*, orders!inner(route_id)")
-    .in("orders.route_id", routeIds)
+    .select("id, order_id, driver_id, photo_url, signature_url, recipient_name, notes, delivered_at, created_at")
+    .in("order_id", orders.map(o => o.id))
 
   const pods = allPods || []
   console.log("[v0] [DISPATCH] Fetched PODs count:", pods.length)
