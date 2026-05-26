@@ -26,8 +26,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const { toast } = useToast()
   const [notes, setNotes] = useState("")
   const [recipientName, setRecipientName] = useState("")
-  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
-  const [photoFileName, setPhotoFileName] = useState<string>("")
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(existingPod?.photo_url || null)
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
@@ -50,19 +49,9 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    console.log("[v0] [DRIVER] Photo selected:", file ? {
-      name: file.name,
-      size: file.size,
-      type: file.type
-    } : "none")
     if (file) {
-      // Convert to Blob immediately to prevent mobile state loss
-      file.arrayBuffer().then(buffer => {
-        const blob = new Blob([buffer], { type: file.type || "image/jpeg" })
-        setPhotoBlob(blob)
-        setPhotoFileName(file.name)
-        setPhotoPreview(URL.createObjectURL(blob))
-      })
+      setPhotoFile(file)
+      setPhotoPreview(URL.createObjectURL(file))
     }
   }
 
@@ -122,32 +111,24 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   }
 
   const uploadPodMedia = async (podId: string) => {
-    console.log("[v0] [DRIVER] uploadPodMedia called - podId:", podId, "photoBlob:", !!photoBlob, "signatureData:", !!signatureData)
-    
     const formData = new FormData()
     formData.append("podId", podId)
     
-    if (photoBlob) {
-      console.log("[v0] [DRIVER] Appending photo to FormData:", photoFileName, photoBlob.size, photoBlob.type)
-      formData.append("photo", photoBlob, photoFileName || "photo.jpg")
+    if (photoFile) {
+      formData.append("photo", photoFile)
     }
     
     if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
-      console.log("[v0] [DRIVER] Appending signature to FormData")
       const signatureBlob = dataUrlToBlob(signatureData)
       formData.append("signature", signatureBlob, "signature.png")
     }
 
-    console.log("[v0] [DRIVER] Sending upload request to /api/driver/pod-media/upload")
     const response = await fetch("/api/driver/pod-media/upload", {
       method: "POST",
       body: formData,
     })
 
-    console.log("[v0] [DRIVER] Upload response status:", response.status)
     const result = await readJsonResponse(response)
-    console.log("[v0] [DRIVER] Upload result:", result)
-    
     if (!response.ok || !result.success) {
       throw new Error(result.error || "Failed to upload proof media")
     }
@@ -236,11 +217,8 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       }
 
       console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
-      console.log("[v0] [DRIVER] Checking media upload - podId:", result.podId, "photoBlob:", !!photoBlob, "signatureData:", !!signatureData)
-      
-      if (result.podId && (photoBlob || (signatureData && signatureData.startsWith("data:")))) {
-        setSubmitStatus(photoBlob ? "Uploading photo..." : "Uploading proof...")
-        console.log("[v0] [DRIVER] Starting media upload...")
+      if (result.podId && (photoFile || (signatureData && signatureData.startsWith("data:")))) {
+        setSubmitStatus(photoFile ? "Uploading photo..." : "Uploading proof...")
 
         try {
           await withTimeout(uploadPodMedia(result.podId), 30000, "Proof media upload")
@@ -434,8 +412,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     variant="outline"
                     className="w-full bg-transparent"
                     onClick={() => {
-                      setPhotoBlob(null)
-                      setPhotoFileName("")
+                      setPhotoFile(null)
                       setPhotoPreview(null)
                       setSubmitStatus(null)
                     }}
