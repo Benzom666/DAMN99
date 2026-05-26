@@ -54,13 +54,24 @@ export default async function DispatchPage() {
   }
 
   // Get PODs for all delivered orders (not just active routes)
-  const { data: allPods } = await supabase
-    .from("pods")
-    .select("id, order_id, driver_id, photo_url, signature_url, recipient_name, notes, delivered_at, created_at")
-    .in("order_id", orders.map(o => o.id))
+  const orderIds = orders.map(o => o.id).filter(Boolean)
+  
+  let pods = []
+  if (orderIds.length > 0) {
+    const { data: allPods, error: podsError } = await supabase
+      .from("pods")
+      .select("id, order_id, driver_id, photo_url, signature_url, recipient_name, notes, delivered_at, created_at")
+      .in("order_id", orderIds)
 
-  const pods = allPods || []
+    if (podsError) {
+      console.error("[v0] [DISPATCH] Error fetching PODs:", podsError)
+    }
+    
+    pods = allPods || []
+  }
+  
   console.log("[v0] [DISPATCH] Fetched PODs count:", pods.length)
+  console.log("[v0] [DISPATCH] Order IDs:", orderIds.length)
 
   const driverIds = routes?.map((r) => r.driver_id).filter(Boolean) || []
   let driverPositions = []
