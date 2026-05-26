@@ -25,7 +25,7 @@ export default async function DispatchPage() {
     .from("routes")
     .select("*, driver:profiles!driver_id(display_name, email)")
     .eq("admin_id", user.id)
-    .in("status", ["active", "pending"])
+    .in("status", ["active", "pending", "completed"])
     .order("created_at", { ascending: false })
 
   if (routesError) {
@@ -34,7 +34,7 @@ export default async function DispatchPage() {
 
   console.log("[v0] [DISPATCH] Fetched routes count:", routes?.length || 0)
 
-  // Get all orders for active routes
+  // Get all orders for routes (including completed ones for POD visibility)
   const routeIds = routes?.map((r) => r.id) || []
 
   let orders = []
@@ -53,14 +53,14 @@ export default async function DispatchPage() {
     console.log("[v0] [DISPATCH] Fetched orders count:", orders.length)
   }
 
-  // Get PODs for delivered orders
-  const deliveredOrderIds = orders?.filter((o: any) => o.status === "delivered").map((o: any) => o.id) || []
+  // Get PODs for all delivered orders (not just active routes)
+  const { data: allPods } = await supabase
+    .from("pods")
+    .select("*, orders!inner(route_id)")
+    .in("orders.route_id", routeIds)
 
-  let pods = []
-  if (deliveredOrderIds.length > 0) {
-    const { data } = await supabase.from("pods").select("*").in("order_id", deliveredOrderIds)
-    pods = data || []
-  }
+  const pods = allPods || []
+  console.log("[v0] [DISPATCH] Fetched PODs count:", pods.length)
 
   const driverIds = routes?.map((r) => r.driver_id).filter(Boolean) || []
   let driverPositions = []
