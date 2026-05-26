@@ -8,6 +8,8 @@ export async function POST(request: Request) {
     const formData = await request.formData()
     
     const podId = formData.get("podId") as string
+    console.log("[POD_UPLOAD] Starting upload for POD:", podId)
+    
     if (!validateUUID(podId)) {
       return NextResponse.json({ success: false, error: "Invalid POD ID" }, { status: 400 })
     }
@@ -21,6 +23,7 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (podError || !pod) {
+      console.error("[POD_UPLOAD] POD not found or unauthorized:", podError)
       return NextResponse.json(
         { success: false, error: "POD not found or unauthorized" },
         { status: 403 }
@@ -31,14 +34,29 @@ export async function POST(request: Request) {
 
     // Upload photo if provided
     const photoFile = formData.get("photo") as File | null
+    console.log("[POD_UPLOAD] Photo file:", photoFile ? {
+      name: photoFile.name,
+      size: photoFile.size,
+      type: photoFile.type
+    } : "none")
+    
     if (photoFile) {
       const photoExt = photoFile.name.split(".").pop() || "jpg"
       const photoPath = `pod-photos/${podId}-${Date.now()}.${photoExt}`
       
+      // Mobile browsers sometimes send empty or incorrect contentType
+      // Default to image/jpeg if contentType is missing or generic
+      let contentType = photoFile.type
+      if (!contentType || contentType === "application/octet-stream") {
+        contentType = "image/jpeg"
+      }
+      
+      console.log("[POD_UPLOAD] Uploading photo to:", photoPath, "contentType:", contentType)
+      
       const { data: photoData, error: photoError } = await supabase.storage
         .from("pod-media")
         .upload(photoPath, photoFile, {
-          contentType: photoFile.type,
+          contentType,
           upsert: false,
         })
 
@@ -54,13 +72,22 @@ export async function POST(request: Request) {
         .from("pod-media")
         .getPublicUrl(photoData.path)
 
+      console.log("[POD_UPLOAD] Photo uploaded successfully, URL:", publicUrl)
       updates.photo_url = publicUrl
     }
 
     // Upload signature if provided
     const signatureFile = formData.get("signature") as File | null
+    console.log("[POD_UPLOAD] Signature file:", signatureFile ? {
+      name: signatureFile.name,
+      size: signatureFile.size,
+      type: signatureFile.type
+    } : "none")
+    
     if (signatureFile) {
       const signaturePath = `pod-signatures/${podId}-${Date.now()}.png`
+      
+      console.log("[POD_UPLOAD] Uploading signature to:", signaturePath)
       
       const { data: signatureData, error: signatureError } = await supabase.storage
         .from("pod-media")
@@ -81,11 +108,14 @@ export async function POST(request: Request) {
         .from("pod-media")
         .getPublicUrl(signatureData.path)
 
+      console.log("[POD_UPLOAD] Signature uploaded successfully, URL:", publicUrl)
       updates.signature_url = publicUrl
     }
 
     // Update POD with URLs
     if (Object.keys(updates).length > 0) {
+      console.log("[POD_UPLOAD] Updating POD with URLs:", updates)
+      
       const { error: updateError } = await supabase
         .from("pods")
         .update(updates)
@@ -99,6 +129,8 @@ export async function POST(request: Request) {
           { status: 500 }
         )
       }
+      
+      console.log("[POD_UPLOAD] POD updated successfully")
     }
 
     return NextResponse.json({ success: true })
