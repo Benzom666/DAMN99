@@ -48,7 +48,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }, 1200)
   }
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     console.log("[v0] [DRIVER] Photo selected:", file ? {
       name: file.name,
@@ -57,10 +57,12 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     } : "none")
     if (file) {
       // Convert to Blob immediately to prevent mobile state loss
-      const blob = new Blob([await file.arrayBuffer()], { type: file.type || "image/jpeg" })
-      setPhotoBlob(blob)
-      setPhotoFileName(file.name)
-      setPhotoPreview(URL.createObjectURL(blob))
+      file.arrayBuffer().then(buffer => {
+        const blob = new Blob([buffer], { type: file.type || "image/jpeg" })
+        setPhotoBlob(blob)
+        setPhotoFileName(file.name)
+        setPhotoPreview(URL.createObjectURL(blob))
+      })
     }
   }
 
