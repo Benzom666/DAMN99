@@ -551,8 +551,63 @@ end $$;
 create index if not exists idx_orders_customer_email on public.orders(customer_email);
 
 -- ============================================================================
+-- SCRIPT 027: ENSURE POD-MEDIA BUCKET IS PUBLIC
+-- ============================================================================
+
+-- Create pod-media bucket if it doesn't exist and ensure it's public
+insert into storage.buckets (id, name, public)
+values ('pod-media', 'pod-media', true)
+on conflict (id) do update
+set public = true;
+
+-- Ensure the bucket is public so getPublicUrl() works
+update storage.buckets
+set public = true
+where id = 'pod-media';
+
+-- RLS policies for pod-media bucket
+-- Allow drivers to upload to pod-media bucket
+create policy if not exists "Drivers can upload POD media"
+on storage.objects for insert
+to authenticated
+with check (
+  bucket_id = 'pod-media' 
+  and auth.uid() in (
+    select id from public.profiles where role = 'driver'
+  )
+);
+
+-- Allow drivers to update their own POD media
+create policy if not exists "Drivers can update their POD media"
+on storage.objects for update
+to authenticated
+using (
+  bucket_id = 'pod-media'
+  and auth.uid() in (
+    select id from public.profiles where role = 'driver'
+  )
+);
+
+-- Allow everyone to view POD media (public bucket)
+create policy if not exists "Anyone can view POD media"
+on storage.objects for select
+to public
+using (bucket_id = 'pod-media');
+
+-- Allow admins to view POD media
+create policy if not exists "Admins can view POD media"
+on storage.objects for select
+to authenticated
+using (
+  bucket_id = 'pod-media'
+  and auth.uid() in (
+    select id from public.profiles where role in ('admin', 'super_admin')
+  )
+);
+
+-- ============================================================================
 -- SETUP COMPLETE
 -- ============================================================================
--- All tables, indexes, triggers, and RLS policies have been created.
+-- All tables, indexes, triggers, RLS policies, and storage buckets have been created.
 -- You can now use the application!
 -- ============================================================================

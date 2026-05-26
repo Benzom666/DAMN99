@@ -9,7 +9,7 @@
 
 2. **Created Supabase Storage bucket**
    - Bucket name: `pod-media`
-   - Public bucket: YES
+   - Public bucket: YES ⚠️ **CRITICAL: Must be public for mobile uploads to work**
    - Used for POD photos and signatures
 
 3. **Applied RLS policies**
@@ -22,6 +22,12 @@
    - `/api/driver/pod-media/upload` now uses Supabase Storage
    - Uploads to `pod-media` bucket
    - Returns public URLs
+
+5. **Fixed mobile photo visibility issue** ✅
+   - Migration: `027_ensure_pod_media_bucket_public.sql`
+   - Ensures bucket is created and set to public
+   - Fixes issue where photos uploaded from mobile weren't visible to dispatch
+   - See `MOBILE_PHOTO_UPLOAD_FIX.md` for details
 
 ## 🔧 OPTIONAL CLEANUP
 
@@ -64,7 +70,10 @@ If setting up a new database, run migrations in this order:
 13. `023_repair_here_api_usage_columns.sql` - Fix API usage
 14. `024_repair_pod_schema.sql` - POD schema updates
 15. `025_pod_media_update_policy.sql` - POD update permissions
-16. `026_pod_media_storage_policies.sql` - **Storage RLS policies** ⭐
+16. `026_pod_media_storage_policies.sql` - Storage RLS policies
+17. `027_ensure_pod_media_bucket_public.sql` - **Ensure bucket is public** ⭐ **CRITICAL**
+
+**OR** simply run `00_master_setup.sql` which includes all migrations.
 
 ## 🎉 RESULT
 
