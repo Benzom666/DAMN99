@@ -3,14 +3,19 @@ import { requireDriver } from "@/lib/security/authorization"
 import { validateUUID } from "@/lib/security/input-validation"
 
 export async function POST(request: Request) {
+  console.log("[POD_UPLOAD] ========== UPLOAD REQUEST START ==========")
   try {
     const { user, supabase } = await requireDriver()
+    console.log("[POD_UPLOAD] Driver authenticated:", user.id)
+    
     const formData = await request.formData()
+    console.log("[POD_UPLOAD] FormData received")
     
     const podId = formData.get("podId") as string
-    console.log("[POD_UPLOAD] Starting upload for POD:", podId)
+    console.log("[POD_UPLOAD] POD ID:", podId)
     
     if (!validateUUID(podId)) {
+      console.error("[POD_UPLOAD] Invalid POD ID")
       return NextResponse.json({ success: false, error: "Invalid POD ID" }, { status: 400 })
     }
 
@@ -29,6 +34,8 @@ export async function POST(request: Request) {
         { status: 403 }
       )
     }
+    
+    console.log("[POD_UPLOAD] POD verified, belongs to driver")
 
     const updates: { photo_url?: string; signature_url?: string } = {}
 
@@ -131,11 +138,16 @@ export async function POST(request: Request) {
       }
       
       console.log("[POD_UPLOAD] POD updated successfully")
+    } else {
+      console.log("[POD_UPLOAD] No updates to apply")
     }
 
+    console.log("[POD_UPLOAD] ========== UPLOAD REQUEST SUCCESS ==========")
     return NextResponse.json({ success: true })
   } catch (error) {
+    console.error("[POD_UPLOAD] ========== UPLOAD REQUEST FAILED ==========")
     console.error("[POD_UPLOAD] Unexpected error:", error)
+    console.error("[POD_UPLOAD] Error stack:", error instanceof Error ? error.stack : "no stack")
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "Upload failed" },
       { status: 500 }
