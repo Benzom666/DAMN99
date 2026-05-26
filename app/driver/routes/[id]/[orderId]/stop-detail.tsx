@@ -150,7 +150,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     setSubmitStatus("Preparing delivery...")
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
     console.log("[v0] [DRIVER] Order ID:", order.id)
-    console.log("[v0] [DRIVER] Has photo:", !!photoFile)
+    console.log("[v0] [DRIVER] Has photo:", !!photoDataUrl)
     console.log("[v0] [DRIVER] Has signature:", !!signatureData)
     console.log("[v0] [DRIVER] Recipient:", recipientName || "none")
     console.log("[v0] [DRIVER] Notes:", notes || "none")
