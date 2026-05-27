@@ -142,7 +142,7 @@ function LoginForm() {
             <Ban className="h-4 w-4" />
             <AlertTitle>Access Suspended</AlertTitle>
             <AlertDescription>
-              Your account has been suspended. Contact ops@damn99 to reinstate
+              Your account has been suspended. Contact support@deliveryos.com to reinstate
               access.
             </AlertDescription>
           </Alert>

@@ -13,6 +13,7 @@ import {
   Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { BrandMark, BrandLockup } from "@/components/brand-mark"
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -90,21 +91,8 @@ function TopBar() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-10 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="relative">
-            <div className="size-7 grid place-items-center bg-signal text-signal-foreground font-mono text-[11px] font-bold tracking-tight">
-              99
-            </div>
-            <div className="absolute inset-0 bg-signal animate-pulse-signal opacity-0 group-hover:opacity-100" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-mono text-sm font-semibold tracking-[0.18em] text-foreground">
-              DAMN
-            </span>
-            <span className="font-serif italic text-sm text-signal">
-              ninety-nine
-            </span>
-          </div>
+        <Link href="/" className="flex items-center group">
+          <BrandLockup textSize="sm" />
         </Link>
 
         <nav className="hidden md:flex items-center gap-8">
@@ -215,9 +203,9 @@ function Hero() {
             </h1>
 
             <p className="mt-8 text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-[58ch]">
-              DAMN99 is the dispatch terminal for serious logistics operators.
-              Optimize 10,000 stops before lunch. Track every drop. Ship the
-              day, every day.
+              Delivery OS is the dispatch terminal for serious logistics
+              operators. Optimize 10,000 stops before lunch. Track every drop.
+              Ship the day, every day.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -284,7 +272,7 @@ function ConsolePreview() {
               <div className="size-2.5 rounded-full bg-success/70" />
             </div>
             <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground ml-3">
-              ops-console.damn99
+              ops-console.deliveryos
             </span>
           </div>
           <span className="pulse-dot" />
@@ -389,9 +377,9 @@ function Manifesto() {
             <p className="text-3xl lg:text-[2.5rem] font-light leading-[1.18] tracking-[-0.015em] text-foreground/95">
               We don't believe in dashboards{" "}
               <span className="font-serif italic text-signal">that look pretty</span>{" "}
-              while routes burn fuel. We built DAMN99 for the operator at 5 AM in
-              the warehouse, the dispatcher with a dropped pin and a customer on
-              the line, the driver with{" "}
+              while routes burn fuel. We built Delivery OS for the operator at
+              5 AM in the warehouse, the dispatcher with a dropped pin and a
+              customer on the line, the driver with{" "}
               <span className="font-serif italic text-signal">
                 forty-seven stops
               </span>{" "}
@@ -878,13 +866,8 @@ function Footer() {
       <div className="max-w-[1400px] mx-auto px-6 lg:px-10 py-12">
         <div className="grid lg:grid-cols-12 gap-10 items-start">
           <div className="lg:col-span-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="size-7 grid place-items-center bg-signal text-signal-foreground font-mono text-[11px] font-bold">
-                99
-              </div>
-              <span className="font-mono text-sm font-semibold tracking-[0.18em]">
-                DAMN<span className="font-serif italic text-signal ml-1">ninety-nine</span>
-              </span>
+            <div className="mb-4">
+              <BrandLockup textSize="sm" />
             </div>
             <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
               Dispatch terminal for fleets that move real things to real
@@ -926,7 +909,7 @@ function Footer() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-border flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-          <span>© 2026 DAMN99 · all rights reserved</span>
+          <span>© 2026 Delivery OS · all rights reserved</span>
           <span className="flex items-center gap-2">
             <span className="pulse-dot" />
             Operations green · {new Date().getFullYear()} build

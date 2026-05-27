@@ -20,6 +20,7 @@ import {
   ArrowUpRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { BrandMark } from "@/components/brand-mark"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -97,19 +98,14 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
             href={isSuper ? "/super-admin" : "/admin"}
             className="flex items-center gap-2.5 group"
           >
-            <div
-              className={cn(
-                "size-7 grid place-items-center font-mono text-[11px] font-bold tracking-tight rounded-[2px]",
-                isSuper
-                  ? "bg-destructive text-destructive-foreground"
-                  : "bg-signal text-signal-foreground",
-              )}
-            >
-              99
-            </div>
+            <BrandMark tone={isSuper ? "destructive" : "signal"} size={7} />
             <div className="flex flex-col leading-tight">
               <span className="font-mono text-[11px] font-semibold tracking-[0.16em] text-sidebar-foreground">
-                {isSuper ? "DAMN99 · SU" : "DAMN99"}
+                <span className="font-serif italic font-normal mr-1 normal-case">
+                  Delivery
+                </span>
+                OS
+                {isSuper && <span className="text-destructive ml-1.5">· SU</span>}
               </span>
               <span
                 className={cn(
@@ -123,16 +119,11 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
           </Link>
         )}
         {collapsed && (
-          <div
-            className={cn(
-              "size-7 grid place-items-center font-mono text-[11px] font-bold rounded-[2px] mx-auto",
-              isSuper
-                ? "bg-destructive text-destructive-foreground"
-                : "bg-signal text-signal-foreground",
-            )}
-          >
-            99
-          </div>
+          <BrandMark
+            tone={isSuper ? "destructive" : "signal"}
+            size={7}
+            className="mx-auto"
+          />
         )}
         <Button
           variant="ghost"

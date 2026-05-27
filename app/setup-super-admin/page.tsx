@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { BrandLockup } from "@/components/brand-mark"
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck, ShieldOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from "react"
@@ -121,11 +122,8 @@ export default function SetupSuperAdminPage() {
       <div className="absolute top-0 left-0 right-0 h-1 hazard-stripe opacity-80" />
       <div className="w-full max-w-md relative">
         <div className="flex items-center justify-between mb-4">
-          <a href="/" className="flex items-center gap-2.5">
-            <div className="size-7 grid place-items-center bg-destructive text-destructive-foreground font-mono text-[11px] font-bold rounded-[2px]">99</div>
-            <span className="font-mono text-xs font-semibold tracking-[0.18em]">
-              DAMN<span className="font-serif italic text-destructive ml-1">ninety-nine</span>
-            </span>
+          <a href="/" className="flex items-center">
+            <BrandLockup textSize="sm" tone="destructive" />
           </a>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-destructive border border-destructive/40 px-2 py-1 rounded-[2px]">
             BOOT · SUPER

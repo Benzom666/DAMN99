@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createServerClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
+import { BrandMark } from "@/components/brand-mark"
 import Link from "next/link"
 import {
   Package,
@@ -88,12 +89,13 @@ export default async function DriverDashboard() {
         <div className="px-4 sm:px-6 pt-5 pb-4 max-w-2xl mx-auto w-full">
           <div className="flex items-center justify-between mb-3">
             <Link href="/driver" className="flex items-center gap-2.5">
-              <div className="size-7 grid place-items-center bg-signal text-signal-foreground font-mono text-[11px] font-bold rounded-[2px]">
-                99
-              </div>
+              <BrandMark size={7} />
               <div className="flex flex-col leading-tight">
                 <span className="font-mono text-[11px] font-semibold tracking-[0.16em]">
-                  DAMN99
+                  <span className="font-serif italic font-normal mr-1 normal-case">
+                    Delivery
+                  </span>
+                  OS
                 </span>
                 <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
                   Field App

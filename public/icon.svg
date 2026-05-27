@@ -1,10 +1,15 @@
-<svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Speed lines -->
-  <rect x="8" y="18" width="8" height="3" rx="1.5" fill="#FF8C42"/>
-  <rect x="8" y="26" width="12" height="3" rx="1.5" fill="#FF8C42"/>
-  <rect x="8" y="34" width="8" height="3" rx="1.5" fill="#FF8C42"/>
-  <rect x="8" y="42" width="10" height="3" rx="1.5" fill="#FF8C42"/>
-  
-  <!-- Main D curve -->
-  <path d="M 22 10 Q 50 10 50 30 Q 50 50 22 50" stroke="#FF8C42" stroke-width="7" fill="none" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" aria-label="Delivery OS" role="img">
+  <!-- Hi-vis cargo-yellow tile -->
+  <rect width="32" height="32" rx="3" fill="#F2D900"/>
+
+  <!-- Optimized route: depot (filled dot) → one elbow → arrowhead destination -->
+  <circle cx="8" cy="24" r="2.6" fill="#0F0E0A"/>
+  <path d="M 8 24 L 8 12 L 22 12" stroke="#0F0E0A" stroke-width="2.4" stroke-linejoin="miter" stroke-linecap="square"/>
+  <path d="M 19 8 L 26 12 L 19 16 Z" fill="#0F0E0A"/>
+
+  <!-- Subtle corner notches: terminal/console hint -->
+  <rect x="2" y="2" width="3" height="1" fill="#0F0E0A" opacity="0.18"/>
+  <rect x="2" y="2" width="1" height="3" fill="#0F0E0A" opacity="0.18"/>
+  <rect x="27" y="29" width="3" height="1" fill="#0F0E0A" opacity="0.18"/>
+  <rect x="29" y="27" width="1" height="3" fill="#0F0E0A" opacity="0.18"/>
 </svg>

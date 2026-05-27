@@ -36,7 +36,7 @@ export default function SignUpSuccessPage() {
             <p className="text-sm text-foreground/90 leading-relaxed">
               Verification typically arrives within 30 seconds. If it doesn't,
               check your spam folder or contact{" "}
-              <span className="font-mono text-signal">ops@damn99</span>.
+              <span className="font-mono text-signal">support@deliveryos.com</span>.
             </p>
           </div>
         </div>

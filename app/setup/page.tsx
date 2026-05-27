@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { BrandLockup } from "@/components/brand-mark"
 import { CheckCircle2, XCircle, Loader2, Database, Copy, Check, ExternalLink } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -303,11 +304,8 @@ export default function SetupPage() {
       <div className="max-w-4xl mx-auto space-y-6 relative">
         {/* Brand strip */}
         <div className="flex items-center justify-between mb-2">
-          <a href="/" className="flex items-center gap-2.5">
-            <div className="size-7 grid place-items-center bg-signal text-signal-foreground font-mono text-[11px] font-bold rounded-[2px]">99</div>
-            <span className="font-mono text-xs font-semibold tracking-[0.18em]">
-              DAMN<span className="font-serif italic text-signal ml-1">ninety-nine</span>
-            </span>
+          <a href="/" className="flex items-center">
+            <BrandLockup textSize="sm" />
           </a>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-signal border border-signal/40 px-2 py-1 rounded-[2px]">
             BOOT · DB-INIT

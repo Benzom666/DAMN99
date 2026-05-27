@@ -1,5 +1,6 @@
 import * as React from "react"
 import Link from "next/link"
+import { BrandLockup } from "@/components/brand-mark"
 
 interface AuthShellProps {
   /** Operational tag, e.g. "OPS-LOGIN" */
@@ -41,18 +42,8 @@ export function AuthShell({
 
         <div className="relative">
           {/* Top brand */}
-          <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="size-8 grid place-items-center bg-signal text-signal-foreground font-mono text-xs font-bold tracking-tight">
-              99
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono text-sm font-semibold tracking-[0.18em] text-foreground">
-                DAMN
-              </span>
-              <span className="font-serif italic text-sm text-signal">
-                ninety-nine
-              </span>
-            </div>
+          <Link href="/" className="inline-flex items-center group">
+            <BrandLockup textSize="sm" />
           </Link>
         </div>
 
@@ -108,13 +99,8 @@ export function AuthShell({
       <main className="relative flex flex-col">
         {/* Mobile-only top brand */}
         <div className="lg:hidden border-b border-border px-6 py-4 flex items-center justify-between bg-sidebar">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="size-7 grid place-items-center bg-signal text-signal-foreground font-mono text-[11px] font-bold">
-              99
-            </div>
-            <span className="font-mono text-xs font-semibold tracking-[0.18em]">
-              DAMN<span className="font-serif italic text-signal ml-1">ninety-nine</span>
-            </span>
+          <Link href="/">
+            <BrandLockup textSize="xs" />
           </Link>
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-signal">
             {tag}

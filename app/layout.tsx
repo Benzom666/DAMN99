@@ -25,11 +25,11 @@ const instrumentSerif = Instrument_Serif({
 })
 
 export const metadata: Metadata = {
-  title: "DAMN99 — Dispatch Terminal for Logistics Operators",
+  title: "Delivery OS — Dispatch Terminal for Logistics Operators",
   description:
     "Run the route. Make the drop. Ship the day. Production-grade route optimization, live dispatch, and proof of delivery for fleets that can't afford to break.",
-  generator: "DAMN99",
-  applicationName: "DAMN99",
+  generator: "Delivery OS",
+  applicationName: "Delivery OS",
   keywords: [
     "route optimization",
     "delivery management",
@@ -38,12 +38,19 @@ export const metadata: Metadata = {
     "proof of delivery",
     "last-mile",
   ],
-  authors: [{ name: "DAMN99" }],
+  authors: [{ name: "Delivery OS" }],
   openGraph: {
-    title: "DAMN99 — Dispatch Terminal for Logistics Operators",
+    title: "Delivery OS — Dispatch Terminal for Logistics Operators",
     description:
       "Routes that don't break under pressure. 10,000 packages, optimized, dispatched, delivered.",
     type: "website",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon.png",
   },
 }
 
