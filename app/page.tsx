@@ -35,7 +35,9 @@ function LandingPage() {
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-xl">
         <div className="mx-auto max-w-[1400px] px-8 py-6 flex items-center justify-between">
-          <div className="text-2xl font-bold tracking-tight bg-gradient-to-r from-neutral-900 to-neutral-600 bg-clip-text text-transparent">DAMN99</div>
+          <div className="flex items-center gap-2">
+            <img src="/logo.svg" alt="Delivery OS" className="h-8" />
+          </div>
           <div className="flex items-center gap-4">
             <Link href="/auth/login">
               <Button variant="ghost" className="font-normal">Sign In</Button>

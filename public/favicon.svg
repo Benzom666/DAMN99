@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Speed lines -->
+  <rect x="4" y="10" width="4" height="2" rx="1" fill="#FF8C42"/>
+  <rect x="4" y="14" width="6" height="2" rx="1" fill="#FF8C42"/>
+  <rect x="4" y="18" width="4" height="2" rx="1" fill="#FF8C42"/>
+  <rect x="4" y="22" width="5" height="2" rx="1" fill="#FF8C42"/>
+  
+  <!-- Main D curve -->
+  <path d="M 12 6 Q 26 6 26 16 Q 26 26 12 26" stroke="#FF8C42" stroke-width="4" fill="none" stroke-linecap="round"/>
+</svg>
