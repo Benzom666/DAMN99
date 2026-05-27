@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @theme {
   --color-background: oklch(0.99 0 0);
@@ -40,71 +39,11 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
   --radius-xl: 1rem;
+  
+  --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-}
-
-@layer utilities {
-  .status-pending {
-    @apply bg-warning/10 text-warning border border-warning/20;
-  }
-  .status-active {
-    @apply bg-info/10 text-info border border-info/20;
-  }
-  .status-completed, .status-delivered {
-    @apply bg-success/10 text-success border border-success/20;
-  }
-  .status-failed {
-    @apply bg-destructive/10 text-destructive border border-destructive/20;
-  }
-  .status-cancelled {
-    @apply bg-muted text-muted-foreground border border-border;
-  }
-  .sidebar-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200;
-  }
-  .sidebar-item-active {
-    @apply bg-sidebar-primary text-sidebar-primary-foreground shadow-sm;
-  }
-  .sidebar-item-inactive {
-    @apply text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground;
-  }
-  .card-hover {
-    @apply transition-all duration-200 hover:shadow-md hover:border-primary/20;
-  }
-  .metric-card {
-    @apply bg-card border border-border rounded-lg p-6 transition-all duration-200;
-  }
-  .metric-card-hover {
-    @apply metric-card hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5;
-  }
-}
-
-@keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-  100% { transform: translate(0px, 0px) scale(1); }
-}
-
-.animate-blob {
-  animation: blob 7s infinite;
-}
-
-.animation-delay-2000 {
-  animation-delay: 2s;
-}
-
-.animation-delay-4000 {
-  animation-delay: 4s;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
