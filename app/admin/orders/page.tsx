@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { OrdersTable } from "./orders-table"
 import { MigrationBanner } from "./migration-banner"
-import Link from "next/link"
 
 export default async function OrdersPage() {
   const supabase = await createClient()
@@ -17,11 +16,9 @@ export default async function OrdersPage() {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
     redirect("/driver")
   }
-
-  console.log("[v0] [ORDERS] Admin ID:", user.id)
 
   const { data: orders, error } = await supabase
     .from("orders")
@@ -29,42 +26,28 @@ export default async function OrdersPage() {
     .eq("admin_id", user.id)
     .order("created_at", { ascending: false })
 
-  console.log("[v0] [ORDERS] Fetched orders count:", orders?.length || 0)
   if (error) {
-    console.error("[v0] [ORDERS] Error fetching orders:", error)
+    console.error("[ORDERS] Error fetching orders:", error)
   }
 
   const needsMigration = orders && orders.length > 0 && !("order_number" in orders[0])
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-6">
-            <Link href="/admin" className="text-xl font-semibold">
-              Admin Dashboard
-            </Link>
-            <nav className="flex gap-4">
-              <Link href="/admin/orders" className="text-sm font-medium">
-                Orders
-              </Link>
-              <Link href="/admin/routes" className="text-sm text-muted-foreground hover:text-foreground">
-                Routes
-              </Link>
-              <Link href="/admin/drivers" className="text-sm text-muted-foreground hover:text-foreground">
-                Drivers
-              </Link>
-              <Link href="/admin/dispatch" className="text-sm text-muted-foreground hover:text-foreground">
-                Dispatch
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="px-8 py-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage and track all delivery orders
+            </p>
           </div>
         </div>
       </header>
-      <main className="flex-1 container mx-auto p-6">
+
+      {/* Main Content */}
+      <main className="flex-1 px-8 py-6">
         {needsMigration && <MigrationBanner />}
         <OrdersTable orders={orders || []} />
       </main>

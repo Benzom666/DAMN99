@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DispatchMonitor } from "./dispatch-monitor"
-import Link from "next/link"
 
 export default async function DispatchPage() {
   const supabase = await createClient()
@@ -16,7 +15,7 @@ export default async function DispatchPage() {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
     redirect("/driver")
   }
 
@@ -29,10 +28,8 @@ export default async function DispatchPage() {
     .order("created_at", { ascending: false })
 
   if (routesError) {
-    console.error("[v0] [DISPATCH] Error fetching routes:", routesError)
+    console.error("[DISPATCH] Error fetching routes:", routesError)
   }
-
-  console.log("[v0] [DISPATCH] Fetched routes count:", routes?.length || 0)
 
   // Get all orders for routes (including completed ones for POD visibility)
   const routeIds = routes?.map((r) => r.id) || []
@@ -46,14 +43,13 @@ export default async function DispatchPage() {
       .order("stop_sequence", { ascending: true })
 
     if (ordersError) {
-      console.error("[v0] [DISPATCH] Error fetching orders:", ordersError)
+      console.error("[DISPATCH] Error fetching orders:", ordersError)
     }
 
     orders = data || []
-    console.log("[v0] [DISPATCH] Fetched orders count:", orders.length)
   }
 
-  // Get PODs for all delivered orders (not just active routes)
+  // Get PODs for all delivered orders
   const orderIds = orders.map(o => o.id).filter(Boolean)
   
   let pods = []
@@ -64,14 +60,11 @@ export default async function DispatchPage() {
       .in("order_id", orderIds)
 
     if (podsError) {
-      console.error("[v0] [DISPATCH] Error fetching PODs:", podsError)
+      console.error("[DISPATCH] Error fetching PODs:", podsError)
     }
     
     pods = allPods || []
   }
-  
-  console.log("[v0] [DISPATCH] Fetched PODs count:", pods.length)
-  console.log("[v0] [DISPATCH] Order IDs:", orderIds.length)
 
   const driverIds = routes?.map((r) => r.driver_id).filter(Boolean) || []
   let driverPositions = []
@@ -84,34 +77,21 @@ export default async function DispatchPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-6">
-            <Link href="/admin" className="text-xl font-semibold">
-              Admin Dashboard
-            </Link>
-            <nav className="flex gap-4">
-              <Link href="/admin/orders" className="text-sm text-muted-foreground hover:text-foreground">
-                Orders
-              </Link>
-              <Link href="/admin/routes" className="text-sm text-muted-foreground hover:text-foreground">
-                Routes
-              </Link>
-              <Link href="/admin/drivers" className="text-sm text-muted-foreground hover:text-foreground">
-                Drivers
-              </Link>
-              <Link href="/admin/dispatch" className="text-sm font-medium">
-                Dispatch
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="px-8 py-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dispatch Monitor</h1>
+            <p className="text-muted-foreground mt-1">
+              Real-time tracking and delivery monitoring
+            </p>
           </div>
         </div>
       </header>
-      <main className="flex-1 container mx-auto p-6">
+
+      {/* Main Content */}
+      <main className="flex-1 px-8 py-6">
         <DispatchMonitor
           routes={routes || []}
           orders={orders || []}

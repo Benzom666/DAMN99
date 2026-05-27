@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Ban } from 'lucide-react'
+import { Ban, Package } from 'lucide-react'
 import Link from "next/link"
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState, useEffect } from "react"
@@ -108,16 +108,25 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Delivery Management</CardTitle>
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10 bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="w-full max-w-md">
+        {/* Logo/Brand */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
+            <Package className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">DAMN99</h1>
+          <p className="text-muted-foreground mt-1">Delivery Management Platform</p>
+        </div>
+
+        <Card className="border-2">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
             <CardDescription>Sign in to access your dashboard</CardDescription>
           </CardHeader>
           <CardContent>
             {isSuspended && (
-              <Alert variant="destructive" className="mb-4">
+              <Alert variant="destructive" className="mb-6">
                 <Ban className="h-4 w-4" />
                 <AlertDescription>
                   Your account has been suspended. Please contact support for assistance.
@@ -126,9 +135,9 @@ function LoginForm() {
             )}
             
             <form onSubmit={handleLogin}>
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -136,32 +145,46 @@ function LoginForm() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    className="h-11"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    className="h-11"
                   />
                 </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription className="text-sm">{error}</AlertDescription>
+                  </Alert>
+                )}
+                <Button type="submit" className="w-full h-11 mt-2" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign in"}
                 </Button>
               </div>
-              <div className="mt-4 text-center text-sm">
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
-                <Link href="/auth/sign-up" className="underline underline-offset-4">
+                <Link href="/auth/sign-up" className="font-medium text-primary hover:underline">
                   Sign up
                 </Link>
-              </div>
-            </form>
+              </p>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-muted-foreground mt-8">
+          By signing in, you agree to our Terms of Service and Privacy Policy
+        </p>
       </div>
     </div>
   )

@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { RoutesTable } from "./routes-table"
-import Link from "next/link"
 
 export default async function RoutesPage() {
   const supabase = await createClient()
@@ -16,11 +15,9 @@ export default async function RoutesPage() {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
     redirect("/driver")
   }
-
-  console.log("[v0] [ROUTES] Admin ID:", user.id)
 
   const { data: routes, error: routesError } = await supabase
     .from("routes")
@@ -29,7 +26,7 @@ export default async function RoutesPage() {
     .order("created_at", { ascending: false })
 
   if (routesError) {
-    console.error("[v0] [ROUTES] Error fetching routes:", routesError)
+    console.error("[ROUTES] Error fetching routes:", routesError)
   }
 
   const { data: orders, error: ordersError } = await supabase
@@ -38,13 +35,12 @@ export default async function RoutesPage() {
     .or(`admin_id.eq.${user.id},admin_id.is.null`)
 
   if (ordersError) {
-    console.error("[v0] [ROUTES] Error fetching orders:", ordersError)
+    console.error("[ROUTES] Error fetching orders:", ordersError)
   }
 
   if (orders && orders.length > 0) {
     const ordersNeedingAdminId = orders.filter((o) => !o.admin_id)
     if (ordersNeedingAdminId.length > 0) {
-      console.log("[v0] [ROUTES] Auto-assigning admin_id to", ordersNeedingAdminId.length, "orders")
       await supabase
         .from("orders")
         .update({ admin_id: user.id })
@@ -62,7 +58,7 @@ export default async function RoutesPage() {
     .eq("is_active", true)
 
   if (driversError) {
-    console.error("[v0] [ROUTES] Error fetching drivers:", driversError)
+    console.error("[ROUTES] Error fetching drivers:", driversError)
   }
 
   let drivers = allDrivers || []
@@ -71,9 +67,7 @@ export default async function RoutesPage() {
     const driversNeedingAdminId = drivers.filter((d) => !d.admin_id)
     const driversForThisAdmin = drivers.filter((d) => d.admin_id === user.id)
 
-    // If this admin has no drivers, assign some unassigned drivers to them
     if (driversForThisAdmin.length === 0 && driversNeedingAdminId.length > 0) {
-      console.log("[v0] [ROUTES] Admin has no drivers, assigning", driversNeedingAdminId.length, "unassigned drivers")
       await supabase
         .from("profiles")
         .update({ admin_id: user.id })
@@ -107,34 +101,21 @@ export default async function RoutesPage() {
   })
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-6">
-            <Link href="/admin" className="text-xl font-semibold">
-              Admin Dashboard
-            </Link>
-            <nav className="flex gap-4">
-              <Link href="/admin/orders" className="text-sm text-muted-foreground hover:text-foreground">
-                Orders
-              </Link>
-              <Link href="/admin/routes" className="text-sm font-medium">
-                Routes
-              </Link>
-              <Link href="/admin/drivers" className="text-sm text-muted-foreground hover:text-foreground">
-                Drivers
-              </Link>
-              <Link href="/admin/dispatch" className="text-sm text-muted-foreground hover:text-foreground">
-                Dispatch
-              </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="px-8 py-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Routes</h1>
+            <p className="text-muted-foreground mt-1">
+              Create and optimize delivery routes
+            </p>
           </div>
         </div>
       </header>
-      <main className="flex-1 container mx-auto p-6">
+
+      {/* Main Content */}
+      <main className="flex-1 px-8 py-6">
         <RoutesTable routes={routesWithProgress || []} orders={orders || []} drivers={drivers || []} />
       </main>
     </div>

@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import Link from "next/link"
-import { Package, Clock } from 'lucide-react'
+import { Package, Clock, CheckCircle2, XCircle, ChevronRight, LogOut } from 'lucide-react'
 
 export default async function DriverDashboard() {
   const supabase = await createServerClient()
@@ -22,23 +22,13 @@ export default async function DriverDashboard() {
     .eq("id", user.id)
     .maybeSingle()
 
-  // If no profile exists, redirect to complete profile
   if (!profile) {
-    console.log("[v0] [DRIVER] No profile found, redirecting to complete profile")
     redirect("/auth/complete-profile")
   }
 
-  // If not a driver, redirect to admin (they must be admin or super_admin)
   if (profile.role !== "driver") {
-    console.log("[v0] [DRIVER] Not a driver, redirecting to admin")
     redirect("/admin")
   }
-
-  // if (profile.is_active === false) {
-  //   console.log("[v0] [DRIVER] Driver is inactive/deleted, signing out")
-  //   await supabase.auth.signOut()
-  //   redirect("/auth/login?error=account_inactive")
-  // }
 
   const { data: routes } = await supabase
     .from("routes")
@@ -74,71 +64,112 @@ export default async function DriverDashboard() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="text-xl font-semibold">Driver Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold">Driver Dashboard</h1>
+              <p className="text-sm text-muted-foreground">{profile.display_name || profile.email}</p>
+            </div>
             <form action={signOut}>
-              <Button variant="outline" size="sm">
-                Sign Out
+              <Button variant="ghost" size="icon" title="Sign Out">
+                <LogOut className="h-5 w-5" />
               </Button>
             </form>
           </div>
         </div>
       </header>
-      <main className="flex-1 container mx-auto p-4 max-w-2xl">
+
+      {/* Main Content */}
+      <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full">
         <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold">Welcome, {profile.display_name || "Driver"}</h2>
-            <p className="text-muted-foreground">View your assigned routes and deliveries</p>
+          {/* Welcome Section */}
+          <div className="text-center py-4">
+            <h2 className="text-2xl font-bold mb-2">Welcome, {profile.display_name || "Driver"}!</h2>
+            <p className="text-muted-foreground">Your assigned routes and deliveries</p>
           </div>
 
-          <div className="space-y-3">
-            <h3 className="font-semibold text-lg">Your Routes</h3>
+          {/* Routes List */}
+          <div className="space-y-4">
             {routesWithStats.length === 0 ? (
-              <Card className="p-6 text-center">
-                <Package className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-muted-foreground">No active routes assigned yet</p>
+              <Card className="p-8 text-center">
+                <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="font-semibold text-lg mb-2">No Active Routes</h3>
+                <p className="text-muted-foreground text-sm">You don't have any routes assigned yet</p>
               </Card>
             ) : (
-              routesWithStats.map((route) => (
-                <Link key={route.id} href={`/driver/routes/${route.id}`}>
-                  <Card className="p-4 hover:bg-accent transition-colors">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold text-lg">{route.name}</h4>
-                        <p className="text-sm text-muted-foreground capitalize">Status: {route.status}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold">
-                          {route.completedStops + route.failedStops}/{route.totalStops}
+              routesWithStats.map((route) => {
+                const progress = route.totalStops > 0 
+                  ? ((route.completedStops + route.failedStops) / route.totalStops) * 100 
+                  : 0
+
+                return (
+                  <Link key={route.id} href={`/driver/routes/${route.id}`}>
+                    <Card className="card-hover cursor-pointer overflow-hidden">
+                      {/* Route Header */}
+                      <div className="p-4 border-b bg-muted/30">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-bold text-lg mb-1">{route.name}</h3>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                route.status === 'active' 
+                                  ? 'bg-info/10 text-info border border-info/20' 
+                                  : 'bg-warning/10 text-warning border border-warning/20'
+                              }`}>
+                                {route.status}
+                              </span>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
                         </div>
-                        <div className="text-xs text-muted-foreground">stops</div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-muted rounded p-2 text-center">
-                        <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                        <div className="text-sm font-medium">
-                          {route.totalStops - route.completedStops - route.failedStops}
+
+                      {/* Progress Bar */}
+                      <div className="px-4 pt-4">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="font-medium">Progress</span>
+                          <span className="text-muted-foreground">
+                            {route.completedStops + route.failedStops} / {route.totalStops} stops
+                          </span>
                         </div>
-                        <div className="text-xs text-muted-foreground">Pending</div>
-                      </div>
-                      <div className="bg-green-50 dark:bg-green-950 rounded p-2 text-center">
-                        <div className="text-sm font-medium text-green-700 dark:text-green-400">
-                          {route.completedStops}
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
-                        <div className="text-xs text-green-600 dark:text-green-500">Delivered</div>
                       </div>
-                      <div className="bg-red-50 dark:bg-red-950 rounded p-2 text-center">
-                        <div className="text-sm font-medium text-red-700 dark:text-red-400">{route.failedStops}</div>
-                        <div className="text-xs text-red-600 dark:text-red-500">Failed</div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-3 gap-3 p-4">
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <Clock className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                          <div className="text-lg font-bold">
+                            {route.totalStops - route.completedStops - route.failedStops}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Pending</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-success/10">
+                          <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-success" />
+                          <div className="text-lg font-bold text-success">
+                            {route.completedStops}
+                          </div>
+                          <div className="text-xs text-success/80">Delivered</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-destructive/10">
+                          <XCircle className="h-5 w-5 mx-auto mb-1 text-destructive" />
+                          <div className="text-lg font-bold text-destructive">
+                            {route.failedStops}
+                          </div>
+                          <div className="text-xs text-destructive/80">Failed</div>
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                </Link>
-              ))
+                    </Card>
+                  </Link>
+                )
+              })
             )}
           </div>
         </div>

@@ -1,9 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { Package, Route, Radio } from 'lucide-react'
+import { Package, Route, Radio, Users, TrendingUp, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -16,24 +15,21 @@ export default async function AdminDashboard() {
     redirect("/auth/login")
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .maybeSingle()
 
-  // If no profile exists, redirect to complete profile
   if (!profile) {
-    console.log("[v0] [ADMIN] No profile found, redirecting to complete profile")
     redirect("/auth/complete-profile")
   }
 
-  // If not an admin or super_admin, redirect to driver
   if (profile.role !== "admin" && profile.role !== "super_admin") {
     redirect("/driver")
   }
 
-  // Get stats
+  // Get comprehensive stats
   const { count: totalOrders } = await supabase
     .from("orders")
     .select("*", { count: "exact", head: true })
@@ -45,133 +41,183 @@ export default async function AdminDashboard() {
     .eq("admin_id", user.id)
     .eq("status", "pending")
 
+  const { count: deliveredOrders } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("admin_id", user.id)
+    .eq("status", "delivered")
+
   const { count: activeRoutes } = await supabase
-    .from("routes")
+    .from("orders")
     .select("*", { count: "exact", head: true })
     .eq("admin_id", user.id)
     .eq("status", "active")
 
-  async function signOut() {
-    "use server"
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect("/auth/login")
-  }
+  const { count: totalDrivers } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true })
+    .eq("admin_id", user.id)
+    .eq("role", "driver")
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-6">
-            <Link href="/admin" className="text-xl font-semibold">
-              Admin Dashboard
-            </Link>
-            <nav className="flex gap-4">
-              <Link href="/admin/orders" className="text-sm text-muted-foreground hover:text-foreground">
-                Orders
-              </Link>
-              <Link href="/admin/routes" className="text-sm text-muted-foreground hover:text-foreground">
-                Routes
-              </Link>
-              <Link href="/admin/drivers" className="text-sm text-muted-foreground hover:text-foreground">
-                Drivers
-              </Link>
-              <Link href="/admin/dispatch" className="text-sm text-muted-foreground hover:text-foreground">
-                Dispatch
-              </Link>
-              {profile.role === "super_admin" && (
-                <Link href="/super-admin" className="text-sm text-purple-600 hover:text-purple-700 font-medium">
-                  Super Admin
-                </Link>
-              )}
-            </nav>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{profile.display_name || profile.email}</span>
-            <form action={signOut}>
-              <Button variant="outline" size="sm">
-                Sign Out
-              </Button>
-            </form>
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="px-8 py-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">
+              Welcome back, {profile.display_name || "Admin"}
+            </p>
           </div>
         </div>
       </header>
-      <main className="flex-1 container mx-auto p-6">
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold">Welcome, {profile.display_name || "Admin"}</h2>
-            <p className="text-muted-foreground">Manage orders, routes, and drivers from your dashboard</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalOrders || 0}</div>
-                <p className="text-xs text-muted-foreground">{pendingOrders || 0} pending</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Routes</CardTitle>
-                <Route className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activeRoutes || 0}</div>
-                <p className="text-xs text-muted-foreground">Currently in progress</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Dispatch Monitor</CardTitle>
-                <Radio className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Live</div>
-                <p className="text-xs text-muted-foreground">Real-time tracking</p>
-              </CardContent>
-            </Card>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Link href="/admin/orders">
-              <Card className="cursor-pointer hover:bg-accent transition-colors">
+
+      {/* Main Content */}
+      <div className="flex-1 px-8 py-6 space-y-8">
+        {/* Key Metrics */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="metric-card-hover">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+              <Package className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalOrders || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {pendingOrders || 0} pending
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="metric-card-hover">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
+              <CheckCircle2 className="h-5 w-5 text-success" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{deliveredOrders || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                {totalOrders ? Math.round((deliveredOrders || 0) / totalOrders * 100) : 0}% completion rate
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="metric-card-hover">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active Routes</CardTitle>
+              <Route className="h-5 w-5 text-info" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{activeRoutes || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">Currently in progress</p>
+            </CardContent>
+          </Card>
+
+          <Card className="metric-card-hover">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Drivers</CardTitle>
+              <Users className="h-5 w-5 text-warning" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalDrivers || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">Total drivers</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Link href="/admin/orders" className="group">
+              <Card className="card-hover cursor-pointer h-full">
                 <CardHeader>
-                  <CardTitle>Orders</CardTitle>
-                  <CardDescription>Create, edit, and manage delivery orders</CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Orders</CardTitle>
+                      <CardDescription className="text-xs">Manage deliveries</CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
               </Card>
             </Link>
-            <Link href="/admin/routes">
-              <Card className="cursor-pointer hover:bg-accent transition-colors">
+
+            <Link href="/admin/routes" className="group">
+              <Card className="card-hover cursor-pointer h-full">
                 <CardHeader>
-                  <CardTitle>Routes</CardTitle>
-                  <CardDescription>Create and optimize delivery routes</CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-info/10 text-info group-hover:bg-info group-hover:text-info-foreground transition-colors">
+                      <Route className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Routes</CardTitle>
+                      <CardDescription className="text-xs">Optimize routes</CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
               </Card>
             </Link>
-            <Link href="/admin/drivers">
-              <Card className="cursor-pointer hover:bg-accent transition-colors">
+
+            <Link href="/admin/drivers" className="group">
+              <Card className="card-hover cursor-pointer h-full">
                 <CardHeader>
-                  <CardTitle>Drivers</CardTitle>
-                  <CardDescription>Manage driver availability and details</CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-warning/10 text-warning group-hover:bg-warning group-hover:text-warning-foreground transition-colors">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Drivers</CardTitle>
+                      <CardDescription className="text-xs">Manage team</CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
               </Card>
             </Link>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Link href="/admin/dispatch">
-              <Card className="cursor-pointer hover:bg-accent transition-colors">
+
+            <Link href="/admin/dispatch" className="group">
+              <Card className="card-hover cursor-pointer h-full">
                 <CardHeader>
-                  <CardTitle>Dispatch</CardTitle>
-                  <CardDescription>Monitor active deliveries in real-time</CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-success/10 text-success group-hover:bg-success group-hover:text-success-foreground transition-colors">
+                      <Radio className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Dispatch</CardTitle>
+                      <CardDescription className="text-xs">Live tracking</CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
               </Card>
             </Link>
           </div>
         </div>
-      </main>
+
+        {/* Status Overview */}
+        {pendingOrders && pendingOrders > 0 && (
+          <Card className="border-warning/50 bg-warning/5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-warning" />
+                <CardTitle className="text-base">Attention Required</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                You have <span className="font-semibold text-foreground">{pendingOrders} pending orders</span> waiting to be assigned to routes.
+              </p>
+              <Link href="/admin/orders" className="text-sm font-medium text-primary hover:underline mt-2 inline-block">
+                View pending orders →
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }
