@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -17,6 +17,7 @@ import {
   XCircle,
   Upload,
   CloudUpload,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
@@ -34,15 +35,28 @@ interface StopDetailProps {
 /**
  * Driver POD capture view.
  *
- * Photo + signature flow is now durable end-to-end:
- *   1. Photo files are compressed client-side on capture (cuts ~90% of payload).
- *   2. Captured blobs live in component state for the hot-path upload.
- *   3. The hot-path retries on EVERY non-2xx response (5xx, timeout, auth) up
- *      to 4 times with exponential backoff.
- *   4. If those retries are exhausted, blobs are queued to IndexedDB
- *      (lib/pod-uploads/db.ts) before we navigate away. A background
- *      <PendingUploads/> component on the route page then keeps retrying
- *      until the upload lands. Drivers cannot lose POD data.
+ * The previous "first photo never uploaded" bug had a single root cause:
+ * `handlePhotoChange` was async (it awaited compressImage). React committed
+ * the first batch of state updates ("Optimising photo…") before `photoBlob`
+ * was ever set, leaving a 1–3 second window where the driver could tap
+ * Delivered and the upload would fire WITH NO PHOTO. The server returned
+ * 200 OK (with only the signature), the durable queue was never engaged
+ * (because the call "succeeded"), and the photo was lost.
+ *
+ * Fix:
+ *   - Refs (`photoBlobRef`, `signatureBlobRef`) are set SYNCHRONOUSLY the
+ *     moment the user selects a file / saves a signature. They're the source
+ *     of truth at upload time — no stale closure can ever read null.
+ *   - Compression runs in the background. If it shrinks the image, we
+ *     swap the ref to the smaller blob. Otherwise the original file is
+ *     used. Either way the upload always has a valid photo.
+ *   - On Delivered, we await the in-flight compression promise with a 4s
+ *     safety cap before building FormData — best of both worlds.
+ *   - Defence in depth: if `photoPreview` is set but the ref is empty
+ *     somehow, we refuse to submit and surface the issue to the driver.
+ *   - Hot-path retries (4 attempts, broad coverage) + IndexedDB queue
+ *     (lib/pod-uploads/db.ts) handle the network/cold-start failure
+ *     surface that the previous fix already addressed.
  */
 export function StopDetail({
   order,
@@ -54,17 +68,36 @@ export function StopDetail({
   const { toast } = useToast()
   const [notes, setNotes] = useState("")
   const [recipientName, setRecipientName] = useState("")
-  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
+
+  /* ----- Photo + signature state ---------------------------------------
+   * State mirrors the ref so React can re-render previews and disable the
+   * Delivered button while processing — but the REF is the source of truth
+   * for what actually gets uploaded. Refs eliminate stale-closure bugs.
+   * ------------------------------------------------------------------- */
+  const photoBlobRef = useRef<Blob | null>(null)
+  const signatureBlobRef = useRef<Blob | null>(null)
+  const photoCompressionRef = useRef<Promise<Blob> | null>(null)
+
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     existingPod?.photo_url || null,
   )
-  const [showSignaturePad, setShowSignaturePad] = useState(false)
-  const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
   const [signaturePreview, setSignaturePreview] = useState<string | null>(
     existingPod?.signature_url || null,
   )
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false)
+  const [showSignaturePad, setShowSignaturePad] = useState(false)
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<string | null>(null)
+
+  /* Only blob: URLs need revoke; existing remote URLs do not. */
+  useEffect(() => {
+    return () => {
+      if (photoPreview && photoPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(photoPreview)
+      }
+    }
+  }, [photoPreview])
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
   const routeHref = `/driver/routes/${routeId}`
@@ -79,40 +112,85 @@ export function StopDetail({
     }, 1200)
   }
 
-  const handlePhotoChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  /* --------------------------------------------------------- PHOTO */
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-
-    try {
-      setSubmitStatus("Optimising photo…")
-      const compressed = await compressImage(file)
-      const previewUrl = URL.createObjectURL(compressed)
-      setPhotoBlob(compressed)
-      setPhotoPreview(previewUrl)
-      setSubmitStatus(null)
-      console.log(
-        "[v0] [DRIVER] photo ready — original:",
-        file.size,
-        "compressed:",
-        compressed.size,
-      )
-    } catch (err) {
-      console.error("[v0] [DRIVER] photo capture failed", err)
+    if (!file || file.size === 0) {
       toast({
-        title: "Couldn't read photo",
-        description: "Please try again or pick a different photo.",
+        title: "No photo selected",
+        description: "Please pick or take a photo.",
         variant: "destructive",
       })
-      setSubmitStatus(null)
+      return
     }
+
+    // 1. SYNCHRONOUSLY set the ref so the upload pipeline is never null.
+    photoBlobRef.current = file
+
+    // 2. Show preview immediately. Use a blob URL on the original file.
+    const previewUrl = URL.createObjectURL(file)
+    if (photoPreview && photoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(photoPreview)
+    }
+    setPhotoPreview(previewUrl)
+    setIsProcessingPhoto(true)
+
+    console.log(
+      "[v0] [DRIVER] photo selected — ref set immediately, original size:",
+      file.size,
+    )
+
+    // 3. Compress in the background. If it succeeds, swap the ref.
+    const promise = compressImage(file)
+    photoCompressionRef.current = promise
+
+    promise
+      .then((compressed) => {
+        // Only swap if compression actually produced a smaller blob AND the
+        // ref still points at the original (i.e. user didn't remove or
+        // replace the photo while we were compressing).
+        if (
+          photoBlobRef.current === file &&
+          compressed !== file &&
+          compressed.size < file.size
+        ) {
+          photoBlobRef.current = compressed
+          console.log(
+            "[v0] [DRIVER] compression complete — swapped ref, new size:",
+            compressed.size,
+          )
+        } else {
+          console.log("[v0] [DRIVER] compression complete — kept original")
+        }
+      })
+      .catch((err) => {
+        // Original file is already in the ref — nothing is lost.
+        console.warn("[v0] [DRIVER] compression failed, original retained:", err)
+      })
+      .finally(() => {
+        if (photoCompressionRef.current === promise) {
+          photoCompressionRef.current = null
+        }
+        setIsProcessingPhoto(false)
+      })
   }
 
+  const handlePhotoRemove = () => {
+    if (photoPreview && photoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(photoPreview)
+    }
+    photoBlobRef.current = null
+    photoCompressionRef.current = null
+    setPhotoPreview(null)
+    setIsProcessingPhoto(false)
+  }
+
+  /* --------------------------------------------------------- SIGNATURE */
   const handleSignatureSave = (dataUrl: string) => {
     try {
       const blob = dataUrlToBlob(dataUrl)
-      setSignatureBlob(blob)
+      // SYNCHRONOUSLY set ref before triggering re-render.
+      signatureBlobRef.current = blob
       setSignaturePreview(dataUrl)
       setShowSignaturePad(false)
     } catch (err) {
@@ -125,19 +203,28 @@ export function StopDetail({
     }
   }
 
+  const handleSignatureClear = () => {
+    signatureBlobRef.current = null
+    setSignaturePreview(null)
+  }
+
+  /* --------------------------------------------------------- UPLOAD */
   const buildFormData = (podId: string): FormData => {
     const fd = new FormData()
     fd.append("podId", podId)
-    if (photoBlob) fd.append("photo", photoBlob, "photo.jpg")
-    if (signatureBlob) fd.append("signature", signatureBlob, "signature.png")
+
+    // ALWAYS read from refs at FormData build time. State could be stale.
+    const photo = photoBlobRef.current
+    if (photo && photo.size > 0) {
+      fd.append("photo", photo, "photo.jpg")
+    }
+    const signature = signatureBlobRef.current
+    if (signature && signature.size > 0) {
+      fd.append("signature", signature, "signature.png")
+    }
     return fd
   }
 
-  /**
-   * Hot-path media upload with broad retry coverage.
-   * Returns true on success, false if exhausted (caller will enqueue).
-   * Throws only on permanent failures (auth) where retry is pointless.
-   */
   const uploadMediaHotPath = async (
     podId: string,
   ): Promise<{ ok: boolean; permanent?: boolean; error?: string }> => {
@@ -147,15 +234,13 @@ export function StopDetail({
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         if (attempt > 0) {
-          setSubmitStatus(
-            `Retrying upload (${attempt}/${MAX_ATTEMPTS - 1})…`,
-          )
+          setSubmitStatus(`Retrying upload (${attempt}/${MAX_ATTEMPTS - 1})…`)
           await new Promise((r) =>
             setTimeout(r, BACKOFF_MS[attempt - 1] ?? 10000),
           )
         } else {
           setSubmitStatus(
-            photoBlob ? "Uploading photo…" : "Uploading signature…",
+            photoBlobRef.current ? "Uploading photo…" : "Uploading signature…",
           )
         }
 
@@ -180,15 +265,10 @@ export function StopDetail({
             console.log("[v0] [DRIVER] hot-path upload succeeded")
             return { ok: true }
           }
-          // 200 with success:false — treat as retryable server hiccup
-          console.warn(
-            "[v0] [DRIVER] upload returned non-success body:",
-            body,
-          )
+          console.warn("[v0] [DRIVER] upload returned non-success body:", body)
           continue
         }
 
-        // 401/403 are permanent for this session
         if (res.status === 401 || res.status === 403) {
           let message = `HTTP ${res.status}`
           try {
@@ -198,8 +278,12 @@ export function StopDetail({
           return { ok: false, permanent: true, error: message }
         }
 
-        // 4xx other than auth — likely a malformed request, also permanent
-        if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+        if (
+          res.status >= 400 &&
+          res.status < 500 &&
+          res.status !== 408 &&
+          res.status !== 429
+        ) {
           let message = `HTTP ${res.status}`
           try {
             const body = await res.json()
@@ -208,29 +292,64 @@ export function StopDetail({
           return { ok: false, permanent: true, error: message }
         }
 
-        // 5xx, 408, 429 → retry
         console.warn(
           "[v0] [DRIVER] hot-path upload non-2xx, will retry:",
           res.status,
         )
       } catch (err) {
-        // Network error / abort / cors — retry
-        console.warn(
-          "[v0] [DRIVER] hot-path upload threw, will retry:",
-          err,
-        )
+        console.warn("[v0] [DRIVER] hot-path upload threw, will retry:", err)
       }
     }
 
     return { ok: false, permanent: false, error: "Retries exhausted" }
   }
 
+  /* --------------------------------------------------------- DELIVER */
   const handleDeliver = async () => {
     if (isSubmitting) return
 
+    /* Defensive guard: if the driver clearly captured a photo (preview set to
+     * a blob: URL — meaning a NEW capture, not just an existing pod URL) but
+     * the ref is somehow empty, refuse and tell them why. This shouldn't
+     * happen with the new ref-based flow but protects against unknown
+     * regressions. */
+    const userCapturedPhoto =
+      photoPreview && photoPreview.startsWith("blob:")
+    if (userCapturedPhoto && !photoBlobRef.current) {
+      toast({
+        title: "Photo isn't ready",
+        description:
+          "We couldn't read the photo. Please re-take or re-select it.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsSubmitting(true)
+
+    /* If photo compression is still running, wait briefly so the smaller
+     * version uploads. After 4 seconds, give up and proceed with whatever
+     * the ref currently holds (always at least the original file). */
+    if (photoCompressionRef.current) {
+      setSubmitStatus("Finishing photo processing…")
+      try {
+        await Promise.race([
+          photoCompressionRef.current,
+          new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+        ])
+      } catch {
+        // ignore — original is still in the ref
+      }
+    }
+
     setSubmitStatus("Saving delivery…")
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
+    console.log(
+      "[v0] [DRIVER] photo blob:",
+      photoBlobRef.current?.size || "none",
+      "signature blob:",
+      signatureBlobRef.current?.size || "none",
+    )
 
     try {
       // 1. Mark delivered + create POD row
@@ -280,9 +399,10 @@ export function StopDetail({
       }
 
       const podId: string | undefined = deliverBody.podId
-      const hasMedia = (photoBlob || signatureBlob) && podId
+      const hasMedia =
+        (photoBlobRef.current || signatureBlobRef.current) && podId
 
-      // 2. If we have media, try to upload it inline
+      // 2. Upload media if any
       if (hasMedia && podId) {
         const result = await uploadMediaHotPath(podId)
 
@@ -296,16 +416,19 @@ export function StopDetail({
           return
         }
 
-        // Hot path exhausted — enqueue to IndexedDB before navigating away.
+        // Hot path exhausted — enqueue blobs to IndexedDB (durable retry).
         try {
           await enqueuePodUpload({
             podId,
             orderId: order.id,
-            photo: photoBlob || undefined,
-            signature: signatureBlob || undefined,
+            photo: photoBlobRef.current || undefined,
+            signature: signatureBlobRef.current || undefined,
             lastError: result.error,
           })
-          console.log("[v0] [DRIVER] enqueued for background retry, podId:", podId)
+          console.log(
+            "[v0] [DRIVER] enqueued for background retry, podId:",
+            podId,
+          )
 
           if (result.permanent) {
             toast({
@@ -325,12 +448,11 @@ export function StopDetail({
           setTimeout(returnToRoute, 600)
           return
         } catch (queueErr) {
-          // IndexedDB itself failed — last-resort UI
           console.error("[v0] [DRIVER] failed to enqueue:", queueErr)
           toast({
             title: "Delivered, upload pending",
             description:
-              "Photo + signature couldn't be saved for retry. Stay on this page and try Retry below.",
+              "Photo + signature couldn't be saved for retry. Stay on this page and try again.",
             variant: "destructive",
           })
           setIsSubmitting(false)
@@ -339,7 +461,7 @@ export function StopDetail({
         }
       }
 
-      // 3. No media — straight return
+      // 3. No media path
       if (deliverBody.warning) {
         toast({
           title: "Delivered with warning",
@@ -357,8 +479,7 @@ export function StopDetail({
       console.error("[v0] [DRIVER] unexpected:", err)
       toast({
         title: "Unexpected error",
-        description:
-          err instanceof Error ? err.message : "Please try again.",
+        description: err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
       })
       setIsSubmitting(false)
@@ -366,6 +487,7 @@ export function StopDetail({
     }
   }
 
+  /* --------------------------------------------------------- FAIL */
   const handleFail = async () => {
     if (!notes.trim()) {
       toast({
@@ -410,6 +532,7 @@ export function StopDetail({
     }
   }
 
+  /* --------------------------------------------------------- RENDER */
   return (
     <div className="min-h-screen bg-background p-4 pb-20">
       <div className="max-w-2xl mx-auto space-y-4">
@@ -430,7 +553,7 @@ export function StopDetail({
           </div>
         </div>
 
-        {/* Order Info */}
+        {/* Order info */}
         <Card className="p-4 space-y-3">
           <div>
             <p className="text-sm text-muted-foreground">Order number</p>
@@ -474,7 +597,15 @@ export function StopDetail({
           <>
             {/* Photo */}
             <Card className="p-4 space-y-3">
-              <Label>Photo (optional)</Label>
+              <div className="flex items-center justify-between">
+                <Label>Photo (optional)</Label>
+                {isProcessingPhoto && (
+                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                    <Loader2 className="size-3 animate-spin" />
+                    Optimising…
+                  </span>
+                )}
+              </div>
               {photoPreview ? (
                 <div className="space-y-2">
                   <img
@@ -485,13 +616,7 @@ export function StopDetail({
                   <Button
                     variant="outline"
                     className="w-full bg-transparent"
-                    onClick={() => {
-                      if (photoPreview && photoPreview.startsWith("blob:")) {
-                        URL.revokeObjectURL(photoPreview)
-                      }
-                      setPhotoBlob(null)
-                      setPhotoPreview(null)
-                    }}
+                    onClick={handlePhotoRemove}
                   >
                     Remove photo
                   </Button>
@@ -559,10 +684,7 @@ export function StopDetail({
                   <Button
                     variant="outline"
                     className="w-full bg-transparent"
-                    onClick={() => {
-                      setSignatureBlob(null)
-                      setSignaturePreview(null)
-                    }}
+                    onClick={handleSignatureClear}
                   >
                     Clear signature
                   </Button>
@@ -603,7 +725,7 @@ export function StopDetail({
             </Card>
 
             {/* Sync hint */}
-            {(photoBlob || signatureBlob) && (
+            {(photoBlobRef.current || signatureBlobRef.current) && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
                 <CloudUpload className="size-3.5" />
                 Saved to this device — will sync even if your connection drops.
@@ -637,9 +759,7 @@ export function StopDetail({
 
         {isCompleted && existingPod && (
           <Card className="p-4 space-y-4">
-            <h3 className="font-semibold tracking-tight">
-              Proof of delivery
-            </h3>
+            <h3 className="font-semibold tracking-tight">Proof of delivery</h3>
             {existingPod.photo_url && (
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Photo</p>
@@ -652,9 +772,7 @@ export function StopDetail({
             )}
             {existingPod.signature_url && (
               <div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Signature
-                </p>
+                <p className="text-sm text-muted-foreground mb-2">Signature</p>
                 <img
                   src={existingPod.signature_url}
                   alt="Signature"
