@@ -1,33 +1,27 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google"
+import { DM_Sans, DM_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
-const geist = Geist({
+const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 })
 
-const geistMono = Geist_Mono({
+const dmMono = DM_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
-  display: "swap",
-})
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-serif",
+  weight: ["400", "500"],
   display: "swap",
 })
 
 export const metadata: Metadata = {
-  title: "Delivery OS — Dispatch Terminal for Logistics Operators",
+  title: "Delivery OS — Modern logistics operations for regional carriers",
   description:
-    "Run the route. Make the drop. Ship the day. Production-grade route optimization, live dispatch, and proof of delivery for fleets that can't afford to break.",
+    "Delivery OS scales with you from your first delivery to millions daily. Route optimization, live dispatch, proof of delivery, and a unified operator console for last-mile teams.",
   generator: "Delivery OS",
   applicationName: "Delivery OS",
   keywords: [
@@ -37,12 +31,13 @@ export const metadata: Metadata = {
     "fleet logistics",
     "proof of delivery",
     "last-mile",
+    "regional carrier",
   ],
   authors: [{ name: "Delivery OS" }],
   openGraph: {
-    title: "Delivery OS — Dispatch Terminal for Logistics Operators",
+    title: "Delivery OS — Modern logistics for the modern regional carrier",
     description:
-      "Routes that don't break under pressure. 10,000 packages, optimized, dispatched, delivered.",
+      "A technology-first approach to last-mile delivery. Built for operators.",
     type: "website",
   },
   icons: {
@@ -62,10 +57,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable} dark`}
+      className={`${dmSans.variable} ${dmMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="font-sans antialiased bg-background text-foreground selection:bg-signal selection:text-signal-foreground">
+      <body className="font-sans antialiased bg-background text-foreground">
         {children}
         <Analytics />
       </body>

@@ -107,10 +107,8 @@ export default async function RoutesPage() {
   return (
     <div className="flex flex-col min-h-screen relative">
       <PageHeader
-        tag="OPS-03"
-        eyebrow="Sector A · Optimization"
-        title="Route"
-        serifEmphasis="planner"
+        eyebrow="Optimization"
+        title="Route planner"
         description="Solve, sequence, and dispatch routes. Constraints in, optimal paths out."
       />
 

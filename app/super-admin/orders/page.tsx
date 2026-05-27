@@ -27,10 +27,8 @@ export default async function SuperAdminOrdersPage() {
   return (
     <div className="flex flex-col min-h-screen relative">
       <PageHeader
-        tag="SUPER · S-04"
-        eyebrow="Sovereign · Manifest"
-        title="Order"
-        serifEmphasis="register"
+        eyebrow="Manifest"
+        title="Order register"
         description="Latest 500 orders across every tenant."
       />
 

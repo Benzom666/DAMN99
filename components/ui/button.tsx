@@ -7,40 +7,42 @@ import { cn } from '@/lib/utils'
 const buttonVariants = cva(
   [
     'inline-flex items-center justify-center gap-2 whitespace-nowrap',
-    'text-sm font-medium tracking-wide',
-    'transition-[transform,background-color,border-color,color,box-shadow] duration-150',
+    'text-sm font-medium tracking-tight',
+    'rounded-full',
+    'transition-[background-color,color,border-color,box-shadow,transform] duration-150',
     'disabled:pointer-events-none disabled:opacity-50',
     "[&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0",
-    'outline-none focus-visible:ring-2 focus-visible:ring-signal/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-    'aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
-    'rounded-sm',
+    'outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     'active:translate-y-[0.5px]',
   ].join(' '),
   {
     variants: {
       variant: {
         default:
-          'bg-signal text-signal-foreground hover:bg-signal/90 font-semibold uppercase tracking-[0.08em] text-xs',
+          'bg-foreground text-background hover:bg-foreground/90',
+        primary:
+          'bg-primary text-primary-foreground hover:bg-[var(--color-primary-hover)]',
         destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold uppercase tracking-[0.08em] text-xs',
+          'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         outline:
-          'border border-border-strong bg-transparent text-foreground hover:bg-surface-2 hover:border-foreground/30 uppercase tracking-[0.08em] text-xs font-semibold',
+          'border border-border-strong bg-transparent text-foreground hover:bg-secondary',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-surface-3 border border-border uppercase tracking-[0.08em] text-xs font-semibold',
+          'bg-secondary text-secondary-foreground hover:bg-surface-3',
+        soft:
+          'bg-primary-soft text-primary hover:bg-primary-soft/70',
         ghost:
-          'hover:bg-surface-2 hover:text-foreground text-muted-foreground uppercase tracking-[0.08em] text-xs font-semibold',
-        link: 'text-signal underline-offset-4 hover:underline font-mono uppercase tracking-[0.1em] text-xs',
-        signal:
-          'bg-signal text-signal-foreground hover:bg-signal/90 font-bold uppercase tracking-[0.1em] text-xs shadow-[0_0_0_1px_oklch(0.12_0.01_80)] hover:shadow-[0_0_0_1px_oklch(0.12_0.01_80),0_0_24px_-4px_oklch(0.92_0.19_100/0.4)]',
+          'text-foreground/80 hover:bg-secondary hover:text-foreground',
+        link:
+          'text-primary underline-offset-4 hover:underline rounded-none px-0',
       },
       size: {
-        default: 'h-9 px-4 has-[>svg]:px-3',
-        sm: 'h-8 px-3 has-[>svg]:px-2.5 text-[11px]',
-        lg: 'h-11 px-6 has-[>svg]:px-5 text-[13px]',
-        xl: 'h-14 px-8 has-[>svg]:px-7 text-sm',
-        icon: 'size-9',
-        'icon-sm': 'size-8',
-        'icon-lg': 'size-11',
+        default: 'h-10 px-5 has-[>svg]:px-4',
+        sm: 'h-9 px-4 has-[>svg]:px-3.5 text-[13px]',
+        lg: 'h-12 px-6 has-[>svg]:px-5 text-[15px]',
+        xl: 'h-14 px-8 has-[>svg]:px-7 text-base',
+        icon: 'size-10',
+        'icon-sm': 'size-9',
+        'icon-lg': 'size-12',
       },
     },
     defaultVariants: {

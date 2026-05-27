@@ -41,11 +41,9 @@ export default async function OrdersPage() {
   return (
     <div className="flex flex-col min-h-screen relative">
       <PageHeader
-        tag="OPS-02"
-        eyebrow="Sector A · Manifest"
-        title="Order"
-        serifEmphasis="manifest"
-        description="Drop, edit, archive, and assign every package moving through the yard."
+        eyebrow="Manifest"
+        title="Order manifest"
+        description="Drop, edit, archive, and assign every package moving through the system."
       />
 
       <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">

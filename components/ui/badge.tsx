@@ -6,9 +6,9 @@ import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
   [
-    'inline-flex items-center justify-center gap-1.5',
-    'px-2 py-0.5 rounded-[2px]',
-    'font-mono text-[10px] font-semibold uppercase tracking-[0.1em]',
+    'inline-flex items-center justify-center gap-1',
+    'px-2.5 py-0.5 rounded-full',
+    'text-[11.5px] font-medium tracking-tight',
     'border w-fit whitespace-nowrap shrink-0',
     '[&>svg]:size-3 [&>svg]:pointer-events-none',
     'transition-colors',
@@ -17,21 +17,21 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          'border-signal/40 bg-signal/15 text-signal',
+          'border-primary/20 bg-primary-soft text-primary',
         secondary:
-          'border-border bg-surface-2 text-foreground',
+          'border-border bg-secondary text-foreground',
         destructive:
-          'border-destructive/50 bg-destructive/15 text-destructive',
+          'border-destructive/30 bg-destructive-soft text-destructive',
         success:
-          'border-success/40 bg-success/15 text-success',
+          'border-success/30 bg-success-soft text-success',
         warning:
-          'border-warning/40 bg-warning/15 text-warning',
+          'border-warning/30 bg-warning-soft text-warning',
         info:
-          'border-info/40 bg-info/15 text-info',
+          'border-info/30 bg-info-soft text-info',
         outline:
-          'border-border-strong bg-transparent text-muted-foreground',
-        signal:
-          'border-signal/60 bg-signal text-signal-foreground',
+          'border-border bg-transparent text-muted-foreground',
+        solid:
+          'border-transparent bg-foreground text-background',
       },
     },
     defaultVariants: {

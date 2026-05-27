@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { BrandLockup } from "@/components/brand-mark"
 import { CheckCircle2, XCircle, Loader2, Database, Copy, Check, ExternalLink } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -299,26 +300,22 @@ export default function SetupPage() {
 
   return (
     <div className="min-h-screen bg-background p-4 py-12 relative">
-      <div className="pointer-events-none fixed inset-0 bg-grid-paper-fine opacity-25 [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]" />
-      <div className="absolute top-0 left-0 right-0 h-1 hazard-stripe opacity-90" />
       <div className="max-w-4xl mx-auto space-y-6 relative">
         {/* Brand strip */}
         <div className="flex items-center justify-between mb-2">
           <a href="/" className="flex items-center">
             <BrandLockup textSize="sm" />
           </a>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-signal border border-signal/40 px-2 py-1 rounded-[2px]">
-            BOOT · DB-INIT
-          </span>
+          <Badge variant="default">Database setup</Badge>
         </div>
 
         <Card>
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 size-14 grid place-items-center bg-signal/10 border border-signal/40 rounded-sm">
-              <Database className="size-7 text-signal" strokeWidth={1.4} />
+            <div className="mx-auto mb-4 size-14 grid place-items-center bg-primary-soft rounded-full">
+              <Database className="size-7 text-primary" strokeWidth={1.6} />
             </div>
             <CardTitle className="text-3xl tracking-tight">
-              Database <span className="font-serif italic font-normal text-signal">setup</span> required
+              Database setup required
             </CardTitle>
             <CardDescription className="text-base">
               Run these SQL scripts in your Supabase SQL Editor to initialize the database.
@@ -348,7 +345,7 @@ export default function SetupPage() {
                       href="https://supabase.com/dashboard"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-signal hover:underline inline-flex items-center gap-1"
+                      className="text-primary hover:underline inline-flex items-center gap-1"
                     >
                       Supabase Dashboard
                       <ExternalLink className="w-3 h-3" />

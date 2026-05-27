@@ -20,19 +20,17 @@ export default async function AuditLogPage() {
     .limit(100)
 
   return (
-    <div className="flex flex-col min-h-screen relative">
+    <div className="flex flex-col min-h-screen">
       <PageHeader
-        tag="SUPER · S-06"
-        eyebrow="Sovereign · Compliance"
-        title="Audit"
-        serifEmphasis="trail"
+        eyebrow="Compliance"
+        title="Audit trail"
         description="Last 100 sovereign actions. Every override, every suspension, every reassignment."
       />
 
       <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">
         {!logs || logs.length === 0 ? (
-          <div className="border border-border bg-card rounded-sm p-10 text-center">
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-2">
+          <div className="soft-card p-10 text-center">
+            <p className="text-sm font-medium text-muted-foreground mb-2">
               Empty trail
             </p>
             <p className="text-sm text-muted-foreground">
@@ -40,9 +38,9 @@ export default async function AuditLogPage() {
             </p>
           </div>
         ) : (
-          <div className="border border-border bg-card rounded-sm overflow-x-auto">
+          <div className="soft-card overflow-x-auto p-0">
             <table className="w-full text-sm">
-              <thead className="border-b border-border bg-surface-2">
+              <thead className="border-b border-border bg-secondary">
                 <tr className="text-left">
                   <Th>Time</Th>
                   <Th>Sovereign</Th>
@@ -55,9 +53,9 @@ export default async function AuditLogPage() {
                 {logs.map((log) => (
                   <tr
                     key={log.id}
-                    className="border-b border-border last:border-b-0 hover:bg-surface-2/40 transition-colors"
+                    className="border-b border-border last:border-b-0 hover:bg-secondary/40 transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-[11px] tabular-nums text-muted-foreground whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs tabular-nums text-muted-foreground whitespace-nowrap">
                       {new Date(log.created_at).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-sm">
@@ -68,10 +66,10 @@ export default async function AuditLogPage() {
                     <td className="px-4 py-3">
                       <Badge variant="outline">{log.action}</Badge>
                     </td>
-                    <td className="px-4 py-3 font-mono text-[11px] text-signal whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-primary whitespace-nowrap">
                       {log.target_table}:{log.target_id?.slice(0, 8)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-md truncate font-mono">
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-md truncate">
                       {JSON.stringify(log.details)}
                     </td>
                   </tr>
@@ -87,7 +85,7 @@ export default async function AuditLogPage() {
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
+    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground tracking-tight">
       {children}
     </th>
   )

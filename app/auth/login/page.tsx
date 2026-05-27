@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AuthShell } from "@/components/auth-shell"
-import { Ban, ArrowUpRight, Loader2 } from "lucide-react"
+import { Ban, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState, useEffect } from "react"
@@ -102,9 +102,9 @@ function LoginForm() {
   if (isChecking) {
     return (
       <div className="flex min-h-svh w-full items-center justify-center bg-background text-muted-foreground">
-        <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.16em]">
-          <Loader2 className="size-4 animate-spin" />
-          <span>Authenticating session…</span>
+        <div className="flex items-center gap-3 text-sm">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          <span>Checking session…</span>
         </div>
       </div>
     )
@@ -112,49 +112,38 @@ function LoginForm() {
 
   return (
     <AuthShell
-      tag="OPS-LOGIN"
-      eyebrow="Operator console"
-      serifLine={`Sign back\ninto the\nterminal.`}
-      subtitle="Resume your dispatch session. Routes are still moving — let's get you back on the wire."
-      footer={
-        <span>
-          By signing in you accept the operator agreement &nbsp;◆&nbsp; v1.0
-        </span>
-      }
+      headline="Welcome back. Routes are still moving."
+      pitch="Resume your dispatch session and pick up where you left off."
+      footer={<span>By signing in you accept the terms of service.</span>}
     >
       <div>
         <div className="mb-8">
-          <span className="eyebrow-signal">Sector A · Sign in</span>
-          <h1 className="mt-2 text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
-            Welcome back,{" "}
-            <span className="font-serif italic font-normal text-signal">
-              operator
-            </span>
-            .
+          <h1 className="text-3xl font-bold tracking-tight leading-tight text-foreground">
+            Sign in to Delivery OS
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
-            Enter your credentials to access dispatch.
+            Enter your credentials to access your dashboard.
           </p>
         </div>
 
         {isSuspended && (
           <Alert variant="destructive" className="mb-6">
-            <Ban className="h-4 w-4" />
-            <AlertTitle>Access Suspended</AlertTitle>
+            <Ban className="size-4" />
+            <AlertTitle>Account suspended</AlertTitle>
             <AlertDescription>
-              Your account has been suspended. Contact support@deliveryos.com to reinstate
-              access.
+              Your account has been suspended. Contact support@deliveryos.com
+              to reinstate access.
             </AlertDescription>
           </Alert>
         )}
 
         <form onSubmit={handleLogin} className="flex flex-col gap-5">
           <div className="grid gap-2">
-            <Label htmlFor="email">Operator email</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
-              placeholder="you@operator.co"
+              placeholder="you@company.com"
               required
               autoComplete="email"
               value={email}
@@ -162,12 +151,7 @@ function LoginForm() {
             />
           </div>
           <div className="grid gap-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70">
-                ENCRYPTED
-              </span>
-            </div>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
@@ -186,7 +170,6 @@ function LoginForm() {
 
           <Button
             type="submit"
-            variant="signal"
             size="lg"
             disabled={isLoading}
             className="w-full mt-2"
@@ -194,25 +177,22 @@ function LoginForm() {
             {isLoading ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Authenticating…
+                Signing in…
               </>
             ) : (
-              <>
-                Sign in to dispatch
-                <ArrowUpRight className="size-4" strokeWidth={2.5} />
-              </>
+              "Sign in"
             )}
           </Button>
         </form>
 
         <div className="mt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            New operator?{" "}
+            New to Delivery OS?{" "}
             <Link
               href="/auth/sign-up"
-              className="font-mono text-[12px] uppercase tracking-[0.14em] text-signal hover:underline underline-offset-4"
+              className="text-primary hover:underline underline-offset-4 font-medium"
             >
-              Create an account →
+              Create an account
             </Link>
           </p>
         </div>
@@ -226,9 +206,9 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="flex min-h-svh w-full items-center justify-center bg-background text-muted-foreground">
-          <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.16em]">
-            <Loader2 className="size-4 animate-spin" />
-            <span>Loading terminal…</span>
+          <div className="flex items-center gap-3 text-sm">
+            <Loader2 className="size-4 animate-spin text-primary" />
+            <span>Loading…</span>
           </div>
         </div>
       }

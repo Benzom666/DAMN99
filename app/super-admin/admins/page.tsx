@@ -23,10 +23,8 @@ export default async function SuperAdminAdminsPage() {
       return (
         <div className="flex flex-col min-h-screen relative">
           <PageHeader
-            tag="SUPER · S-02"
-            eyebrow="Sovereign · Tenants"
-            title="Admin"
-            serifEmphasis="management"
+            eyebrow="Tenants"
+            title="Admin management"
             description="View, edit, suspend, and manage tenant operators."
           />
           <div className="flex-1 px-6 lg:px-10 py-8">
@@ -50,10 +48,8 @@ export default async function SuperAdminAdminsPage() {
     return (
       <div className="flex flex-col min-h-screen relative">
         <PageHeader
-          tag="SUPER · S-02"
-          eyebrow="Sovereign · Tenants"
-          title="Admin"
-          serifEmphasis="management"
+          eyebrow="Tenants"
+          title="Admin management"
           description="View, edit, suspend, and manage tenant operators."
         />
 
@@ -66,10 +62,8 @@ export default async function SuperAdminAdminsPage() {
     return (
       <div className="flex flex-col min-h-screen relative">
         <PageHeader
-          tag="SUPER · S-02"
-          eyebrow="Sovereign · Tenants"
-          title="Admin"
-          serifEmphasis="management"
+          eyebrow="Tenants"
+          title="Admin management"
           description="Unexpected error."
         />
         <div className="flex-1 px-6 lg:px-10 py-8">

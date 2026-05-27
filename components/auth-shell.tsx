@@ -3,108 +3,72 @@ import Link from "next/link"
 import { BrandLockup } from "@/components/brand-mark"
 
 interface AuthShellProps {
-  /** Operational tag, e.g. "OPS-LOGIN" */
-  tag: string
-  /** Eyebrow above the editorial title */
-  eyebrow: string
-  /** Big editorial italic phrase rendered on the left panel */
-  serifLine: string
-  /** Plain prose subline */
-  subtitle: string
-  /** The form/content (right panel) */
+  /** Sub-headline text on the left panel */
+  pitch: string
+  /** Big headline on the left panel */
+  headline: string
+  /** Form area */
   children: React.ReactNode
-  /** Optional bottom secondary CTA (right panel) */
+  /** Optional bottom row under the form */
   footer?: React.ReactNode
 }
 
 /**
- * AuthShell — full-bleed dispatch-terminal auth layout.
- * Left: editorial serif statement + live console-style status.
- * Right: form area on warm-asphalt background.
+ * AuthShell — minimalist split layout.
+ * Left: soft purple-gradient panel with brand, headline, pitch, mock dashboard card.
+ * Right: clean white form panel.
  */
 export function AuthShell({
-  tag,
-  eyebrow,
-  serifLine,
-  subtitle,
+  pitch,
+  headline,
   children,
   footer,
 }: AuthShellProps) {
   return (
-    <div className="min-h-svh bg-background grid lg:grid-cols-[1.1fr_1fr] relative overflow-hidden">
-      {/* Decorative background */}
-      <div className="pointer-events-none absolute inset-0 bg-noise opacity-[0.18]" />
-
-      {/* LEFT — editorial panel */}
-      <aside className="relative hidden lg:flex flex-col justify-between p-10 xl:p-14 border-r border-border bg-sidebar overflow-hidden">
-        <div className="absolute inset-0 bg-grid-paper opacity-50" />
-        <div className="absolute top-0 left-0 right-0 h-2 hazard-stripe opacity-90" />
-
-        <div className="relative">
-          {/* Top brand */}
+    <div className="min-h-svh bg-background grid lg:grid-cols-[1.05fr_1fr]">
+      {/* LEFT — gradient pitch panel */}
+      <aside className="relative hidden lg:flex flex-col justify-between p-12 xl:p-16 hero-gradient text-white overflow-hidden">
+        <div className="relative z-10">
           <Link href="/" className="inline-flex items-center group">
-            <BrandLockup textSize="sm" />
+            <BrandLockup tone="white" textSize="md" wordmarkClass="text-white" />
           </Link>
         </div>
 
-        <div className="relative">
-          <div className="flex items-center gap-3 mb-6">
-            <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-signal border border-signal/40 px-2 py-1 rounded-[2px]">
-              {tag}
-            </span>
-            <span className="hairline flex-1 max-w-20" />
-            <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
-              {eyebrow}
-            </span>
-          </div>
-          <h2 className="text-[clamp(2.5rem,5vw,4.5rem)] font-light leading-[0.95] tracking-[-0.025em] text-foreground">
-            <span className="font-serif italic font-normal text-signal">
-              {serifLine}
-            </span>
+        <div className="relative z-10">
+          <h2 className="text-3xl xl:text-4xl font-bold tracking-tight leading-[1.15] text-white max-w-md">
+            {headline}
           </h2>
-          <p className="mt-6 text-base lg:text-lg text-muted-foreground leading-relaxed max-w-md">
-            {subtitle}
+          <p className="mt-5 text-base text-white/85 leading-relaxed max-w-md">
+            {pitch}
           </p>
-        </div>
 
-        {/* Status footer */}
-        <div className="relative">
-          <div className="grid grid-cols-3 gap-6 max-w-md mb-6">
+          {/* Trust strip */}
+          <div className="mt-12 grid grid-cols-3 gap-6 max-w-sm">
             {[
-              { k: "10K+", v: "Stops/day" },
+              { k: "10K+", v: "Stops daily" },
               { k: "41%", v: "Fuel saved" },
               { k: "99.97%", v: "Uptime" },
             ].map((s, i) => (
-              <div key={i} className="border-l border-border pl-3">
-                <div className="font-mono text-lg font-semibold tracking-tight">
-                  {s.k}
-                </div>
-                <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground mt-1">
-                  {s.v}
-                </div>
+              <div key={i}>
+                <div className="text-2xl font-bold tracking-tight">{s.k}</div>
+                <div className="text-xs text-white/75 mt-1">{s.v}</div>
               </div>
             ))}
           </div>
+        </div>
 
-          <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            <span className="pulse-dot" />
-            <span>All systems operational</span>
-            <span className="text-border">◆</span>
-            <span>SOC2 in progress</span>
-          </div>
+        <div className="relative z-10 text-xs text-white/70">
+          © 2026 Delivery OS · all rights reserved
         </div>
       </aside>
 
       {/* RIGHT — form panel */}
-      <main className="relative flex flex-col">
+      <main className="relative flex flex-col bg-background">
         {/* Mobile-only top brand */}
-        <div className="lg:hidden border-b border-border px-6 py-4 flex items-center justify-between bg-sidebar">
+        <div className="lg:hidden border-b border-border px-6 py-4 flex items-center justify-between">
           <Link href="/">
-            <BrandLockup textSize="xs" />
+            <BrandLockup textSize="sm" />
           </Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-signal">
-            {tag}
-          </span>
         </div>
 
         <div className="flex-1 flex items-center justify-center px-6 py-12 lg:py-0">
@@ -112,7 +76,7 @@ export function AuthShell({
         </div>
 
         {footer && (
-          <div className="border-t border-border px-6 py-4 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground bg-surface">
+          <div className="border-t border-border px-6 py-4 text-center text-xs text-muted-foreground">
             {footer}
           </div>
         )}

@@ -10,7 +10,6 @@ import {
   Radio,
   Users,
   TrendingUp,
-  Clock,
   CheckCircle2,
   AlertTriangle,
   ArrowUpRight,
@@ -43,7 +42,6 @@ export default async function AdminDashboard() {
     redirect("/driver")
   }
 
-  // Stats queries (preserved from original)
   const { count: totalOrders } = await supabase
     .from("orders")
     .select("*", { count: "exact", head: true })
@@ -80,14 +78,11 @@ export default async function AdminDashboard() {
   const operatorName = profile.display_name || "Operator"
 
   return (
-    <div className="flex flex-col min-h-screen relative">
+    <div className="flex flex-col min-h-screen">
       <PageHeader
-        tag="OPS-CONSOLE"
-        eyebrow="Sector A · Dispatch"
-        title="Operator console,"
-        serifEmphasis={operatorName}
-        description="The day at a glance. Routes moving, packages dropping, drivers running their manifests."
-        live
+        eyebrow="Operator console"
+        title={`Welcome back, ${operatorName}`}
+        description="Your day at a glance — routes moving, packages dropping, drivers on shift."
         actions={
           <>
             <Link href="/admin/orders">
@@ -97,7 +92,7 @@ export default async function AdminDashboard() {
               </Button>
             </Link>
             <Link href="/admin/routes">
-              <Button variant="signal" size="sm">
+              <Button size="sm">
                 <Plus className="size-3.5" strokeWidth={2.5} />
                 New route
               </Button>
@@ -107,100 +102,77 @@ export default async function AdminDashboard() {
       />
 
       <div className="flex-1 px-6 lg:px-10 py-8 space-y-10">
-        {/* Section 1 — Live Metrics */}
+        {/* Section — KPI cards */}
         <section>
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <span className="eyebrow-signal">§ 01 · Live ledger</span>
-              <h2 className="text-xl font-semibold tracking-tight mt-1">
-                What's moving right now
-              </h2>
-            </div>
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              auto-refresh · 30s
-            </span>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
-            <MetricCard
-              code="M-01"
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <KpiCard
               label="Total orders"
               value={totalOrders || 0}
-              meta={`${pendingOrders || 0} pending`}
               icon={Package}
-              accent="default"
+              meta={`${pendingOrders || 0} pending`}
+              tone="primary"
             />
-            <MetricCard
-              code="M-02"
+            <KpiCard
               label="Delivered"
               value={deliveredOrders || 0}
-              meta={`${completionRate}% completion`}
               icon={CheckCircle2}
-              accent="success"
+              meta={`${completionRate}% completion`}
+              tone="success"
             />
-            <MetricCard
-              code="M-03"
+            <KpiCard
               label="Active routes"
               value={activeRoutes || 0}
-              meta="On the road"
               icon={Route}
-              accent="info"
+              meta="On the road"
+              tone="info"
             />
-            <MetricCard
-              code="M-04"
-              label="Driver fleet"
+            <KpiCard
+              label="Drivers"
               value={totalDrivers || 0}
-              meta="Operators online"
               icon={Users}
-              accent="signal"
+              meta="On your team"
+              tone="primary"
             />
-            <MetricCard
-              code="M-05"
+            <KpiCard
               label="On-time"
               value={`${completionRate || 0}%`}
-              meta="This shift"
               icon={TrendingUp}
-              accent="warning"
+              meta="This shift"
+              tone="warning"
             />
           </div>
         </section>
 
-        {/* Section 2 — Operating loop */}
+        {/* Section — Quick navigation */}
         <section>
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <span className="eyebrow-signal">§ 02 · Operating loop</span>
-              <h2 className="text-xl font-semibold tracking-tight mt-1">
-                Four moves to ship the day
-              </h2>
-            </div>
+          <div className="mb-5">
+            <div className="section-eyebrow">Operating loop</div>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">
+              Manage every step of the day
+            </h2>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <OpsCard
-              code="OPS-01"
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <NavCard
               icon={Package}
               title="Orders"
               caption="Drop, edit, archive"
               href="/admin/orders"
             />
-            <OpsCard
-              code="OPS-02"
+            <NavCard
               icon={Route}
               title="Routes"
               caption="Optimize and dispatch"
               href="/admin/routes"
-              primary
+              highlight
             />
-            <OpsCard
-              code="OPS-03"
+            <NavCard
               icon={Users}
               title="Drivers"
               caption="Field operators"
               href="/admin/drivers"
             />
-            <OpsCard
-              code="OPS-04"
+            <NavCard
               icon={Radio}
               title="Dispatch"
               caption="Live monitor"
@@ -209,63 +181,48 @@ export default async function AdminDashboard() {
           </div>
         </section>
 
-        {/* Section 3 — Attention */}
+        {/* Section — Status */}
         {pendingOrders && pendingOrders > 0 ? (
           <section>
-            <div className="flex items-end justify-between mb-5">
-              <div>
-                <span className="eyebrow-signal">§ 03 · Attention</span>
-                <h2 className="text-xl font-semibold tracking-tight mt-1">
-                  Open items on your manifest
-                </h2>
+            <div className="soft-card p-5 flex items-start gap-4 border-warning/30 bg-warning-soft">
+              <div className="size-10 rounded-full bg-warning/20 grid place-items-center flex-shrink-0">
+                <AlertTriangle
+                  className="size-5 text-warning"
+                  strokeWidth={1.8}
+                />
               </div>
-            </div>
-
-            <div className="border border-warning/40 bg-warning-soft px-5 py-5 rounded-sm relative overflow-hidden">
-              <div className="absolute top-0 left-0 bottom-0 w-1 bg-warning" />
-              <div className="flex items-start gap-4">
-                <div className="size-10 grid place-items-center bg-warning/15 border border-warning/40 rounded-sm flex-shrink-0">
-                  <AlertTriangle className="size-5 text-warning" strokeWidth={1.6} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-1">
+                  <Badge variant="warning">Action required</Badge>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1.5">
-                    <Badge variant="warning">REQUIRES ACTION</Badge>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-warning">
-                      {pendingOrders} unassigned
-                    </span>
-                  </div>
-                  <p className="text-sm text-foreground leading-relaxed">
-                    You have{" "}
-                    <span className="font-mono font-semibold text-warning">
-                      {pendingOrders}
-                    </span>{" "}
-                    pending orders waiting to be assigned to a route.
-                  </p>
-                  <Link
-                    href="/admin/orders"
-                    className="font-mono text-[11px] uppercase tracking-[0.14em] text-warning hover:underline underline-offset-4 mt-3 inline-flex items-center gap-1"
-                  >
-                    Resolve now
-                    <ArrowUpRight className="size-3" strokeWidth={2.5} />
-                  </Link>
-                </div>
+                <p className="text-sm text-foreground leading-relaxed">
+                  You have{" "}
+                  <span className="font-semibold text-warning">
+                    {pendingOrders}
+                  </span>{" "}
+                  pending orders waiting to be assigned to a route.
+                </p>
+                <Link
+                  href="/admin/orders"
+                  className="text-sm text-warning font-medium hover:underline underline-offset-4 mt-2 inline-flex items-center gap-1"
+                >
+                  Resolve now
+                  <ArrowUpRight className="size-3.5" strokeWidth={2.2} />
+                </Link>
               </div>
             </div>
           </section>
         ) : (
           <section>
-            <div className="border border-success/40 bg-success-soft px-5 py-4 rounded-sm relative">
-              <div className="absolute top-0 left-0 bottom-0 w-1 bg-success" />
-              <div className="flex items-center gap-3">
-                <div className="pulse-dot" />
-                <div className="flex-1">
-                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-success">
-                    All systems clear
-                  </span>
-                  <p className="text-sm text-foreground/80 mt-0.5">
-                    No outstanding alerts. The yard is quiet.
-                  </p>
+            <div className="soft-card p-5 flex items-center gap-3 border-success/30 bg-success-soft">
+              <div className="size-2 rounded-full bg-success" />
+              <div className="flex-1">
+                <div className="text-sm font-medium text-success">
+                  All systems clear
                 </div>
+                <p className="text-sm text-foreground/80 mt-0.5">
+                  No outstanding alerts. Everything's quiet.
+                </p>
               </div>
             </div>
           </section>
@@ -275,98 +232,78 @@ export default async function AdminDashboard() {
   )
 }
 
-/* ---------- Metric tile ---------- */
-function MetricCard({
-  code,
+/* ---------- KPI tile ---------- */
+function KpiCard({
   label,
   value,
-  meta,
   icon: Icon,
-  accent,
+  meta,
+  tone,
 }: {
-  code: string
   label: string
   value: string | number
-  meta: string
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
-  accent: "default" | "signal" | "success" | "warning" | "info" | "destructive"
+  meta: string
+  tone: "primary" | "success" | "warning" | "info"
 }) {
-  const accentClass = {
-    default: "text-foreground",
-    signal: "text-signal",
-    success: "text-success",
-    warning: "text-warning",
-    info: "text-info",
-    destructive: "text-destructive",
-  }[accent]
-
+  const iconMap = {
+    primary: "bg-primary-soft text-primary",
+    success: "bg-success-soft text-success",
+    warning: "bg-warning-soft text-warning",
+    info: "bg-info-soft text-info",
+  }
   return (
-    <div className="metric-card group">
-      <div className="flex items-center justify-between mb-5">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-signal">
-          {code}
-        </span>
-        <Icon
-          className={`size-4 ${accentClass} opacity-70 group-hover:opacity-100 transition-opacity`}
-          strokeWidth={1.6}
-        />
+    <div className="soft-card p-5">
+      <div className="flex items-start justify-between mb-4">
+        <div className="text-sm text-muted-foreground">{label}</div>
+        <div className={`size-9 rounded-full grid place-items-center ${iconMap[tone]}`}>
+          <Icon className="size-4" strokeWidth={1.8} />
+        </div>
       </div>
-      <div className={`font-mono text-3xl font-semibold tracking-tight ${accentClass} mb-1`}>
+      <div className="text-3xl font-bold tracking-tight text-foreground">
         {value}
       </div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
-        {label}
-      </div>
-      <div className="text-xs text-muted-foreground/80 mt-2 pt-2 border-t border-border flex items-center gap-1.5">
-        <Clock className="size-3" />
-        {meta}
-      </div>
+      <div className="text-xs text-muted-foreground mt-1.5">{meta}</div>
     </div>
   )
 }
 
-/* ---------- Ops nav card ---------- */
-function OpsCard({
-  code,
+/* ---------- Quick-navigation card ---------- */
+function NavCard({
   icon: Icon,
   title,
   caption,
   href,
-  primary = false,
+  highlight = false,
 }: {
-  code: string
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
   title: string
   caption: string
   href: string
-  primary?: boolean
+  highlight?: boolean
 }) {
   return (
     <Link
       href={href}
-      className={`group relative border bg-card hover:bg-surface-2 transition-all duration-200 p-5 overflow-hidden ${
-        primary ? "border-signal/50 bg-signal-soft" : "border-border hover:border-border-strong"
+      className={`soft-card p-5 group transition-transform hover:-translate-y-0.5 ${
+        highlight ? "border-primary/30 bg-primary-soft/40" : ""
       }`}
     >
-      <div className="flex items-center justify-between mb-7">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-signal">
-          {code}
-        </span>
+      <div className="flex items-start justify-between mb-7">
+        <div
+          className={`size-10 rounded-full grid place-items-center ${
+            highlight ? "bg-primary text-primary-foreground" : "bg-primary-soft text-primary"
+          }`}
+        >
+          <Icon className="size-5" strokeWidth={1.8} />
+        </div>
         <ArrowUpRight
-          className="size-4 text-muted-foreground group-hover:text-signal group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
-          strokeWidth={1.6}
+          className="size-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
+          strokeWidth={1.8}
         />
       </div>
-
-      <Icon
-        className={`size-7 mb-4 ${primary ? "text-signal" : "text-foreground"} group-hover:text-signal transition-colors`}
-        strokeWidth={1.4}
-      />
-
-      <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-      <p className="text-xs text-muted-foreground mt-0.5">{caption}</p>
-
-      <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-signal group-hover:w-full transition-all duration-500" />
+      <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+      <p className="text-sm text-muted-foreground mt-0.5">{caption}</p>
     </Link>
   )
 }

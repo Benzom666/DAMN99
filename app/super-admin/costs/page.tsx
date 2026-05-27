@@ -27,12 +27,9 @@ export default async function HereCostAnalyticsPage() {
       <AutoRefresh />
 
       <PageHeader
-        tag="SUPER · S-07"
-        eyebrow="Sovereign · Treasury"
-        title="HERE cost"
-        serifEmphasis="ledger"
+        eyebrow="Treasury"
+        title="HERE cost ledger"
         description="Refreshes every 30 seconds. Costs are estimated from configured HERE per-1,000 request rates."
-        live
       />
 
       {/* Main Content */}

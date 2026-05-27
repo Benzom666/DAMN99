@@ -32,15 +32,12 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-background relative">
-      {/* Decorative grid backdrop on the main canvas */}
-      <div className="pointer-events-none fixed inset-0 bg-grid-paper-fine opacity-25 [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]" />
-
+    <div className="flex min-h-screen bg-background">
       <AppSidebar
         role={profile.role as "admin" | "super_admin"}
         userName={profile.display_name || profile.email || undefined}
       />
-      <main className="flex-1 ml-64 transition-all duration-300 relative">
+      <main className="flex-1 ml-64 transition-all duration-300">
         {children}
       </main>
     </div>

@@ -86,12 +86,9 @@ export default async function DispatchPage() {
   return (
     <div className="flex flex-col min-h-screen relative">
       <PageHeader
-        tag="OPS-05"
-        eyebrow="Sector A · Live Ops"
-        title="Dispatch"
-        serifEmphasis="monitor"
+        eyebrow="Live operations"
+        title="Dispatch monitor"
         description="Real-time positions, on-the-wire status, every drop as it lands."
-        live
       />
 
       <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">

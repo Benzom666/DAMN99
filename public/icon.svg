@@ -1,15 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" aria-label="Delivery OS" role="img">
-  <!-- Hi-vis cargo-yellow tile -->
-  <rect width="32" height="32" rx="3" fill="#F2D900"/>
+  <!-- Soft indigo tile -->
+  <rect width="32" height="32" rx="7" fill="#5B62F7"/>
 
-  <!-- Optimized route: depot (filled dot) → one elbow → arrowhead destination -->
-  <circle cx="8" cy="24" r="2.6" fill="#0F0E0A"/>
-  <path d="M 8 24 L 8 12 L 22 12" stroke="#0F0E0A" stroke-width="2.4" stroke-linejoin="miter" stroke-linecap="square"/>
-  <path d="M 19 8 L 26 12 L 19 16 Z" fill="#0F0E0A"/>
-
-  <!-- Subtle corner notches: terminal/console hint -->
-  <rect x="2" y="2" width="3" height="1" fill="#0F0E0A" opacity="0.18"/>
-  <rect x="2" y="2" width="1" height="3" fill="#0F0E0A" opacity="0.18"/>
-  <rect x="27" y="29" width="3" height="1" fill="#0F0E0A" opacity="0.18"/>
-  <rect x="29" y="27" width="1" height="3" fill="#0F0E0A" opacity="0.18"/>
+  <!-- Optimized route in white: depot dot, single bend, arrowhead -->
+  <circle cx="9" cy="23" r="2.4" fill="#FFFFFF"/>
+  <path d="M 9 23 L 9 13 L 21 13" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 19 9.5 L 24 13 L 19 16.5 Z" fill="#FFFFFF"/>
 </svg>

@@ -15,7 +15,7 @@ import {
 import { AuthShell } from "@/components/auth-shell"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
-import { Loader2, ArrowUpRight, ShieldCheck } from "lucide-react"
+import { Loader2, ShieldCheck } from "lucide-react"
 import { checkAndCreateProfile, getProfileBypass } from "./actions"
 
 export default function CompleteProfilePage() {
@@ -105,9 +105,9 @@ export default function CompleteProfilePage() {
   if (isLoading) {
     return (
       <div className="flex min-h-svh w-full items-center justify-center bg-background text-muted-foreground">
-        <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.16em]">
-          <Loader2 className="size-4 animate-spin text-signal" />
-          <span>Loading operator manifest…</span>
+        <div className="flex items-center gap-3 text-sm">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          <span>Loading…</span>
         </div>
       </div>
     )
@@ -115,35 +115,31 @@ export default function CompleteProfilePage() {
 
   return (
     <AuthShell
-      tag="OPS-PROFILE"
-      eyebrow="Final initialization"
-      serifLine={`One last\nset of\nco-ordinates.`}
-      subtitle="Your account exists, but we need a name and a role to wire up your console. This takes 12 seconds."
+      headline="Almost there. Tell us who you are."
+      pitch="One last step before your dashboard comes online. This takes about 12 seconds."
     >
       <div>
         <div className="mb-8">
-          <span className="eyebrow-signal">Sector A · Profile</span>
-          <h1 className="mt-2 text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
-            Complete your{" "}
-            <span className="font-serif italic font-normal text-signal">
-              identity
-            </span>
-            .
+          <h1 className="text-3xl font-bold tracking-tight leading-tight text-foreground">
+            Complete your profile
           </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            We just need a name and a role to wire up your account.
+          </p>
         </div>
 
         <form onSubmit={handleComplete} className="flex flex-col gap-5">
           <div className="grid gap-2">
-            <Label htmlFor="email">Operator email</Label>
+            <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" value={email || ""} disabled />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="display-name">Display name</Label>
+            <Label htmlFor="display-name">Full name</Label>
             <Input
               id="display-name"
               type="text"
-              placeholder="Marisol Reyes"
+              placeholder="Jane Doe"
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -156,7 +152,7 @@ export default function CompleteProfilePage() {
               value={role}
               onValueChange={(value: "admin" | "driver") => setRole(value)}
             >
-              <SelectTrigger id="role" className="h-11">
+              <SelectTrigger id="role" className="h-11 rounded-xl">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -182,7 +178,6 @@ export default function CompleteProfilePage() {
 
           <Button
             type="submit"
-            variant="signal"
             size="lg"
             disabled={isSaving}
             className="w-full mt-2"
@@ -190,13 +185,10 @@ export default function CompleteProfilePage() {
             {isSaving ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Wiring console…
+                Setting up…
               </>
             ) : (
-              <>
-                Bring console online
-                <ArrowUpRight className="size-4" strokeWidth={2.5} />
-              </>
+              "Complete setup"
             )}
           </Button>
         </form>

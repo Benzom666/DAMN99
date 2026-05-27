@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { BrandLockup } from "@/components/brand-mark"
 import { AlertCircle, CheckCircle2, Loader2, ShieldCheck, ShieldOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -118,26 +119,22 @@ export default function SetupSuperAdminPage() {
 
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10 bg-background relative">
-      <div className="pointer-events-none fixed inset-0 bg-grid-paper-fine opacity-25 [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]" />
-      <div className="absolute top-0 left-0 right-0 h-1 hazard-stripe opacity-80" />
       <div className="w-full max-w-md relative">
         <div className="flex items-center justify-between mb-4">
           <a href="/" className="flex items-center">
-            <BrandLockup textSize="sm" tone="destructive" />
+            <BrandLockup textSize="sm" />
           </a>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-destructive border border-destructive/40 px-2 py-1 rounded-[2px]">
-            BOOT · SUPER
-          </span>
+          <Badge variant="destructive">Super admin setup</Badge>
         </div>
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="size-10 grid place-items-center bg-destructive/15 border border-destructive/40 rounded-sm flex-shrink-0">
-                <ShieldCheck className="size-5 text-destructive" strokeWidth={1.5} />
+              <div className="size-11 grid place-items-center bg-destructive/15 rounded-full flex-shrink-0">
+                <ShieldCheck className="size-5 text-destructive" strokeWidth={1.8} />
               </div>
               <div>
                 <CardTitle className="text-2xl tracking-tight">
-                  Sovereign <span className="font-serif italic font-normal text-destructive">activation</span>
+                  Sovereign activation
                 </CardTitle>
                 <CardDescription>Activate your super admin privileges.</CardDescription>
               </div>

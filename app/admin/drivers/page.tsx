@@ -34,10 +34,8 @@ export default async function DriversPage() {
   return (
     <div className="flex flex-col min-h-screen relative">
       <PageHeader
-        tag="OPS-04"
-        eyebrow="Sector A · Field"
-        title="Field"
-        serifEmphasis="operators"
+        eyebrow="Field"
+        title="Drivers"
         description="Your drivers — the people who turn routes into deliveries."
       />
 

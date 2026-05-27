@@ -26,10 +26,8 @@ export default async function SuperAdminDriversPage() {
   return (
     <div className="flex flex-col min-h-screen relative">
       <PageHeader
-        tag="SUPER · S-03"
-        eyebrow="Sovereign · Field"
-        title="Driver"
-        serifEmphasis="ledger"
+        eyebrow="Field"
+        title="Driver ledger"
         description="View, suspend, restore, and manage drivers across every tenant."
       />
 

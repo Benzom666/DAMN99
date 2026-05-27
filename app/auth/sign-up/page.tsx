@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { AuthShell } from "@/components/auth-shell"
-import { ArrowUpRight, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -60,25 +60,14 @@ export default function SignUpPage() {
 
   return (
     <AuthShell
-      tag="OPS-NEW"
-      eyebrow="Tenant initiation"
-      serifLine={`Open a\nnew\nterminal.`}
-      subtitle="Spin up a tenant in 90 seconds. No sales call, no contract, no card. We'll get you running before your coffee gets cold."
-      footer={
-        <span>
-          By creating an account you accept the operator agreement &nbsp;◆&nbsp; v1.0
-        </span>
-      }
+      headline="Modern logistics, ready in 90 seconds."
+      pitch="Spin up a tenant, import your first manifest, and dispatch your first route — all without a sales call."
+      footer={<span>By creating an account you accept the terms of service.</span>}
     >
       <div>
         <div className="mb-8">
-          <span className="eyebrow-signal">Sector A · Onboarding</span>
-          <h1 className="mt-2 text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
-            Create your{" "}
-            <span className="font-serif italic font-normal text-signal">
-              operator
-            </span>
-            .
+          <h1 className="text-3xl font-bold tracking-tight leading-tight text-foreground">
+            Create your account
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
             One account. One tenant. Routes start the moment you log in.
@@ -87,11 +76,11 @@ export default function SignUpPage() {
 
         <form onSubmit={handleSignUp} className="flex flex-col gap-5">
           <div className="grid gap-2">
-            <Label htmlFor="display-name">Display name</Label>
+            <Label htmlFor="display-name">Full name</Label>
             <Input
               id="display-name"
               type="text"
-              placeholder="Marisol Reyes"
+              placeholder="Jane Doe"
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -99,11 +88,11 @@ export default function SignUpPage() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="email">Operator email</Label>
+            <Label htmlFor="email">Work email</Label>
             <Input
               id="email"
               type="email"
-              placeholder="you@operator.co"
+              placeholder="you@company.com"
               required
               autoComplete="email"
               value={email}
@@ -122,8 +111,8 @@ export default function SignUpPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70">
-              Min 8 characters · stored encrypted
+            <p className="text-xs text-muted-foreground">
+              Minimum 8 characters · stored encrypted
             </p>
           </div>
 
@@ -133,7 +122,7 @@ export default function SignUpPage() {
               value={role}
               onValueChange={(value: "admin" | "driver") => setRole(value)}
             >
-              <SelectTrigger id="role" className="h-11">
+              <SelectTrigger id="role" className="h-11 rounded-xl">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -151,7 +140,6 @@ export default function SignUpPage() {
 
           <Button
             type="submit"
-            variant="signal"
             size="lg"
             disabled={isLoading}
             className="w-full mt-2"
@@ -159,25 +147,22 @@ export default function SignUpPage() {
             {isLoading ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Provisioning tenant…
+                Creating account…
               </>
             ) : (
-              <>
-                Initiate operator
-                <ArrowUpRight className="size-4" strokeWidth={2.5} />
-              </>
+              "Create account"
             )}
           </Button>
         </form>
 
         <div className="mt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Already running?{" "}
+            Already have an account?{" "}
             <Link
               href="/auth/login"
-              className="font-mono text-[12px] uppercase tracking-[0.14em] text-signal hover:underline underline-offset-4"
+              className="text-primary hover:underline underline-offset-4 font-medium"
             >
-              Sign in →
+              Sign in
             </Link>
           </p>
         </div>

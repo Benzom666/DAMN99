@@ -52,10 +52,8 @@ export default async function SuperAdminRoutesPage() {
   return (
     <div className="flex flex-col min-h-screen relative">
       <PageHeader
-        tag="SUPER · S-05"
-        eyebrow="Sovereign · Optimization"
-        title="Route"
-        serifEmphasis="atlas"
+        eyebrow="Optimization"
+        title="Route atlas"
         description="Latest 200 routes across every tenant. Reassign or override as needed."
       />
 

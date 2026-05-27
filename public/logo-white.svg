@@ -1,13 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" fill="none" aria-label="Delivery OS" role="img">
-  <!-- Icon tile -->
-  <rect width="48" height="48" rx="4" fill="#F2D900"/>
-  <circle cx="12" cy="36" r="3.8" fill="#0F0E0A"/>
-  <path d="M 12 36 L 12 18 L 32 18" stroke="#0F0E0A" stroke-width="3.2" stroke-linejoin="miter" stroke-linecap="square"/>
-  <path d="M 28 12 L 38 18 L 28 24 Z" fill="#0F0E0A"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 44" fill="none" aria-label="Delivery OS" role="img">
+  <!-- Icon tile (white-on-purple variant for dark/gradient backgrounds) -->
+  <rect width="40" height="40" y="2" rx="9" fill="#FFFFFF"/>
+  <circle cx="11" cy="30.5" r="3" fill="#5B62F7"/>
+  <path d="M 11 30.5 L 11 18 L 26 18" stroke="#5B62F7" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 24 14 L 30 18 L 24 22 Z" fill="#5B62F7"/>
 
-  <!-- Wordmark — light variant for dark backgrounds -->
-  <g transform="translate(60, 0)">
-    <text x="0" y="32" font-family="'Instrument Serif', 'Times New Roman', Georgia, serif" font-size="30" font-style="italic" fill="#F5F4EE" letter-spacing="-0.02em">Delivery</text>
-    <text x="118" y="32" font-family="ui-monospace, 'JetBrains Mono', 'Geist Mono', SFMono-Regular, Menlo, monospace" font-size="22" font-weight="700" fill="#F2D900" letter-spacing="0.05em">OS</text>
-  </g>
+  <!-- Wordmark in white -->
+  <text x="54" y="29" font-family="'DM Sans', system-ui, -apple-system, Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF" letter-spacing="-0.02em">Delivery OS</text>
 </svg>

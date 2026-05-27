@@ -20,15 +20,14 @@ import {
   ArrowUpRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { BrandMark } from "@/components/brand-mark"
-import { useState, useEffect } from "react"
+import { BrandLockup, BrandMark } from "@/components/brand-mark"
+import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 
 interface NavItem {
   title: string
   href: string
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
-  code: string
 }
 
 interface AppSidebarProps {
@@ -40,14 +39,7 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
-  const [now, setNow] = useState<Date | null>(null)
   const supabase = createClient()
-
-  useEffect(() => {
-    setNow(new Date())
-    const id = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(id)
-  }, [])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -55,120 +47,89 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
   }
 
   const adminNavItems: NavItem[] = [
-    { title: "Console", href: "/admin", icon: LayoutDashboard, code: "C-01" },
-    { title: "Orders", href: "/admin/orders", icon: Package, code: "C-02" },
-    { title: "Routes", href: "/admin/routes", icon: Route, code: "C-03" },
-    { title: "Drivers", href: "/admin/drivers", icon: Users, code: "C-04" },
-    { title: "Dispatch", href: "/admin/dispatch", icon: Radio, code: "C-05" },
+    { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { title: "Orders", href: "/admin/orders", icon: Package },
+    { title: "Routes", href: "/admin/routes", icon: Route },
+    { title: "Drivers", href: "/admin/drivers", icon: Users },
+    { title: "Dispatch", href: "/admin/dispatch", icon: Radio },
   ]
 
   const superAdminNavItems: NavItem[] = [
-    { title: "Console", href: "/super-admin", icon: Activity, code: "S-01" },
-    { title: "Admins", href: "/super-admin/admins", icon: Building2, code: "S-02" },
-    { title: "Drivers", href: "/super-admin/drivers", icon: Truck, code: "S-03" },
-    { title: "Orders", href: "/super-admin/orders", icon: Package, code: "S-04" },
-    { title: "Routes", href: "/super-admin/routes", icon: Route, code: "S-05" },
-    { title: "Audit", href: "/super-admin/audit-log", icon: FileText, code: "S-06" },
-    { title: "Costs", href: "/super-admin/costs", icon: DollarSign, code: "S-07" },
-    { title: "System", href: "/super-admin/system", icon: Database, code: "S-08" },
+    { title: "Dashboard", href: "/super-admin", icon: Activity },
+    { title: "Admins", href: "/super-admin/admins", icon: Building2 },
+    { title: "Drivers", href: "/super-admin/drivers", icon: Truck },
+    { title: "Orders", href: "/super-admin/orders", icon: Package },
+    { title: "Routes", href: "/super-admin/routes", icon: Route },
+    { title: "Audit log", href: "/super-admin/audit-log", icon: FileText },
+    { title: "Costs", href: "/super-admin/costs", icon: DollarSign },
+    { title: "System", href: "/super-admin/system", icon: Database },
   ]
 
   const navItems = role === "super_admin" ? superAdminNavItems : adminNavItems
   const isSuper = role === "super_admin"
 
+  // Initials for avatar
+  const initials = (userName || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("") || "?"
+
   return (
     <aside
       className={cn(
         "fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col",
-        collapsed ? "w-[68px]" : "w-64",
+        collapsed ? "w-[72px]" : "w-64",
       )}
     >
-      {/* Hazard stripe top accent (super-admin only) */}
-      {isSuper && <div className="absolute top-0 left-0 right-0 h-1 hazard-stripe opacity-90" />}
-
       {/* Header */}
-      <div
-        className={cn(
-          "flex items-center justify-between border-b border-sidebar-border h-14 px-3 relative",
-          isSuper && "mt-1",
-        )}
-      >
-        {!collapsed && (
-          <Link
-            href={isSuper ? "/super-admin" : "/admin"}
-            className="flex items-center gap-2.5 group"
-          >
-            <BrandMark tone={isSuper ? "destructive" : "signal"} size={7} />
-            <div className="flex flex-col leading-tight">
-              <span className="font-mono text-[11px] font-semibold tracking-[0.16em] text-sidebar-foreground">
-                <span className="font-serif italic font-normal mr-1 normal-case">
-                  Delivery
-                </span>
-                OS
-                {isSuper && <span className="text-destructive ml-1.5">· SU</span>}
-              </span>
-              <span
-                className={cn(
-                  "font-mono text-[8.5px] uppercase tracking-[0.2em]",
-                  isSuper ? "text-destructive" : "text-sidebar-muted",
-                )}
-              >
-                {isSuper ? "GOD MODE" : "DISPATCH"}
-              </span>
-            </div>
+      <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border relative">
+        {!collapsed ? (
+          <Link href={isSuper ? "/super-admin" : "/admin"}>
+            <BrandLockup textSize="sm" />
           </Link>
-        )}
-        {collapsed && (
-          <BrandMark
-            tone={isSuper ? "destructive" : "signal"}
-            size={7}
-            className="mx-auto"
-          />
+        ) : (
+          <BrandMark size={28} className="mx-auto" />
         )}
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "h-8 w-8 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent border border-transparent hover:border-sidebar-border",
-            collapsed && "absolute -right-3 top-3 bg-sidebar border-sidebar-border z-10 size-6",
+            "h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
+            collapsed &&
+              "absolute -right-3 top-4 z-10 size-6 bg-white border border-sidebar-border rounded-full shadow-sm",
           )}
         >
-          <ChevronLeft className={cn("size-4 transition-transform", collapsed && "rotate-180")} />
+          <ChevronLeft
+            className={cn("size-4 transition-transform", collapsed && "rotate-180")}
+          />
         </Button>
       </div>
 
-      {/* Status strip */}
-      {!collapsed && (
-        <div className="px-3 py-2 border-b border-sidebar-border flex items-center justify-between">
-          <span className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-[0.18em] text-sidebar-muted">
-            <span className={isSuper ? "pulse-dot pulse-dot--destructive" : "pulse-dot"} />
-            {isSuper ? "Sovereign" : "Online"}
-          </span>
-          <span className="font-mono text-[10px] tracking-tight text-sidebar-muted tabular-nums">
-            {now
-              ? now.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                  hour12: false,
-                })
-              : "--:--:--"}
-          </span>
-        </div>
-      )}
-
-      {/* Section eyebrow */}
-      {!collapsed && (
-        <div className="px-3 pt-4 pb-2">
-          <span className="eyebrow text-sidebar-muted">
-            § {isSuper ? "Super sectors" : "Sectors"}
-          </span>
+      {/* Super-admin role chip */}
+      {!collapsed && isSuper && (
+        <div className="px-4 pt-3">
+          <div className="text-[11px] font-medium text-muted-foreground bg-secondary rounded-md px-2.5 py-1 inline-flex items-center gap-1.5">
+            <span className="size-1.5 rounded-full bg-destructive" />
+            Super admin · god mode
+          </div>
         </div>
       )}
 
       {/* Navigation */}
-      <nav className={cn("flex-1 space-y-0.5 overflow-y-auto", collapsed ? "p-2" : "px-3 pb-3")}>
+      <nav
+        className={cn(
+          "flex-1 space-y-1 overflow-y-auto",
+          collapsed ? "p-2" : "px-3 py-4",
+        )}
+      >
+        {!collapsed && (
+          <div className="px-3 pb-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            Workspace
+          </div>
+        )}
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -183,25 +144,13 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
               href={item.href}
               className={cn(
                 "sidebar-item",
-                isActive ? "sidebar-item-active" : "sidebar-item-inactive",
+                isActive && "sidebar-item-active",
                 collapsed && "justify-center px-0",
               )}
               title={collapsed ? item.title : undefined}
             >
-              <Icon className="size-4 flex-shrink-0" strokeWidth={1.6} />
-              {!collapsed && (
-                <>
-                  <span className="flex-1">{item.title}</span>
-                  <span
-                    className={cn(
-                      "font-mono text-[9px] tracking-[0.1em]",
-                      isActive ? "text-signal-foreground/60" : "text-sidebar-muted/60",
-                    )}
-                  >
-                    {item.code}
-                  </span>
-                </>
-              )}
+              <Icon className="size-[18px] flex-shrink-0" strokeWidth={1.8} />
+              {!collapsed && <span>{item.title}</span>}
             </Link>
           )
         })}
@@ -210,21 +159,16 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
         {isSuper && (
           <>
             <div className="my-3 border-t border-sidebar-border" />
-            {!collapsed && (
-              <div className="px-3 pb-2">
-                <span className="eyebrow text-sidebar-muted">§ Cross-link</span>
-              </div>
-            )}
             <Link
               href="/admin"
               className={cn(
-                "sidebar-item sidebar-item-inactive",
+                "sidebar-item",
                 collapsed && "justify-center px-0",
               )}
               title={collapsed ? "Open admin" : undefined}
             >
-              <ArrowUpRight className="size-4 flex-shrink-0" strokeWidth={1.6} />
-              {!collapsed && <span className="flex-1">Admin shell</span>}
+              <ArrowUpRight className="size-[18px] flex-shrink-0" strokeWidth={1.8} />
+              {!collapsed && <span>Admin shell</span>}
             </Link>
           </>
         )}
@@ -233,16 +177,18 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
       {/* Footer */}
       <div className="border-t border-sidebar-border p-3 space-y-2">
         {!collapsed && userName && (
-          <div className="px-2 py-2 border border-sidebar-border bg-sidebar-accent/40 rounded-sm">
-            <div className="eyebrow text-sidebar-muted mb-1">
-              {isSuper ? "Sovereign" : "Operator"}
+          <div className="flex items-center gap-3 px-2 py-2 rounded-lg">
+            <div className="size-8 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold flex-shrink-0">
+              {initials}
             </div>
-            <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {userName}
-            </p>
-            <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-sidebar-muted mt-0.5">
-              {role.replace("_", " ")}
-            </p>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-foreground truncate">
+                {userName}
+              </div>
+              <div className="text-[11px] text-muted-foreground capitalize">
+                {role.replace("_", " ")}
+              </div>
+            </div>
           </div>
         )}
         <Button
@@ -250,12 +196,12 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
           size="sm"
           onClick={handleSignOut}
           className={cn(
-            "w-full justify-start text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent border border-transparent hover:border-sidebar-border",
-            collapsed && "justify-center",
+            "w-full justify-start text-muted-foreground hover:text-foreground hover:bg-sidebar-accent",
+            collapsed && "justify-center px-0",
           )}
-          title={collapsed ? "Sign Out" : undefined}
+          title={collapsed ? "Sign out" : undefined}
         >
-          <LogOut className="size-4 flex-shrink-0" />
+          <LogOut className="size-[18px] flex-shrink-0" strokeWidth={1.8} />
           {!collapsed && <span className="ml-2">Sign out</span>}
         </Button>
       </div>
