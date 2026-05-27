@@ -236,9 +236,6 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
-  )
-}
 
       <Dialog open={apiKeyDialog.open} onOpenChange={(open) => setApiKeyDialog({ open, admin: null })}>
         <DialogContent>
@@ -273,3 +270,6 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  )
+}
