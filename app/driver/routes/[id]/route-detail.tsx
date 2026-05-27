@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { PendingUploads } from "@/components/pending-uploads"
 import {
   ArrowLeft,
   CheckCircle,
@@ -143,6 +144,11 @@ export function RouteDetail({ route, orders }: RouteDetailProps) {
 
       {/* Stops list */}
       <main className="flex-1 max-w-2xl mx-auto px-4 sm:px-6 py-5 pb-20 w-full">
+        {/* Pending POD uploads — auto-flushes the IndexedDB queue */}
+        <div className="mb-4">
+          <PendingUploads />
+        </div>
+
         <div className="flex items-center justify-between mb-3">
           <div className="section-eyebrow">Stops</div>
           <span className="text-xs text-muted-foreground">in sequence</span>

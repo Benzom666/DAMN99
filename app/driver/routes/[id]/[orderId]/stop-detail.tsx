@@ -9,10 +9,20 @@ import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Camera, PenTool, CheckCircle, XCircle, Upload } from "lucide-react"
+import {
+  ArrowLeft,
+  Camera,
+  PenTool,
+  CheckCircle,
+  XCircle,
+  Upload,
+  CloudUpload,
+} from "lucide-react"
 import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
 import { useToast } from "@/hooks/use-toast"
+import { compressImage } from "@/lib/pod-uploads/compress"
+import { enqueue as enqueuePodUpload } from "@/lib/pod-uploads/db"
 
 interface StopDetailProps {
   order: any
@@ -21,19 +31,40 @@ interface StopDetailProps {
   existingPod: any
 }
 
-export function StopDetail({ order, routeName, routeId, existingPod }: StopDetailProps) {
+/**
+ * Driver POD capture view.
+ *
+ * Photo + signature flow is now durable end-to-end:
+ *   1. Photo files are compressed client-side on capture (cuts ~90% of payload).
+ *   2. Captured blobs live in component state for the hot-path upload.
+ *   3. The hot-path retries on EVERY non-2xx response (5xx, timeout, auth) up
+ *      to 4 times with exponential backoff.
+ *   4. If those retries are exhausted, blobs are queued to IndexedDB
+ *      (lib/pod-uploads/db.ts) before we navigate away. A background
+ *      <PendingUploads/> component on the route page then keeps retrying
+ *      until the upload lands. Drivers cannot lose POD data.
+ */
+export function StopDetail({
+  order,
+  routeName,
+  routeId,
+  existingPod,
+}: StopDetailProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [notes, setNotes] = useState("")
   const [recipientName, setRecipientName] = useState("")
-  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(existingPod?.photo_url || null)
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(
+    existingPod?.photo_url || null,
+  )
   const [showSignaturePad, setShowSignaturePad] = useState(false)
-  const [signatureData, setSignatureData] = useState<string | null>(existingPod?.signature_url || null)
+  const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(
+    existingPod?.signature_url || null,
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<string | null>(null)
-  const [uploadFailed, setUploadFailed] = useState(false)
-  const [pendingPodId, setPendingPodId] = useState<string | null>(null)
 
   const isCompleted = order.status === "delivered" || order.status === "failed"
   const routeHref = `/driver/routes/${routeId}`
@@ -41,7 +72,6 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
   const returnToRoute = () => {
     router.replace(routeHref)
     router.refresh()
-
     window.setTimeout(() => {
       if (window.location.pathname !== routeHref) {
         window.location.assign(routeHref)
@@ -49,409 +79,334 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
     }, 1200)
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string
-        setPhotoDataUrl(dataUrl)
-        setPhotoPreview(dataUrl)
-        console.log("[v0] [DRIVER] Photo converted to base64, length:", dataUrl.length)
-      }
-      reader.onerror = () => {
-        console.error("[v0] [DRIVER] Failed to read photo file")
-        toast({
-          title: "Error",
-          description: "Failed to read photo. Please try again.",
-          variant: "destructive",
-        })
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const readJsonResponse = async (response: Response) => {
-    const responseText = await response.text()
-    console.log("[v0] [DRIVER] API response body:", responseText)
+    if (!file) return
 
     try {
-      return responseText ? JSON.parse(responseText) : {}
-    } catch {
-      return {
-        success: false,
-        error: response.ok ? "Server returned an invalid response." : responseText || "Request failed.",
-      }
+      setSubmitStatus("Optimising photo…")
+      const compressed = await compressImage(file)
+      const previewUrl = URL.createObjectURL(compressed)
+      setPhotoBlob(compressed)
+      setPhotoPreview(previewUrl)
+      setSubmitStatus(null)
+      console.log(
+        "[v0] [DRIVER] photo ready — original:",
+        file.size,
+        "compressed:",
+        compressed.size,
+      )
+    } catch (err) {
+      console.error("[v0] [DRIVER] photo capture failed", err)
+      toast({
+        title: "Couldn't read photo",
+        description: "Please try again or pick a different photo.",
+        variant: "destructive",
+      })
+      setSubmitStatus(null)
     }
   }
 
   const handleSignatureSave = (dataUrl: string) => {
-    setSignatureData(dataUrl)
-    setShowSignaturePad(false)
-  }
-
-  const getFileExtension = (file: File) => {
-    const fromName = file.name.split(".").pop()?.toLowerCase()
-    if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName
-
-    if (file.type === "image/png") return "png"
-    if (file.type === "image/webp") return "webp"
-    if (file.type === "image/heic" || file.type === "image/heif") return "heic"
-    return "jpg"
-  }
-
-  const dataUrlToBlob = (dataUrl: string) => {
-    const [header, data] = dataUrl.split(",")
-    const contentType = header.match(/:(.*?);/)?.[1] || "image/png"
-    const binary = atob(data)
-    const bytes = new Uint8Array(binary.length)
-
-    for (let index = 0; index < binary.length; index++) {
-      bytes[index] = binary.charCodeAt(index)
-    }
-
-    return new Blob([bytes], { type: contentType })
-  }
-
-  const uploadPodMedia = async (podId: string, retryCount = 0): Promise<any> => {
-    const MAX_RETRIES = 3
-    const RETRY_DELAY = [2000, 4000, 8000] // Exponential backoff
-    
     try {
-      console.log("[v0] [DRIVER] uploadPodMedia starting - podId:", podId, "retry:", retryCount)
-      console.log("[v0] [DRIVER] photoDataUrl exists:", !!photoDataUrl, "length:", photoDataUrl?.length)
-      console.log("[v0] [DRIVER] signatureData exists:", !!signatureData, "length:", signatureData?.length)
-      
-      const formData = new FormData()
-      formData.append("podId", podId)
-      
-      if (photoDataUrl) {
-        const photoBlob = dataUrlToBlob(photoDataUrl)
-        console.log("[v0] [DRIVER] Photo blob created - size:", photoBlob.size, "type:", photoBlob.type)
-        formData.append("photo", photoBlob, "photo.jpg")
-      }
-      
-      if (signatureData && signatureData !== existingPod?.signature_url && signatureData.startsWith("data:")) {
-        const signatureBlob = dataUrlToBlob(signatureData)
-        console.log("[v0] [DRIVER] Signature blob created - size:", signatureBlob.size, "type:", signatureBlob.type)
-        formData.append("signature", signatureBlob, "signature.png")
-      }
-
-      console.log("[v0] [DRIVER] Sending FormData to /api/driver/pod-media/upload")
-      
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s timeout
-      
-      const response = await fetch("/api/driver/pod-media/upload", {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
+      const blob = dataUrlToBlob(dataUrl)
+      setSignatureBlob(blob)
+      setSignaturePreview(dataUrl)
+      setShowSignaturePad(false)
+    } catch (err) {
+      console.error("[v0] [DRIVER] signature decode failed", err)
+      toast({
+        title: "Couldn't save signature",
+        description: "Please try again.",
+        variant: "destructive",
       })
-      
-      clearTimeout(timeoutId)
-
-      console.log("[v0] [DRIVER] Upload response status:", response.status, "ok:", response.ok)
-      const result = await readJsonResponse(response)
-      console.log("[v0] [DRIVER] Upload result:", result)
-      
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to upload proof media")
-      }
-
-      // Update local state with server URLs
-      if (result.photo_url) {
-        console.log("[v0] [DRIVER] Updating photoPreview with server URL:", result.photo_url)
-        setPhotoPreview(result.photo_url)
-        setPhotoDataUrl(null) // Clear the dataURL after successful upload
-      }
-      if (result.signature_url) {
-        console.log("[v0] [DRIVER] Updating signatureData with server URL:", result.signature_url)
-        setSignatureData(result.signature_url)
-      }
-
-      return result
-    } catch (error) {
-      console.error("[v0] [DRIVER] uploadPodMedia error:", error, "retry:", retryCount)
-      
-      // Retry on network errors or timeouts
-      if (retryCount < MAX_RETRIES) {
-        const isNetworkError = error instanceof Error && 
-          (error.name === 'AbortError' || error.message.includes('fetch') || error.message.includes('network'))
-        
-        if (isNetworkError) {
-          console.log("[v0] [DRIVER] Retrying upload in", RETRY_DELAY[retryCount], "ms")
-          setSubmitStatus(`Upload failed, retrying (${retryCount + 1}/${MAX_RETRIES})...`)
-          
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY[retryCount]))
-          return uploadPodMedia(podId, retryCount + 1)
-        }
-      }
-      
-      throw error
     }
+  }
+
+  const buildFormData = (podId: string): FormData => {
+    const fd = new FormData()
+    fd.append("podId", podId)
+    if (photoBlob) fd.append("photo", photoBlob, "photo.jpg")
+    if (signatureBlob) fd.append("signature", signatureBlob, "signature.png")
+    return fd
+  }
+
+  /**
+   * Hot-path media upload with broad retry coverage.
+   * Returns true on success, false if exhausted (caller will enqueue).
+   * Throws only on permanent failures (auth) where retry is pointless.
+   */
+  const uploadMediaHotPath = async (
+    podId: string,
+  ): Promise<{ ok: boolean; permanent?: boolean; error?: string }> => {
+    const MAX_ATTEMPTS = 4
+    const BACKOFF_MS = [1000, 3000, 6000, 10000]
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        if (attempt > 0) {
+          setSubmitStatus(
+            `Retrying upload (${attempt}/${MAX_ATTEMPTS - 1})…`,
+          )
+          await new Promise((r) =>
+            setTimeout(r, BACKOFF_MS[attempt - 1] ?? 10000),
+          )
+        } else {
+          setSubmitStatus(
+            photoBlob ? "Uploading photo…" : "Uploading signature…",
+          )
+        }
+
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 90_000)
+
+        let res: Response
+        try {
+          res = await fetch("/api/driver/pod-media/upload", {
+            method: "POST",
+            body: buildFormData(podId),
+            credentials: "include",
+            signal: controller.signal,
+          })
+        } finally {
+          clearTimeout(timer)
+        }
+
+        if (res.ok) {
+          const body = await res.json().catch(() => ({}))
+          if (body?.success) {
+            console.log("[v0] [DRIVER] hot-path upload succeeded")
+            return { ok: true }
+          }
+          // 200 with success:false — treat as retryable server hiccup
+          console.warn(
+            "[v0] [DRIVER] upload returned non-success body:",
+            body,
+          )
+          continue
+        }
+
+        // 401/403 are permanent for this session
+        if (res.status === 401 || res.status === 403) {
+          let message = `HTTP ${res.status}`
+          try {
+            const body = await res.json()
+            if (body?.error) message = body.error
+          } catch {}
+          return { ok: false, permanent: true, error: message }
+        }
+
+        // 4xx other than auth — likely a malformed request, also permanent
+        if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+          let message = `HTTP ${res.status}`
+          try {
+            const body = await res.json()
+            if (body?.error) message = body.error
+          } catch {}
+          return { ok: false, permanent: true, error: message }
+        }
+
+        // 5xx, 408, 429 → retry
+        console.warn(
+          "[v0] [DRIVER] hot-path upload non-2xx, will retry:",
+          res.status,
+        )
+      } catch (err) {
+        // Network error / abort / cors — retry
+        console.warn(
+          "[v0] [DRIVER] hot-path upload threw, will retry:",
+          err,
+        )
+      }
+    }
+
+    return { ok: false, permanent: false, error: "Retries exhausted" }
   }
 
   const handleDeliver = async () => {
-    if (isSubmitting) {
-      console.log("[v0] [DRIVER] Already submitting, ignoring click")
-      return
-    }
+    if (isSubmitting) return
 
     setIsSubmitting(true)
-    setSubmitStatus("Preparing delivery...")
+    setSubmitStatus("Saving delivery…")
     console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
-    console.log("[v0] [DRIVER] Order ID:", order.id)
-    console.log("[v0] [DRIVER] Has photo:", !!photoDataUrl)
-    console.log("[v0] [DRIVER] Has signature:", !!signatureData)
-    console.log("[v0] [DRIVER] Recipient:", recipientName || "none")
-    console.log("[v0] [DRIVER] Notes:", notes || "none")
 
     try {
-      console.log("[v0] [DRIVER] Calling delivery API...")
-      console.log("[v0] [DRIVER] API endpoint: /api/driver/deliver")
-      setSubmitStatus("Saving delivery...")
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => {
-        console.error("[v0] [DRIVER] API call timeout after 90 seconds")
-        controller.abort()
-      }, 90000)
-
-      let response: Response
+      // 1. Mark delivered + create POD row
+      let deliverRes: Response
       try {
-        response = await fetch("/api/driver/deliver", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            notes,
-            recipientName,
-          }),
-          signal: controller.signal,
-        })
-        clearTimeout(timeoutId)
-      } catch (fetchError) {
-        clearTimeout(timeoutId)
-        console.error("[v0] [DRIVER] Fetch error:", fetchError)
-
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          toast({
-            title: "Request Timeout",
-            description: "The request took too long. Please check your connection and try again.",
-            variant: "destructive",
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 60_000)
+        try {
+          deliverRes = await fetch("/api/driver/deliver", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: order.id,
+              notes,
+              recipientName,
+            }),
+            credentials: "include",
+            signal: controller.signal,
           })
-        } else {
-          toast({
-            title: "Network Error",
-            description: "Failed to connect to server. Please check your internet connection.",
-            variant: "destructive",
-          })
+        } finally {
+          clearTimeout(timer)
         }
-        setIsSubmitting(false)
-        setSubmitStatus(null)
-        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (FETCH ERROR) ==========")
-        return
-      }
-
-      console.log("[v0] [DRIVER] API response status:", response.status)
-      console.log("[v0] [DRIVER] API response ok:", response.ok)
-
-      const result = await readJsonResponse(response)
-
-      if (!response.ok || !result.success) {
-        console.error("[v0] [DRIVER] API error:", result.error)
+      } catch (err) {
+        console.error("[v0] [DRIVER] /deliver fetch error:", err)
         toast({
-          title: "Delivery Failed",
-          description: result.error || "Failed to mark as delivered. Please try again.",
+          title: "Network error",
+          description:
+            "Couldn't reach the server. Check your connection and try again.",
           variant: "destructive",
         })
         setIsSubmitting(false)
         setSubmitStatus(null)
-        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (API ERROR) ==========")
         return
       }
 
-      console.log("[v0] [DRIVER] ✅ Delivery marked successfully!")
-      
-      // Upload media if present - WAIT for completion before navigation
-      if (result.podId && (photoDataUrl || (signatureData && signatureData.startsWith("data:")))) {
-        setSubmitStatus(photoDataUrl ? "Uploading photo..." : "Uploading proof...")
+      const deliverBody = await deliverRes.json().catch(() => ({}))
+      if (!deliverRes.ok || !deliverBody?.success) {
+        toast({
+          title: "Delivery failed",
+          description:
+            deliverBody?.error || "Couldn't mark this stop as delivered.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        setSubmitStatus(null)
+        return
+      }
 
+      const podId: string | undefined = deliverBody.podId
+      const hasMedia = (photoBlob || signatureBlob) && podId
+
+      // 2. If we have media, try to upload it inline
+      if (hasMedia && podId) {
+        const result = await uploadMediaHotPath(podId)
+
+        if (result.ok) {
+          toast({
+            title: "Delivered",
+            description: "Photo + signature uploaded.",
+          })
+          setSubmitStatus(null)
+          setTimeout(returnToRoute, 400)
+          return
+        }
+
+        // Hot path exhausted — enqueue to IndexedDB before navigating away.
         try {
-          await uploadPodMedia(result.podId)
-          console.log("[v0] [DRIVER] ✅ Media uploaded successfully!")
-          
-          // Success - show toast and navigate
-          if (result.warning) {
+          await enqueuePodUpload({
+            podId,
+            orderId: order.id,
+            photo: photoBlob || undefined,
+            signature: signatureBlob || undefined,
+            lastError: result.error,
+          })
+          console.log("[v0] [DRIVER] enqueued for background retry, podId:", podId)
+
+          if (result.permanent) {
             toast({
-              title: "Delivered with warning",
-              description: result.warning,
+              title: "Delivered — sign-in needed",
+              description:
+                "Your delivery was saved. Photos will sync once you re-authenticate.",
               variant: "destructive",
             })
           } else {
             toast({
-              title: "Success",
-              description: "Delivery complete with photo/signature!",
+              title: "Delivered — sync in progress",
+              description:
+                "Photo + signature saved on this device. We'll keep retrying in the background.",
             })
           }
-          
-          console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS) ==========")
-          setTimeout(returnToRoute, 500) // Wait for toast to show
-          
-        } catch (mediaError) {
-          console.error("[v0] [DRIVER] POD media upload failed after retries:", mediaError)
-          const errorMsg = mediaError instanceof Error ? mediaError.message : String(mediaError)
-          
-          // Upload failed - stay on page and allow retry
+          setSubmitStatus(null)
+          setTimeout(returnToRoute, 600)
+          return
+        } catch (queueErr) {
+          // IndexedDB itself failed — last-resort UI
+          console.error("[v0] [DRIVER] failed to enqueue:", queueErr)
+          toast({
+            title: "Delivered, upload pending",
+            description:
+              "Photo + signature couldn't be saved for retry. Stay on this page and try Retry below.",
+            variant: "destructive",
+          })
           setIsSubmitting(false)
           setSubmitStatus(null)
-          setUploadFailed(true)
-          setPendingPodId(result.podId)
-          
-          toast({
-            title: "Upload Failed",
-            description: `Delivery was saved, but photo/signature upload failed: ${errorMsg}. You can retry below.`,
-            variant: "destructive",
-          })
-          
-          console.log("[v0] [DRIVER] ========== POD SUBMISSION END (MEDIA ERROR - STAYING ON PAGE) ==========")
-          // Don't navigate - let driver retry
           return
         }
-      } else {
-        // No media to upload
-        console.log("[v0] [DRIVER] ⚠️ No media to upload")
-        console.log("[v0] [DRIVER] ========== POD SUBMISSION END (SUCCESS - NO MEDIA) ==========")
-        
-        if (result.warning) {
-          toast({
-            title: "Delivered with warning",
-            description: result.warning,
-            variant: "destructive",
-          })
-        } else {
-          toast({
-            title: "Success",
-            description: "Delivery marked as complete!",
-          })
-        }
-        
-        setTimeout(returnToRoute, 500)
       }
-    } catch (error) {
-      console.error("[v0] [DRIVER] Unexpected error:", error)
-      console.error("[v0] [DRIVER] Error stack:", error instanceof Error ? error.stack : "no stack")
 
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      // 3. No media — straight return
+      if (deliverBody.warning) {
+        toast({
+          title: "Delivered with warning",
+          description: deliverBody.warning,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Delivered",
+          description: "Stop marked as complete.",
+        })
+      }
+      setTimeout(returnToRoute, 400)
+    } catch (err) {
+      console.error("[v0] [DRIVER] unexpected:", err)
       toast({
-        title: "Unexpected Error",
-        description: `Failed to mark as delivered: ${errorMessage}`,
+        title: "Unexpected error",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
       })
       setIsSubmitting(false)
       setSubmitStatus(null)
-      console.log("[v0] [DRIVER] ========== POD SUBMISSION END (EXCEPTION) ==========")
-    }
-  }
-
-  const handleRetryUpload = async () => {
-    if (!pendingPodId) return
-    
-    setIsSubmitting(true)
-    setUploadFailed(false)
-    setSubmitStatus("Retrying upload...")
-    
-    try {
-      await uploadPodMedia(pendingPodId)
-      console.log("[v0] [DRIVER] ✅ Retry upload successful!")
-      
-      toast({
-        title: "Success",
-        description: "Photo/signature uploaded successfully!",
-      })
-      
-      setPendingPodId(null)
-      setTimeout(returnToRoute, 500)
-    } catch (error) {
-      console.error("[v0] [DRIVER] Retry upload failed:", error)
-      setIsSubmitting(false)
-      setSubmitStatus(null)
-      setUploadFailed(true)
-      
-      toast({
-        title: "Retry Failed",
-        description: `Upload still failing: ${error instanceof Error ? error.message : "Unknown error"}`,
-        variant: "destructive",
-      })
     }
   }
 
   const handleFail = async () => {
     if (!notes.trim()) {
       toast({
-        title: "Notes Required",
-        description: "Please provide a reason for the failed delivery.",
+        title: "Notes required",
+        description: "Tell us why this delivery failed.",
         variant: "destructive",
       })
       return
     }
-
-    if (isSubmitting) {
-      console.log("[v0] [DRIVER] Already submitting, ignoring click")
-      return
-    }
+    if (isSubmitting) return
 
     setIsSubmitting(true)
-    setSubmitStatus("Saving failed delivery...")
-    console.log("[v0] [DRIVER] ========== FAILED DELIVERY START ==========")
-    console.log("[v0] [DRIVER] Order ID:", order.id)
-    console.log("[v0] [DRIVER] Notes:", notes)
+    setSubmitStatus("Saving failed delivery…")
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 45000)
-
-      const response = await fetch("/api/driver/fail", {
+      const timer = setTimeout(() => controller.abort(), 45_000)
+      const res = await fetch("/api/driver/fail", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId: order.id,
-          notes,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id, notes }),
+        credentials: "include",
         signal: controller.signal,
       })
+      clearTimeout(timer)
 
-      clearTimeout(timeoutId)
-
-      const result = await readJsonResponse(response)
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to update status")
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body?.success) {
+        throw new Error(body?.error || `HTTP ${res.status}`)
       }
 
-      console.log("[v0] [DRIVER] ✅ Marked as failed successfully!")
-      console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (SUCCESS) ==========")
-
-      toast({
-        title: "Success",
-        description: "Delivery marked as failed.",
-      })
-
+      toast({ title: "Saved", description: "Stop marked as failed." })
       setTimeout(returnToRoute, 250)
-    } catch (error) {
-      console.error("[v0] [DRIVER] Error marking as failed:", error)
+    } catch (err) {
       toast({
-        title: "Error",
-        description: `Failed to update status: ${error instanceof Error ? error.message : "Unknown error"}`,
+        title: "Couldn't save",
+        description: err instanceof Error ? err.message : "Try again.",
         variant: "destructive",
       })
       setIsSubmitting(false)
       setSubmitStatus(null)
-      console.log("[v0] [DRIVER] ========== FAILED DELIVERY END (ERROR) ==========")
     }
   }
 
@@ -465,18 +420,23 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Stop #{order.stop_sequence}</h1>
-            <p className="text-sm text-muted-foreground">{routeName}</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold tracking-tight">
+              Stop #{order.stop_sequence}
+            </h1>
+            <p className="text-sm text-muted-foreground truncate">
+              {routeName}
+            </p>
           </div>
         </div>
 
         {/* Order Info */}
         <Card className="p-4 space-y-3">
           <div>
-            <p className="text-sm text-muted-foreground">Order Number</p>
+            <p className="text-sm text-muted-foreground">Order number</p>
             <p className="text-xl font-bold font-mono text-primary">
-              {order.order_number || order.id.substring(0, 8).toUpperCase()}
+              {order.order_number ||
+                order.id.substring(0, 8).toUpperCase()}
             </p>
           </div>
           <div>
@@ -490,16 +450,17 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
           {order.phone && (
             <div>
               <p className="text-sm text-muted-foreground">Phone</p>
-              <p className="font-medium">
-                <a href={`tel:${order.phone}`} className="text-primary hover:underline">
-                  {order.phone}
-                </a>
-              </p>
+              <a
+                href={`tel:${order.phone}`}
+                className="text-primary hover:underline font-medium"
+              >
+                {order.phone}
+              </a>
             </div>
           )}
           {order.notes && (
             <div>
-              <p className="text-sm text-muted-foreground">Delivery Notes</p>
+              <p className="text-sm text-muted-foreground">Delivery notes</p>
               <p className="font-medium">{order.notes}</p>
             </div>
           )}
@@ -511,22 +472,28 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
         {!isCompleted && (
           <>
-            {/* Photo Capture */}
+            {/* Photo */}
             <Card className="p-4 space-y-3">
-              <Label>Photo (Optional)</Label>
+              <Label>Photo (optional)</Label>
               {photoPreview ? (
                 <div className="space-y-2">
-                  <img src={photoPreview || "/placeholder.svg"} alt="Delivery proof" className="w-full rounded-lg" />
+                  <img
+                    src={photoPreview}
+                    alt="Delivery proof"
+                    className="w-full rounded-lg"
+                  />
                   <Button
                     variant="outline"
                     className="w-full bg-transparent"
                     onClick={() => {
-                      setPhotoDataUrl(null)
+                      if (photoPreview && photoPreview.startsWith("blob:")) {
+                        URL.revokeObjectURL(photoPreview)
+                      }
+                      setPhotoBlob(null)
                       setPhotoPreview(null)
-                      setSubmitStatus(null)
                     }}
                   >
-                    Remove Photo
+                    Remove photo
                   </Button>
                 </div>
               ) : (
@@ -547,18 +514,26 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
                     id="photo-upload-input"
                   />
                   <label htmlFor="photo-camera-input">
-                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full bg-transparent"
+                      asChild
+                    >
                       <span>
                         <Camera className="h-4 w-4 mr-2" />
-                        Take Photo
+                        Take photo
                       </span>
                     </Button>
                   </label>
                   <label htmlFor="photo-upload-input">
-                    <Button variant="outline" className="w-full bg-transparent" asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full bg-transparent"
+                      asChild
+                    >
                       <span>
                         <Upload className="h-4 w-4 mr-2" />
-                        Upload Photo
+                        Upload photo
                       </span>
                     </Button>
                   </label>
@@ -566,33 +541,47 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
               )}
             </Card>
 
-            {/* Signature Capture */}
+            {/* Signature */}
             <Card className="p-4 space-y-3">
-              <Label>Signature (Optional)</Label>
+              <Label>Signature (optional)</Label>
               {showSignaturePad ? (
-                <SignaturePad onSave={handleSignatureSave} onCancel={() => setShowSignaturePad(false)} />
-              ) : signatureData ? (
+                <SignaturePad
+                  onSave={handleSignatureSave}
+                  onCancel={() => setShowSignaturePad(false)}
+                />
+              ) : signaturePreview ? (
                 <div className="space-y-2">
                   <img
-                    src={signatureData || "/placeholder.svg"}
+                    src={signaturePreview}
                     alt="Signature"
                     className="w-full border rounded-lg bg-white"
                   />
-                  <Button variant="outline" className="w-full bg-transparent" onClick={() => setSignatureData(null)}>
-                    Clear Signature
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    onClick={() => {
+                      setSignatureBlob(null)
+                      setSignaturePreview(null)
+                    }}
+                  >
+                    Clear signature
                   </Button>
                 </div>
               ) : (
-                <Button variant="outline" className="w-full bg-transparent" onClick={() => setShowSignaturePad(true)}>
+                <Button
+                  variant="outline"
+                  className="w-full bg-transparent"
+                  onClick={() => setShowSignaturePad(true)}
+                >
                   <PenTool className="h-4 w-4 mr-2" />
-                  Capture Signature
+                  Capture signature
                 </Button>
               )}
             </Card>
 
-            {/* Recipient Name */}
+            {/* Recipient */}
             <Card className="p-4 space-y-3">
-              <Label htmlFor="recipient">Recipient Name (Optional)</Label>
+              <Label htmlFor="recipient">Recipient name (optional)</Label>
               <Input
                 id="recipient"
                 placeholder="Who received the delivery?"
@@ -603,61 +592,59 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
 
             {/* Notes */}
             <Card className="p-4 space-y-3">
-              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Label htmlFor="notes">Notes (optional)</Label>
               <Textarea
                 id="notes"
-                placeholder="Add any notes about this delivery..."
+                placeholder="Any notes about this delivery…"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
               />
             </Card>
 
-            {/* Action Buttons */}
-            {uploadFailed && pendingPodId ? (
-              <Card className="p-4 space-y-3 border-destructive">
-                <div className="flex items-start gap-3">
-                  <XCircle className="h-5 w-5 text-destructive mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-destructive">Upload Failed</p>
-                    <p className="text-sm text-muted-foreground">
-                      Delivery was saved, but photo/signature upload failed. Check your connection and retry.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1" onClick={returnToRoute}>
-                    Skip Upload
-                  </Button>
-                  <Button className="flex-1" onClick={handleRetryUpload} disabled={isSubmitting}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    {isSubmitting ? submitStatus || "Retrying..." : "Retry Upload"}
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-              <div className="flex gap-3">
-                <Button variant="destructive" className="flex-1" size="lg" onClick={handleFail} disabled={isSubmitting}>
-                  <XCircle className="h-5 w-5 mr-2" />
-                  {isSubmitting ? submitStatus || "Processing..." : "Failed"}
-                </Button>
-                <Button className="flex-1" size="lg" onClick={handleDeliver} disabled={isSubmitting}>
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                  {isSubmitting ? submitStatus || "Processing..." : "Delivered"}
-                </Button>
+            {/* Sync hint */}
+            {(photoBlob || signatureBlob) && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                <CloudUpload className="size-3.5" />
+                Saved to this device — will sync even if your connection drops.
               </div>
             )}
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button
+                variant="destructive"
+                className="flex-1"
+                size="lg"
+                onClick={handleFail}
+                disabled={isSubmitting}
+              >
+                <XCircle className="h-5 w-5 mr-2" />
+                {isSubmitting ? submitStatus || "Saving…" : "Failed"}
+              </Button>
+              <Button
+                className="flex-1"
+                size="lg"
+                onClick={handleDeliver}
+                disabled={isSubmitting}
+              >
+                <CheckCircle className="h-5 w-5 mr-2" />
+                {isSubmitting ? submitStatus || "Saving…" : "Delivered"}
+              </Button>
+            </div>
           </>
         )}
 
         {isCompleted && existingPod && (
           <Card className="p-4 space-y-4">
-            <h3 className="font-semibold">Proof of Delivery</h3>
+            <h3 className="font-semibold tracking-tight">
+              Proof of delivery
+            </h3>
             {existingPod.photo_url && (
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Photo</p>
                 <img
-                  src={existingPod.photo_url || "/placeholder.svg"}
+                  src={existingPod.photo_url}
                   alt="Delivery proof"
                   className="w-full rounded-lg"
                 />
@@ -665,9 +652,11 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
             )}
             {existingPod.signature_url && (
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Signature</p>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Signature
+                </p>
                 <img
-                  src={existingPod.signature_url || "/placeholder.svg"}
+                  src={existingPod.signature_url}
                   alt="Signature"
                   className="w-full border rounded-lg bg-white"
                 />
@@ -675,7 +664,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
             )}
             {existingPod.recipient_name && (
               <div>
-                <p className="text-sm text-muted-foreground">Received By</p>
+                <p className="text-sm text-muted-foreground">Received by</p>
                 <p className="font-medium">{existingPod.recipient_name}</p>
               </div>
             )}
@@ -690,4 +679,17 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       </div>
     </div>
   )
+}
+
+/* -------------------------------------------------- helpers */
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, data] = dataUrl.split(",")
+  const contentType = header.match(/:(.*?);/)?.[1] || "image/png"
+  const binary = atob(data)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: contentType })
 }

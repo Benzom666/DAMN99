@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { BrandLockup } from "@/components/brand-mark"
+import { PendingUploads } from "@/components/pending-uploads"
 import Link from "next/link"
 import {
   Package,
@@ -120,6 +121,11 @@ export default async function DriverDashboard() {
 
       {/* Main */}
       <main className="flex-1 px-4 sm:px-6 py-6 max-w-2xl mx-auto w-full">
+        {/* Pending POD uploads — auto-flushes the IndexedDB queue */}
+        <div className="mb-4">
+          <PendingUploads />
+        </div>
+
         {/* Day summary */}
         {totalActive > 0 && (
           <section className="mb-6">
