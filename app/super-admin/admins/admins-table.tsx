@@ -178,10 +178,12 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openApiKeyDialog(admin)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit API Key
-                        </DropdownMenuItem>
+                        {typeof admin.here_api_key !== 'undefined' && (
+                          <DropdownMenuItem onClick={() => openApiKeyDialog(admin)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit API Key
+                          </DropdownMenuItem>
+                        )}
                         {admin.is_suspended ? (
                           <DropdownMenuItem onClick={() => handleRestore(admin)}>
                             <CheckCircle className="h-4 w-4 mr-2" />
