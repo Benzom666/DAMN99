@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     }
 
     console.log("[POD_UPLOAD] ========== UPLOAD REQUEST SUCCESS ==========")
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, photo_url: updates.photo_url, signature_url: updates.signature_url })
   } catch (error) {
     console.error("[POD_UPLOAD] ========== UPLOAD REQUEST FAILED ==========")
     console.error("[POD_UPLOAD] Unexpected error:", error)

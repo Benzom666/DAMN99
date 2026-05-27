@@ -158,6 +158,18 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       if (!response.ok || !result.success) {
         throw new Error(result.error || "Failed to upload proof media")
       }
+
+      // Update local state with server URLs
+      if (result.photo_url) {
+        console.log("[v0] [DRIVER] Updating photoPreview with server URL:", result.photo_url)
+        setPhotoPreview(result.photo_url)
+      }
+      if (result.signature_url) {
+        console.log("[v0] [DRIVER] Updating signatureData with server URL:", result.signature_url)
+        setSignatureData(result.signature_url)
+      }
+
+      return result
     } catch (error) {
       console.error("[v0] [DRIVER] uploadPodMedia error:", error)
       throw error
