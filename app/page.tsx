@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
-import { ArrowRight, Check, Package, Route, Radio, Users, DollarSign, Shield, Clock, MapPin, Zap, TrendingUp } from "lucide-react"
+import { ArrowRight, Package, Route, Radio, Users, DollarSign, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default async function HomePage() {
@@ -32,217 +32,162 @@ export default async function HomePage() {
 function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-18">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
-                <Package className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">DAMN99</span>
+      {/* Nav */}
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-zinc-200">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
+              <Package className="h-5 w-5 text-white" />
             </div>
-            <div className="flex items-center gap-3">
-              <Link href="/auth/login">
-                <Button variant="ghost" className="hidden sm:inline-flex">Sign In</Button>
-              </Link>
+            <span className="text-lg font-semibold tracking-tight">DAMN99</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/auth/login">
+              <Button variant="ghost" size="sm">Sign In</Button>
+            </Link>
+            <Link href="/auth/sign-up">
+              <Button size="sm" className="bg-zinc-900 hover:bg-zinc-800">Start Free</Button>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero - Asymmetric Split */}
+      <section className="border-b border-zinc-200">
+        <div className="max-w-6xl mx-auto px-6 py-24 grid lg:grid-cols-[1.2fr_1fr] gap-16 items-center">
+          <div>
+            <h1 className="text-5xl lg:text-6xl font-bold tracking-tight leading-none mb-6">
+              Route optimization<br />for delivery teams
+            </h1>
+            <p className="text-xl text-zinc-600 leading-relaxed mb-8 max-w-[540px]">
+              Cut fuel costs 40%. Track every delivery. Optimize 100+ stops in seconds.
+            </p>
+            <div className="flex items-center gap-4">
               <Link href="/auth/sign-up">
-                <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                  Get Started
+                <Button size="lg" className="bg-zinc-900 hover:bg-zinc-800 h-12 px-6">
+                  Start Free Trial
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             </div>
           </div>
-        </div>
-      </nav>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left Column - Text */}
-            <div>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 border border-emerald-200 mb-8">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-sm font-medium text-emerald-900">Trusted by 500+ logistics teams</span>
-              </div>
-              
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 tracking-tight mb-6">
-                Delivery management
-                <span className="block text-emerald-500 mt-2">made simple</span>
-              </h1>
-              
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Optimize routes, track in real-time, reduce costs by 40%. 
-                Built for teams managing 50+ deliveries daily.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Link href="/auth/sign-up">
-                  <Button size="lg" className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white h-14 px-8 text-lg">
-                    Start Free Trial
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link href="#features">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg border-gray-300">
-                    Watch Demo
-                  </Button>
-                </Link>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-emerald-500" />
-                  <span>No credit card</span>
+          {/* Dashboard Preview */}
+          <div className="relative">
+            <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-100">
+                <div>
+                  <div className="text-sm text-zinc-500 mb-1">Active</div>
+                  <div className="text-3xl font-bold tracking-tight">247</div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-emerald-500" />
-                  <span>14-day trial</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-emerald-500" />
-                  <span>Cancel anytime</span>
+                <div className="w-12 h-12 rounded-lg bg-zinc-900 flex items-center justify-center">
+                  <Route className="h-6 w-6 text-white" />
                 </div>
               </div>
-            </div>
 
-            {/* Right Column - Dashboard Preview */}
-            <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-emerald-400/20 rounded-3xl blur-3xl" />
-              <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 p-6">
-                <div className="space-y-6">
-                  {/* Stats Header */}
-                  <div className="flex items-center justify-between pb-6 border-b border-gray-100">
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">Active Routes</div>
-                      <div className="text-4xl font-bold text-gray-900">247</div>
-                    </div>
-                    <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg">
-                      <Route className="h-8 w-8 text-white" />
-                    </div>
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                {[
+                  { label: "On-time", value: "94%" },
+                  { label: "Today", value: "1.2k" },
+                  { label: "Saved", value: "$4k" }
+                ].map((stat, i) => (
+                  <div key={i} className="text-center p-3 rounded-lg border border-zinc-100">
+                    <div className="text-lg font-bold">{stat.value}</div>
+                    <div className="text-xs text-zinc-500">{stat.label}</div>
                   </div>
+                ))}
+              </div>
 
-                  {/* Mini Stats */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <Clock className="h-6 w-6 mx-auto mb-2 text-emerald-500" />
-                      <div className="text-2xl font-bold text-gray-900">94%</div>
-                      <div className="text-xs text-gray-600">On-Time</div>
-                    </div>
-                    <div className="text-center p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <Package className="h-6 w-6 mx-auto mb-2 text-emerald-500" />
-                      <div className="text-2xl font-bold text-gray-900">1.2k</div>
-                      <div className="text-xs text-gray-600">Today</div>
-                    </div>
-                    <div className="text-center p-4 rounded-xl bg-gray-50 border border-gray-100">
-                      <DollarSign className="h-6 w-6 mx-auto mb-2 text-emerald-500" />
-                      <div className="text-2xl font-bold text-gray-900">$4.2k</div>
-                      <div className="text-xs text-gray-600">Saved</div>
-                    </div>
-                  </div>
-
-                  {/* Driver Progress */}
-                  <div className="space-y-3">
-                    {[
-                      { name: "Sarah M.", progress: 85, stops: "12/15" },
-                      { name: "Mike R.", progress: 60, stops: "9/15" },
-                      { name: "Alex K.", progress: 100, stops: "15/15" }
-                    ].map((driver, i) => (
-                      <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900 mb-2">{driver.name}</div>
-                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
-                              style={{ width: `${driver.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                        <div className="text-sm font-medium text-gray-600">{driver.stops}</div>
+              <div className="space-y-2">
+                {[
+                  { name: "Sarah M.", progress: 85 },
+                  { name: "Mike R.", progress: 60 },
+                  { name: "Alex K.", progress: 100 }
+                ].map((driver, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2 rounded border border-zinc-100">
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-900" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium mb-1.5">{driver.name}</div>
+                      <div className="h-1 bg-zinc-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-zinc-900 rounded-full" style={{ width: `${driver.progress}%` }} />
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Social Proof Stats */}
-      <section className="bg-gray-50 border-y border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+      {/* Stats Bar */}
+      <section className="border-b border-zinc-200 bg-zinc-50">
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
             {[
-              { value: "40%", label: "Cost Reduction" },
-              { value: "94%", label: "On-Time Delivery" },
-              { value: "2.5hrs", label: "Time Saved Daily" },
-              { value: "500+", label: "Happy Customers" }
+              { value: "40%", label: "Cost reduction" },
+              { value: "94%", label: "On-time rate" },
+              { value: "2.5h", label: "Saved daily" },
+              { value: "500+", label: "Teams" }
             ].map((stat, i) => (
-              <div key={i} className="text-center">
-                <div className="text-4xl lg:text-5xl font-bold text-emerald-500 mb-2">{stat.value}</div>
-                <div className="text-sm text-gray-600">{stat.label}</div>
+              <div key={i}>
+                <div className="text-4xl font-bold tracking-tight mb-1">{stat.value}</div>
+                <div className="text-sm text-zinc-600">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">Everything you need</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Powerful features to streamline your delivery operations
+      {/* Features - Asymmetric Grid */}
+      <section className="border-b border-zinc-200">
+        <div className="max-w-6xl mx-auto px-6 py-24">
+          <div className="mb-16">
+            <h2 className="text-4xl font-bold tracking-tight mb-4">Built for logistics teams</h2>
+            <p className="text-xl text-zinc-600 max-w-2xl">
+              Everything you need to manage deliveries at scale
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid lg:grid-cols-2 gap-6">
             {[
               {
                 icon: Route,
-                title: "Smart Route Optimization",
-                description: "AI-powered routing saves time and fuel. Optimize 100+ stops in seconds."
+                title: "Smart routing",
+                description: "AI-powered optimization. 100+ stops in seconds."
               },
               {
                 icon: Radio,
-                title: "Real-Time Tracking",
-                description: "Live GPS tracking and ETA updates. Know exactly where every delivery is."
+                title: "Live tracking",
+                description: "GPS updates. Real-time ETAs. Full visibility."
               },
               {
                 icon: Package,
-                title: "Proof of Delivery",
-                description: "Digital signatures, photos, and notes. Complete delivery documentation."
+                title: "Proof of delivery",
+                description: "Photos, signatures, notes. Complete records."
               },
               {
                 icon: Users,
-                title: "Driver Management",
-                description: "Assign routes, track performance, and manage your entire fleet."
+                title: "Driver management",
+                description: "Assign routes. Track performance. Manage fleet."
               },
               {
                 icon: DollarSign,
-                title: "Cost Control",
-                description: "Track API costs, monitor usage, and optimize spending automatically."
+                title: "Cost control",
+                description: "Monitor API usage. Optimize spending."
               },
               {
                 icon: Shield,
-                title: "Enterprise Security",
-                description: "Bank-level encryption, role-based access, and audit logs."
+                title: "Enterprise security",
+                description: "Encryption. Access control. Audit logs."
               }
             ].map((feature, i) => (
-              <div 
-                key={i} 
-                className="group p-8 rounded-2xl border border-gray-200 bg-white hover:shadow-xl hover:border-emerald-200 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center mb-6 group-hover:bg-emerald-500 transition-colors">
-                  <feature.icon className="h-7 w-7 text-emerald-600 group-hover:text-white transition-colors" />
+              <div key={i} className="p-6 rounded-xl border border-zinc-200 hover:border-zinc-300 transition-colors">
+                <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center mb-4">
+                  <feature.icon className="h-5 w-5 text-zinc-900" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
-                <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                <p className="text-zinc-600 leading-relaxed">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -250,66 +195,48 @@ function LandingPage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-24 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">How it works</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Get started in minutes, not weeks
-            </p>
+      <section className="border-b border-zinc-200 bg-zinc-50">
+        <div className="max-w-6xl mx-auto px-6 py-24">
+          <div className="mb-16">
+            <h2 className="text-4xl font-bold tracking-tight mb-4">Three steps to optimize</h2>
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-12 relative">
-            {/* Connecting Line */}
-            <div className="hidden sm:block absolute top-16 left-1/6 right-1/6 h-0.5 bg-emerald-200" style={{ top: '4rem' }} />
-            
+          <div className="grid lg:grid-cols-3 gap-12">
             {[
-              { 
-                step: "1", 
-                title: "Import Orders", 
-                description: "Upload your delivery list via CSV or API integration" 
-              },
-              { 
-                step: "2", 
-                title: "Optimize Routes", 
-                description: "AI creates the most efficient routes automatically" 
-              },
-              { 
-                step: "3", 
-                title: "Track & Deliver", 
-                description: "Drivers follow optimized routes with live updates" 
-              }
-            ].map((item, i) => (
-              <div key={i} className="relative text-center">
-                <div className="relative inline-flex items-center justify-center w-24 h-24 rounded-full bg-emerald-500 text-white text-4xl font-bold mb-6 shadow-lg z-10">
-                  {item.step}
+              { num: "1", title: "Import orders", desc: "CSV upload or API" },
+              { num: "2", title: "Optimize routes", desc: "AI creates efficient paths" },
+              { num: "3", title: "Track deliveries", desc: "Live updates for drivers" }
+            ].map((step, i) => (
+              <div key={i}>
+                <div className="w-12 h-12 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xl font-bold mb-4">
+                  {step.num}
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">{item.title}</h3>
-                <p className="text-gray-600 leading-relaxed">{item.description}</p>
+                <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
+                <p className="text-zinc-600">{step.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 bg-gradient-to-br from-emerald-500 to-emerald-600">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">
-            Ready to optimize your deliveries?
+      {/* CTA */}
+      <section className="border-b border-zinc-200">
+        <div className="max-w-6xl mx-auto px-6 py-24 text-center">
+          <h2 className="text-4xl font-bold tracking-tight mb-4">
+            Start optimizing deliveries
           </h2>
-          <p className="text-xl text-emerald-100 mb-10">
-            Join 500+ logistics teams saving time and money with DAMN99
+          <p className="text-xl text-zinc-600 mb-8 max-w-2xl mx-auto">
+            Join 500+ logistics teams using DAMN99
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex items-center gap-4 justify-center">
             <Link href="/auth/sign-up">
-              <Button size="lg" className="w-full sm:w-auto bg-white text-emerald-600 hover:bg-gray-100 h-14 px-8 text-lg">
+              <Button size="lg" className="bg-zinc-900 hover:bg-zinc-800 h-12 px-6">
                 Start Free Trial
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
             <Link href="/auth/login">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto border-2 border-white text-white hover:bg-white/10 h-14 px-8 text-lg">
+              <Button size="lg" variant="outline" className="h-12 px-6">
                 Sign In
               </Button>
             </Link>
@@ -318,18 +245,16 @@ function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-50 border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="bg-zinc-50">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
+              <div className="w-6 h-6 rounded bg-zinc-900 flex items-center justify-center">
+                <Package className="h-4 w-4 text-white" />
               </div>
-              <span className="font-bold text-gray-900">DAMN99</span>
+              <span className="font-semibold">DAMN99</span>
             </div>
-            <p className="text-sm text-gray-600">
-              © 2024 DAMN99. All rights reserved.
-            </p>
+            <p className="text-sm text-zinc-600">© 2024 DAMN99</p>
           </div>
         </div>
       </footer>
