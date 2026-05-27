@@ -1,16 +1,50 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+})
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+})
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
-  title: "Delivery Management",
-  description: "Manage deliveries, routes, and drivers",
-  generator: "v0.app",
+  title: "DAMN99 — Dispatch Terminal for Logistics Operators",
+  description:
+    "Run the route. Make the drop. Ship the day. Production-grade route optimization, live dispatch, and proof of delivery for fleets that can't afford to break.",
+  generator: "DAMN99",
+  applicationName: "DAMN99",
+  keywords: [
+    "route optimization",
+    "delivery management",
+    "dispatch software",
+    "fleet logistics",
+    "proof of delivery",
+    "last-mile",
+  ],
+  authors: [{ name: "DAMN99" }],
+  openGraph: {
+    title: "DAMN99 — Dispatch Terminal for Logistics Operators",
+    description:
+      "Routes that don't break under pressure. 10,000 packages, optimized, dispatched, delivered.",
+    type: "website",
+  },
 }
 
 export default function RootLayout({
@@ -19,8 +53,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans antialiased`}>
+    <html
+      lang="en"
+      className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable} dark`}
+      suppressHydrationWarning
+    >
+      <body className="font-sans antialiased bg-background text-foreground selection:bg-signal selection:text-signal-foreground">
         {children}
         <Analytics />
       </body>

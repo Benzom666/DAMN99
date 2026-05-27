@@ -1,65 +1,94 @@
-import { requireSuperAdmin } from '@/lib/auth/super-admin'
-import { createServerClient } from '@/lib/supabase/server'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { requireSuperAdmin } from "@/lib/auth/super-admin"
+import { createServerClient } from "@/lib/supabase/server"
+import { Badge } from "@/components/ui/badge"
+import { PageHeader } from "@/components/page-header"
 
 export default async function AuditLogPage() {
   await requireSuperAdmin()
-  
+
   const supabase = await createServerClient()
 
   const { data: logs } = await supabase
-    .from('super_admin_audit_log')
-    .select(`
+    .from("super_admin_audit_log")
+    .select(
+      `
       *,
       super_admin:profiles!super_admin_id(email, display_name)
-    `)
-    .order('created_at', { ascending: false })
+    `,
+    )
+    .order("created_at", { ascending: false })
     .limit(100)
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Audit Log</h1>
-        <p className="text-muted-foreground">
-          View all super admin actions (latest 100)
-        </p>
-      </div>
+    <div className="flex flex-col min-h-screen relative">
+      <PageHeader
+        tag="SUPER · S-06"
+        eyebrow="Sovereign · Compliance"
+        title="Audit"
+        serifEmphasis="trail"
+        description="Last 100 sovereign actions. Every override, every suspension, every reassignment."
+      />
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Super Admin</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Target</TableHead>
-              <TableHead>Details</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {logs?.map((log) => (
-              <TableRow key={log.id}>
-                <TableCell className="text-sm">
-                  {new Date(log.created_at).toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  {log.super_admin?.display_name || log.super_admin?.email || '-'}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{log.action}</Badge>
-                </TableCell>
-                <TableCell className="font-mono text-xs">
-                  {log.target_table}:{log.target_id?.slice(0, 8)}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                  {JSON.stringify(log.details)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">
+        {!logs || logs.length === 0 ? (
+          <div className="border border-border bg-card rounded-sm p-10 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-2">
+              Empty trail
+            </p>
+            <p className="text-sm text-muted-foreground">
+              No sovereign actions recorded yet.
+            </p>
+          </div>
+        ) : (
+          <div className="border border-border bg-card rounded-sm overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-surface-2">
+                <tr className="text-left">
+                  <Th>Time</Th>
+                  <Th>Sovereign</Th>
+                  <Th>Action</Th>
+                  <Th>Target</Th>
+                  <Th>Details</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr
+                    key={log.id}
+                    className="border-b border-border last:border-b-0 hover:bg-surface-2/40 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-mono text-[11px] tabular-nums text-muted-foreground whitespace-nowrap">
+                      {new Date(log.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {log.super_admin?.display_name ||
+                        log.super_admin?.email ||
+                        "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline">{log.action}</Badge>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[11px] text-signal whitespace-nowrap">
+                      {log.target_table}:{log.target_id?.slice(0, 8)}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-md truncate font-mono">
+                      {JSON.stringify(log.details)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </main>
     </div>
+  )
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
+      {children}
+    </th>
   )
 }

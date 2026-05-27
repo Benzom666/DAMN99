@@ -297,26 +297,43 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 py-12">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-4 py-12 relative">
+      <div className="pointer-events-none fixed inset-0 bg-grid-paper-fine opacity-25 [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]" />
+      <div className="absolute top-0 left-0 right-0 h-1 hazard-stripe opacity-90" />
+      <div className="max-w-4xl mx-auto space-y-6 relative">
+        {/* Brand strip */}
+        <div className="flex items-center justify-between mb-2">
+          <a href="/" className="flex items-center gap-2.5">
+            <div className="size-7 grid place-items-center bg-signal text-signal-foreground font-mono text-[11px] font-bold rounded-[2px]">99</div>
+            <span className="font-mono text-xs font-semibold tracking-[0.18em]">
+              DAMN<span className="font-serif italic text-signal ml-1">ninety-nine</span>
+            </span>
+          </a>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-signal border border-signal/40 px-2 py-1 rounded-[2px]">
+            BOOT · DB-INIT
+          </span>
+        </div>
+
         <Card>
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-              <Database className="w-8 h-8 text-blue-600" />
+            <div className="mx-auto mb-4 size-14 grid place-items-center bg-signal/10 border border-signal/40 rounded-sm">
+              <Database className="size-7 text-signal" strokeWidth={1.4} />
             </div>
-            <CardTitle className="text-3xl">Database Setup Required</CardTitle>
+            <CardTitle className="text-3xl tracking-tight">
+              Database <span className="font-serif italic font-normal text-signal">setup</span> required
+            </CardTitle>
             <CardDescription className="text-base">
-              Run these SQL scripts in your Supabase SQL Editor to initialize the database
+              Run these SQL scripts in your Supabase SQL Editor to initialize the database.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {hasRlsError && (
-              <Alert className="border-red-200 bg-red-50">
-                <XCircle className="h-5 w-5 text-red-600" />
-                <AlertDescription className="text-red-800 ml-2">
-                  <p className="font-semibold mb-2">Infinite Recursion Error Detected</p>
+              <Alert variant="destructive">
+                <XCircle className="size-4" />
+                <AlertDescription>
+                  <p className="font-semibold mb-2">Infinite recursion detected</p>
                   <p className="text-sm">
-                    Your database has an older version of the RLS policies that causes infinite recursion. Please re-run{" "}
+                    Your database has an older version of the RLS policies that causes infinite recursion. Re-run{" "}
                     <strong>Script 2 (Security)</strong> below to fix this issue.
                   </p>
                 </AlertDescription>
@@ -333,7 +350,7 @@ export default function SetupPage() {
                       href="https://supabase.com/dashboard"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                      className="text-signal hover:underline inline-flex items-center gap-1"
                     >
                       Supabase Dashboard
                       <ExternalLink className="w-3 h-3" />
@@ -342,7 +359,7 @@ export default function SetupPage() {
                   <li>Navigate to SQL Editor in the left sidebar</li>
                   <li>Copy and run each script below in order (1, 2, then 3)</li>
                   {hasRlsError && (
-                    <li className="text-red-600 font-semibold">
+                    <li className="text-destructive font-semibold">
                       If you already ran the scripts, re-run Script 2 to fix the recursion error
                     </li>
                   )}
@@ -405,12 +422,12 @@ export default function SetupPage() {
               </Button>
 
               {status === "success" && (
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <AlertDescription className="text-green-800 ml-2">
+                <Alert variant="success">
+                  <CheckCircle2 className="size-4" />
+                  <AlertDescription>
                     <p className="font-semibold mb-2">{message}</p>
-                    <div className="mt-3 space-x-2">
-                      <Button asChild size="sm">
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button asChild size="sm" variant="signal">
                         <a href="/auth/sign-up">Create Account</a>
                       </Button>
                       <Button asChild variant="outline" size="sm">
@@ -422,9 +439,9 @@ export default function SetupPage() {
               )}
 
               {status === "error" && (
-                <Alert className="border-amber-200 bg-amber-50">
-                  <XCircle className="h-5 w-5 text-amber-600" />
-                  <AlertDescription className="text-amber-800 ml-2">
+                <Alert variant="warning">
+                  <XCircle className="size-4" />
+                  <AlertDescription>
                     <p className="font-semibold">{message}</p>
                     <p className="text-sm mt-1">Please run the SQL scripts above in your Supabase SQL Editor.</p>
                   </AlertDescription>

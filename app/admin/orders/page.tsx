@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { OrdersTable } from "./orders-table"
 import { MigrationBanner } from "./migration-banner"
+import { PageHeader } from "@/components/page-header"
 
 export default async function OrdersPage() {
   const supabase = await createClient()
@@ -14,7 +15,11 @@ export default async function OrdersPage() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single()
 
   if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
     redirect("/driver")
@@ -30,24 +35,20 @@ export default async function OrdersPage() {
     console.error("[ORDERS] Error fetching orders:", error)
   }
 
-  const needsMigration = orders && orders.length > 0 && !("order_number" in orders[0])
+  const needsMigration =
+    orders && orders.length > 0 && !("order_number" in orders[0])
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
-        <div className="px-8 py-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage and track all delivery orders
-            </p>
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-col min-h-screen relative">
+      <PageHeader
+        tag="OPS-02"
+        eyebrow="Sector A · Manifest"
+        title="Order"
+        serifEmphasis="manifest"
+        description="Drop, edit, archive, and assign every package moving through the yard."
+      />
 
-      {/* Main Content */}
-      <main className="flex-1 px-8 py-6">
+      <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">
         {needsMigration && <MigrationBanner />}
         <OrdersTable orders={orders || []} />
       </main>

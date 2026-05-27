@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { AutoRefresh } from "./auto-refresh"
+import { PageHeader } from "@/components/page-header"
 import { AlertTriangle, Clock, DollarSign, ShieldCheck, Zap, Key, Server } from "lucide-react"
 
 export const dynamic = "force-dynamic"
@@ -22,23 +23,20 @@ export default async function HereCostAnalyticsPage() {
   const services = Object.entries(analytics.last24h.byService)
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen relative">
       <AutoRefresh />
 
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
-        <div className="px-8 py-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">HERE Cost Analytics</h1>
-            <p className="text-muted-foreground mt-1">
-              Refreshes every 30 seconds. Costs are estimated from configured HERE per-1000 request rates.
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        tag="SUPER · S-07"
+        eyebrow="Sovereign · Treasury"
+        title="HERE cost"
+        serifEmphasis="ledger"
+        description="Refreshes every 30 seconds. Costs are estimated from configured HERE per-1,000 request rates."
+        live
+      />
 
       {/* Main Content */}
-      <div className="flex-1 px-8 py-6 space-y-6">
+      <div className="flex-1 px-6 lg:px-10 py-8 space-y-6">
         {analytics.unavailable && (
           <Card className="border-warning/50 bg-warning/5">
             <CardContent className="flex items-center gap-3 pt-6 text-warning">

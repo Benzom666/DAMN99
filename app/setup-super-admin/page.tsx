@@ -100,8 +100,8 @@ export default function SetupSuperAdminPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-600">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <div className="flex items-center gap-2 rounded-sm bg-warning-soft border border-warning/30 p-3 text-sm text-warning">
+                <AlertCircle className="size-4 flex-shrink-0" />
                 <p>Only the existing super admin can access this page.</p>
               </div>
 
@@ -116,15 +116,32 @@ export default function SetupSuperAdminPage() {
   }
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-md">
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10 bg-background relative">
+      <div className="pointer-events-none fixed inset-0 bg-grid-paper-fine opacity-25 [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_70%)]" />
+      <div className="absolute top-0 left-0 right-0 h-1 hazard-stripe opacity-80" />
+      <div className="w-full max-w-md relative">
+        <div className="flex items-center justify-between mb-4">
+          <a href="/" className="flex items-center gap-2.5">
+            <div className="size-7 grid place-items-center bg-destructive text-destructive-foreground font-mono text-[11px] font-bold rounded-[2px]">99</div>
+            <span className="font-mono text-xs font-semibold tracking-[0.18em]">
+              DAMN<span className="font-serif italic text-destructive ml-1">ninety-nine</span>
+            </span>
+          </a>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-destructive border border-destructive/40 px-2 py-1 rounded-[2px]">
+            BOOT · SUPER
+          </span>
+        </div>
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <ShieldCheck className="h-8 w-8 text-primary" />
+              <div className="size-10 grid place-items-center bg-destructive/15 border border-destructive/40 rounded-sm flex-shrink-0">
+                <ShieldCheck className="size-5 text-destructive" strokeWidth={1.5} />
+              </div>
               <div>
-                <CardTitle className="text-2xl">Super Admin Setup</CardTitle>
-                <CardDescription>Activate your super admin privileges</CardDescription>
+                <CardTitle className="text-2xl tracking-tight">
+                  Sovereign <span className="font-serif italic font-normal text-destructive">activation</span>
+                </CardTitle>
+                <CardDescription>Activate your super admin privileges.</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -164,13 +181,13 @@ export default function SetupSuperAdminPage() {
             )}
 
             {success && (
-              <div className="flex flex-col gap-2 rounded-lg bg-green-500/10 p-3 text-sm text-green-600">
+              <div className="flex flex-col gap-2 rounded-sm bg-success-soft border border-success/30 p-3 text-sm text-success">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                  <CheckCircle2 className="size-4 flex-shrink-0" />
                   <p>{success}</p>
                 </div>
                 {needsLogin && (
-                  <p className="text-xs">Redirecting to login page in 3 seconds...</p>
+                  <p className="text-xs opacity-90">Redirecting to login page in 3 seconds…</p>
                 )}
               </div>
             )}

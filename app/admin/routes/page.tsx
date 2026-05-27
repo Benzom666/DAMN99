@@ -1,6 +1,7 @@
-import { redirect } from 'next/navigation'
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { RoutesTable } from "./routes-table"
+import { PageHeader } from "@/components/page-header"
 
 export default async function RoutesPage() {
   const supabase = await createClient()
@@ -13,7 +14,11 @@ export default async function RoutesPage() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single()
 
   if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
     redirect("/driver")
@@ -76,47 +81,45 @@ export default async function RoutesPage() {
           driversNeedingAdminId.map((d) => d.id),
         )
       drivers = drivers.map((d) =>
-        driversNeedingAdminId.some((nd) => nd.id === d.id) ? { ...d, admin_id: user.id } : d,
+        driversNeedingAdminId.some((nd) => nd.id === d.id)
+          ? { ...d, admin_id: user.id }
+          : d,
       )
     }
 
-    // Filter to only show this admin's drivers
     drivers = drivers.filter((d) => d.admin_id === user.id)
   }
-
-  console.log("[v0] [ROUTES] Fetched routes count:", routes?.length || 0)
-  console.log("[v0] [ROUTES] Fetched orders count:", orders?.length || 0)
-  console.log("[v0] [ROUTES] Fetched drivers count:", drivers?.length || 0)
 
   const routesWithProgress = (routes || []).map((route) => {
     const routeOrders = orders?.filter((o) => o.route_id === route.id) || []
     const totalStops = routeOrders.length
-    const completedStops = routeOrders.filter((o) => o.status === 'delivered' || o.status === 'failed').length
-    
+    const completedStops = routeOrders.filter(
+      (o) => o.status === "delivered" || o.status === "failed",
+    ).length
+
     return {
       ...route,
       total_stops: totalStops,
-      completed_stops: completedStops
+      completed_stops: completedStops,
     }
   })
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-30">
-        <div className="px-8 py-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Routes</h1>
-            <p className="text-muted-foreground mt-1">
-              Create and optimize delivery routes
-            </p>
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-col min-h-screen relative">
+      <PageHeader
+        tag="OPS-03"
+        eyebrow="Sector A · Optimization"
+        title="Route"
+        serifEmphasis="planner"
+        description="Solve, sequence, and dispatch routes. Constraints in, optimal paths out."
+      />
 
-      {/* Main Content */}
-      <main className="flex-1 px-8 py-6">
-        <RoutesTable routes={routesWithProgress || []} orders={orders || []} drivers={drivers || []} />
+      <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">
+        <RoutesTable
+          routes={routesWithProgress || []}
+          orders={orders || []}
+          drivers={drivers || []}
+        />
       </main>
     </div>
   )
