@@ -163,6 +163,7 @@ export function StopDetail({ order, routeName, routeId, existingPod }: StopDetai
       if (result.photo_url) {
         console.log("[v0] [DRIVER] Updating photoPreview with server URL:", result.photo_url)
         setPhotoPreview(result.photo_url)
+        setPhotoDataUrl(null) // Clear the dataURL after successful upload
       }
       if (result.signature_url) {
         console.log("[v0] [DRIVER] Updating signatureData with server URL:", result.signature_url)

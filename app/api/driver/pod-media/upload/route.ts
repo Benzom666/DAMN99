@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { requireDriver } from "@/lib/security/authorization"
 import { validateUUID } from "@/lib/security/input-validation"
 
@@ -138,6 +139,15 @@ export async function POST(request: Request) {
       }
       
       console.log("[POD_UPLOAD] POD updated successfully")
+      
+      // Revalidate paths to ensure fresh data on next page load
+      try {
+        revalidatePath("/driver/routes")
+        revalidatePath("/admin/dispatch")
+        console.log("[POD_UPLOAD] Paths revalidated")
+      } catch (revalidateError) {
+        console.error("[POD_UPLOAD] Revalidation failed:", revalidateError)
+      }
     } else {
       console.log("[POD_UPLOAD] No updates to apply")
     }
