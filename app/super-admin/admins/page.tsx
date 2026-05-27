@@ -7,34 +7,19 @@ export default async function SuperAdminAdminsPage() {
   
   const supabase = createServiceRoleClient()
 
-  // Try to fetch with here_api_key, fall back without it if column doesn't exist
-  let admins = null
-  let error = null
-  
-  try {
-    const result = await supabase
-      .from('profiles')
-      .select('id, email, display_name, role, created_at, is_suspended, suspended_at, suspension_reason, here_api_key')
-      .eq('role', 'admin')
-      .order('created_at', { ascending: false })
-    
-    admins = result.data
-    error = result.error
-  } catch (e) {
-    // If here_api_key column doesn't exist, fetch without it
-    const result = await supabase
-      .from('profiles')
-      .select('id, email, display_name, role, created_at, is_suspended, suspended_at, suspension_reason')
-      .eq('role', 'admin')
-      .order('created_at', { ascending: false })
-    
-    admins = result.data?.map(admin => ({ ...admin, here_api_key: null }))
-    error = result.error
-  }
+  // First try without here_api_key to ensure page loads
+  const { data: admins, error } = await supabase
+    .from('profiles')
+    .select('id, email, display_name, role, created_at, is_suspended, suspended_at, suspension_reason')
+    .eq('role', 'admin')
+    .order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching admins:', error)
   }
+
+  // Add here_api_key as null for all admins (will be populated after migration)
+  const adminsWithApiKey = (admins || []).map(admin => ({ ...admin, here_api_key: null }))
 
   return (
     <div className="container mx-auto p-6">
@@ -45,7 +30,7 @@ export default async function SuperAdminAdminsPage() {
         </p>
       </div>
 
-      <AdminsTable admins={admins || []} />
+      <AdminsTable admins={adminsWithApiKey} />
     </div>
   )
 }
