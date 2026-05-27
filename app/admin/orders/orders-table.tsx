@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { OrderDialog } from "./order-dialog"
 import { CSVImportDialog } from "./csv-import-dialog"
 import { PrintLabelsDialog } from "@/components/print-labels-dialog"
+import { RetryFailedOrderButton, type RetryRouteOption } from "@/components/retry-failed-order-button"
 import { deleteOrder, bulkDeleteOrders } from "./actions"
 import { useState } from "react"
 import type { Order } from "@/lib/types"
@@ -15,9 +16,10 @@ import { useToast } from "@/hooks/use-toast"
 
 interface OrdersTableProps {
   orders: Order[]
+  eligibleRoutes?: RetryRouteOption[]
 }
 
-export function OrdersTable({ orders }: OrdersTableProps) {
+export function OrdersTable({ orders, eligibleRoutes = [] }: OrdersTableProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
   const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false)
@@ -206,6 +208,14 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                   <TableCell>{order.route_id ? `Stop ${order.stop_sequence}` : "-"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {order.status === "failed" && (
+                        <RetryFailedOrderButton
+                          orderId={order.id}
+                          orderLabel={order.order_number || order.id.substring(0, 8).toUpperCase()}
+                          availableRoutes={eligibleRoutes}
+                          variant="icon"
+                        />
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleEditOrder(order)}>
                         <Pencil className="h-4 w-4" />
                       </Button>

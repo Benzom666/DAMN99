@@ -9,6 +9,7 @@ import { ensureOrderCoordinates } from "@/lib/ensure-coords"
 import { revalidatePath } from "next/cache"
 import { env } from "@/lib/env"
 import { recalcRouteMetrics } from "./metrics"
+import { buildCsv } from "@/lib/csv"
 
 const hereTourPlanningEnabled = () => process.env.HERE_TOUR_PLANNING_ENABLED === "true"
 
@@ -506,7 +507,18 @@ export async function updateRouteStatus(routeId: string, status: "draft" | "acti
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  const { error } = await supabase.from("routes").update({ status }).eq("id", routeId).eq("admin_id", user.id)
+  // Build update payload. When the route transitions to "completed", stamp the
+  // completed_at timestamp so it appears correctly in route history exports.
+  const updatePayload: Record<string, any> = { status }
+  if (status === "completed") {
+    updatePayload.completed_at = new Date().toISOString()
+  }
+
+  const { error } = await supabase
+    .from("routes")
+    .update(updatePayload)
+    .eq("id", routeId)
+    .eq("admin_id", user.id)
 
   if (error) throw error
 
@@ -729,4 +741,337 @@ export async function bulkAssignDriver(routeIds: string[], driverId: string | nu
   revalidatePath("/admin/dispatch")
 
   return { updated, errors }
+}
+
+
+// ============================================================================
+// ROUTE HISTORY / ARCHIVAL / EXPORT
+// ============================================================================
+// Snapshots a route + its stops into route_history (immutable archive) and
+// flags the route as archived. Archived routes are hidden from the main
+// listing by default but remain queryable via /admin/routes/history.
+
+interface RouteSnapshotStop {
+  order_id: string
+  order_number: string | null
+  customer_name: string
+  customer_email: string | null
+  address: string
+  city: string | null
+  state: string | null
+  zip: string | null
+  phone: string | null
+  latitude: number | null
+  longitude: number | null
+  stop_sequence: number | null
+  status: string
+  notes: string | null
+  retry_count: number | null
+  last_failed_at: string | null
+  pod_photo_url: string | null
+  pod_signature_url: string | null
+  pod_recipient_name: string | null
+  pod_notes: string | null
+  pod_delivered_at: string | null
+}
+
+async function buildRouteSnapshot(supabase: any, routeId: string, adminId: string) {
+  const { data: route, error: routeError } = await supabase
+    .from("routes")
+    .select("*, driver:profiles!driver_id(display_name, email)")
+    .eq("id", routeId)
+    .eq("admin_id", adminId)
+    .single()
+
+  if (routeError || !route) {
+    throw new Error("Route not found or access denied")
+  }
+
+  const { data: orders } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("route_id", routeId)
+    .order("stop_sequence", { ascending: true })
+
+  const orderIds = (orders || []).map((o: any) => o.id)
+
+  // Load latest POD per order (if any) so the snapshot is fully self-contained
+  const podsByOrder = new Map<string, any>()
+  if (orderIds.length > 0) {
+    const { data: pods } = await supabase
+      .from("pods")
+      .select("*")
+      .in("order_id", orderIds)
+      .order("delivered_at", { ascending: false })
+    for (const pod of pods || []) {
+      if (!podsByOrder.has(pod.order_id)) {
+        podsByOrder.set(pod.order_id, pod)
+      }
+    }
+  }
+
+  const stops: RouteSnapshotStop[] = (orders || []).map((o: any) => {
+    const pod = podsByOrder.get(o.id)
+    return {
+      order_id: o.id,
+      order_number: o.order_number ?? null,
+      customer_name: o.customer_name,
+      customer_email: o.customer_email ?? null,
+      address: o.address,
+      city: o.city ?? null,
+      state: o.state ?? null,
+      zip: o.zip ?? null,
+      phone: o.phone ?? null,
+      latitude: o.latitude ?? null,
+      longitude: o.longitude ?? null,
+      stop_sequence: o.stop_sequence ?? null,
+      status: o.status,
+      notes: o.notes ?? null,
+      retry_count: o.retry_count ?? 0,
+      last_failed_at: o.last_failed_at ?? null,
+      pod_photo_url: pod?.photo_url ?? null,
+      pod_signature_url: pod?.signature_url ?? null,
+      pod_recipient_name: pod?.recipient_name ?? null,
+      pod_notes: pod?.notes ?? null,
+      pod_delivered_at: pod?.delivered_at ?? null,
+    }
+  })
+
+  const completedStops = stops.filter((s) => s.status === "delivered").length
+  const failedStops = stops.filter((s) => s.status === "failed").length
+
+  return { route, stops, completedStops, failedStops }
+}
+
+export async function archiveRoute(routeId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const { route, stops, completedStops, failedStops } = await buildRouteSnapshot(supabase, routeId, user.id)
+
+  // Insert immutable snapshot row (don't fail archive if a snapshot already
+  // exists for this route — the table has no unique constraint, but multiple
+  // snapshots are intentionally allowed for re-archived routes).
+  const { error: histError } = await supabase.from("route_history").insert({
+    route_id: route.id,
+    admin_id: user.id,
+    name: route.name,
+    driver_id: route.driver_id,
+    driver_name: route.driver?.display_name ?? null,
+    driver_email: route.driver?.email ?? null,
+    status: route.status,
+    total_stops: stops.length,
+    completed_stops: completedStops,
+    failed_stops: failedStops,
+    distance_km: route.distance_km ?? null,
+    duration_sec: route.duration_sec ?? null,
+    created_at: route.created_at,
+    completed_at: route.completed_at ?? null,
+    snapshot: {
+      route: {
+        id: route.id,
+        name: route.name,
+        status: route.status,
+        driver_id: route.driver_id,
+        driver_name: route.driver?.display_name ?? null,
+        driver_email: route.driver?.email ?? null,
+        distance_km: route.distance_km ?? null,
+        duration_sec: route.duration_sec ?? null,
+        drive_time_sec: route.drive_time_sec ?? null,
+        service_time_sec: route.service_time_sec ?? null,
+        depot_lat: route.depot_lat ?? null,
+        depot_lng: route.depot_lng ?? null,
+        created_at: route.created_at,
+        completed_at: route.completed_at ?? null,
+      },
+      stops,
+      archived_by: user.id,
+    },
+  })
+
+  if (histError) {
+    console.error("[v0] [ARCHIVE_ROUTE] Failed to write history snapshot:", histError)
+    throw new Error(`Failed to archive route: ${histError.message}`)
+  }
+
+  // Mark route as archived (it stays in the routes table, just filtered out)
+  const { error: routeUpdateError } = await supabase
+    .from("routes")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", routeId)
+    .eq("admin_id", user.id)
+
+  if (routeUpdateError) {
+    console.error("[v0] [ARCHIVE_ROUTE] Failed to flag route as archived:", routeUpdateError)
+    throw routeUpdateError
+  }
+
+  revalidatePath("/admin/routes")
+  revalidatePath("/admin/routes/history")
+  revalidatePath(`/admin/routes/${routeId}`)
+  return { success: true }
+}
+
+export async function unarchiveRoute(routeId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const { error } = await supabase
+    .from("routes")
+    .update({ archived_at: null })
+    .eq("id", routeId)
+    .eq("admin_id", user.id)
+
+  if (error) throw error
+
+  revalidatePath("/admin/routes")
+  revalidatePath("/admin/routes/history")
+  return { success: true }
+}
+
+export async function bulkArchiveRoutes(routeIds: string[]) {
+  let archived = 0
+  const errors: string[] = []
+
+  for (const id of routeIds) {
+    try {
+      await archiveRoute(id)
+      archived++
+    } catch (err: any) {
+      errors.push(`${id}: ${err?.message ?? "unknown error"}`)
+    }
+  }
+
+  return { archived, errors }
+}
+
+/**
+ * Build a CSV export of a single route. Pulls live data when the route still
+ * exists and falls back to the route_history snapshot when only the archive
+ * remains.
+ */
+export async function exportRouteCSV(routeId: string): Promise<{ filename: string; csv: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  // Try live first
+  const { data: liveRoute } = await supabase
+    .from("routes")
+    .select("*, driver:profiles!driver_id(display_name, email)")
+    .eq("id", routeId)
+    .eq("admin_id", user.id)
+    .maybeSingle()
+
+  let routeMeta: any
+  let stops: RouteSnapshotStop[] = []
+
+  if (liveRoute) {
+    const snap = await buildRouteSnapshot(supabase, routeId, user.id)
+    routeMeta = snap.route
+    stops = snap.stops
+  } else {
+    const { data: history } = await supabase
+      .from("route_history")
+      .select("*")
+      .eq("route_id", routeId)
+      .eq("admin_id", user.id)
+      .order("archived_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!history) {
+      throw new Error("Route not found in active routes or history")
+    }
+    routeMeta = history.snapshot?.route ?? {
+      id: history.route_id,
+      name: history.name,
+      driver_name: history.driver_name,
+      driver_email: history.driver_email,
+      status: history.status,
+      distance_km: history.distance_km,
+      duration_sec: history.duration_sec,
+      created_at: history.created_at,
+      completed_at: history.completed_at,
+    }
+    stops = (history.snapshot?.stops ?? []) as RouteSnapshotStop[]
+  }
+
+  const headers = [
+    "Stop #",
+    "Order #",
+    "Customer",
+    "Customer Email",
+    "Status",
+    "Address",
+    "City",
+    "State",
+    "ZIP",
+    "Phone",
+    "Latitude",
+    "Longitude",
+    "Retry Count",
+    "Last Failed At",
+    "POD Recipient",
+    "POD Delivered At",
+    "POD Photo URL",
+    "POD Signature URL",
+    "POD Notes",
+    "Order Notes",
+  ]
+
+  const rows = stops.map((s) => [
+    s.stop_sequence ?? "",
+    s.order_number ?? "",
+    s.customer_name,
+    s.customer_email ?? "",
+    s.status,
+    s.address,
+    s.city ?? "",
+    s.state ?? "",
+    s.zip ?? "",
+    s.phone ?? "",
+    s.latitude ?? "",
+    s.longitude ?? "",
+    s.retry_count ?? 0,
+    s.last_failed_at ?? "",
+    s.pod_recipient_name ?? "",
+    s.pod_delivered_at ?? "",
+    s.pod_photo_url ?? "",
+    s.pod_signature_url ?? "",
+    s.pod_notes ?? "",
+    s.notes ?? "",
+  ])
+
+  const summaryRows: Array<Array<unknown>> = [
+    ["Route Name", routeMeta?.name ?? ""],
+    ["Driver", routeMeta?.driver_name ?? routeMeta?.driver?.display_name ?? routeMeta?.driver?.email ?? "Unassigned"],
+    ["Status", routeMeta?.status ?? ""],
+    ["Total Stops", stops.length],
+    ["Delivered", stops.filter((s) => s.status === "delivered").length],
+    ["Failed", stops.filter((s) => s.status === "failed").length],
+    ["Distance (km)", routeMeta?.distance_km ?? ""],
+    ["Duration (sec)", routeMeta?.duration_sec ?? ""],
+    ["Created At", routeMeta?.created_at ?? ""],
+    ["Completed At", routeMeta?.completed_at ?? ""],
+    [],
+  ]
+
+  const csv = buildCsv(["Field", "Value"], summaryRows) + "\r\n" + buildCsv(headers, rows)
+
+  const safeName = String(routeMeta?.name ?? "route").replace(/[^A-Za-z0-9-_]+/g, "_")
+  const filename = `route_${safeName}_${routeId.slice(0, 8)}.csv`
+
+  return { filename, csv }
 }

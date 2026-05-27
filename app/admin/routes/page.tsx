@@ -2,6 +2,9 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { RoutesTable } from "./routes-table"
 import { PageHeader } from "@/components/page-header"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { History } from "lucide-react"
 
 export default async function RoutesPage() {
   const supabase = await createClient()
@@ -28,6 +31,7 @@ export default async function RoutesPage() {
     .from("routes")
     .select("*, driver:profiles!driver_id(display_name, email)")
     .eq("admin_id", user.id)
+    .is("archived_at", null)
     .order("created_at", { ascending: false })
 
   if (routesError) {
@@ -110,6 +114,14 @@ export default async function RoutesPage() {
         eyebrow="Optimization"
         title="Route planner"
         description="Solve, sequence, and dispatch routes. Constraints in, optimal paths out."
+        actions={
+          <Link href="/admin/routes/history">
+            <Button variant="outline" size="sm">
+              <History className="mr-2 h-4 w-4" />
+              Route history
+            </Button>
+          </Link>
+        }
       />
 
       <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">

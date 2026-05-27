@@ -80,7 +80,12 @@ export async function createOrder(formData: FormData) {
 
   const { error } = await supabase.from("orders").insert(orderData)
 
-  if (error) throw error
+  if (error) {
+    if ((error as any)?.code === "23505" || error.message.toLowerCase().includes("unique")) {
+      throw new Error("Order number already exists for your account. Please try again.")
+    }
+    throw error
+  }
 
   revalidatePath("/admin/orders")
 }
@@ -316,6 +321,50 @@ export async function importOrdersFromCSV(csvData: string) {
 
   console.log(`[v0] Geocoding ${ordersToGeocode.length} addresses in batches...`)
 
+  // ----- Pre-flight order_number duplicate detection -----------------------
+  // 1. Detect duplicates within the CSV itself.
+  const dedupSeen = new Map<string, number>()
+  const csvDupes: string[] = []
+  for (const o of ordersToGeocode) {
+    if (o.order_number && o.order_number.trim() !== "") {
+      const key = o.order_number.trim()
+      if (dedupSeen.has(key)) {
+        csvDupes.push(`Row ${o.rowIndex}: order_number "${key}" duplicates row ${dedupSeen.get(key)}`)
+      } else {
+        dedupSeen.set(key, o.rowIndex)
+      }
+    }
+  }
+
+  if (csvDupes.length > 0) {
+    return { imported: 0, errors: csvDupes }
+  }
+
+  // 2. Detect duplicates against orders already in the database for this admin.
+  const providedNumbers = ordersToGeocode
+    .map((o) => o.order_number?.trim())
+    .filter((n): n is string => !!n && n.length > 0)
+
+  if (providedNumbers.length > 0) {
+    const { data: existing } = await supabase
+      .from("orders")
+      .select("order_number")
+      .eq("admin_id", user.id)
+      .in("order_number", providedNumbers)
+
+    const existingSet = new Set((existing || []).map((r: any) => r.order_number))
+    const dbDupes = providedNumbers.filter((n) => existingSet.has(n))
+
+    if (dbDupes.length > 0) {
+      return {
+        imported: 0,
+        errors: [
+          `The following order_number value(s) already exist in your account and would create duplicates: ${dbDupes.join(", ")}. Please remove or rename them and try again.`,
+        ],
+      }
+    }
+  }
+
   // Batch geocode all addresses
   const geocodeResults = await geocodeBatch(
     ordersToGeocode.map((o) => ({
@@ -371,7 +420,17 @@ export async function importOrdersFromCSV(csvData: string) {
   // Insert all orders
   if (orders.length > 0) {
     const { error } = await supabase.from("orders").insert(orders)
-    if (error) throw error
+    if (error) {
+      // 23505 = unique_violation. With the partial unique index on
+      // (admin_id, order_number) the database is now the final guard against
+      // duplicate order numbers even if they slip past the pre-flight check.
+      if ((error as any)?.code === "23505" || error.message.toLowerCase().includes("unique")) {
+        throw new Error(
+          "One or more order numbers in your CSV conflict with existing orders. Please remove duplicates and try again.",
+        )
+      }
+      throw error
+    }
   }
 
   if (failedGeocodeRows.length > 0) {
@@ -386,4 +445,171 @@ export async function importOrdersFromCSV(csvData: string) {
     imported: successCount,
     errors,
   }
+}
+
+
+// ============================================================================
+// FAILED DELIVERY RE-ROUTE / RETRY
+// ============================================================================
+// Three exported actions:
+//   retryFailedOrder(orderId)         -> back to "pending", no route assigned
+//   addFailedOrderToRoute(orderId, r) -> placed at end of an existing route
+//   bulkRetryFailedOrders(orderIds[]) -> bulk version of retryFailedOrder
+//
+// All of these:
+//   * verify the order belongs to the current admin
+//   * verify the order is currently in "failed" state
+//   * increment retry_count
+//   * preserve original_route_id (set automatically by the DB trigger added
+//     in migration 030 when status first transitions to "failed")
+//   * insert a stop_events row of type 'rerouted' for audit history
+
+async function _verifyFailedOrder(supabase: any, orderId: string, adminId: string) {
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("id", orderId)
+    .eq("admin_id", adminId)
+    .single()
+
+  if (error || !order) {
+    throw new Error("Order not found or access denied")
+  }
+  if (order.status !== "failed") {
+    throw new Error(`Only failed orders can be retried. Current status: ${order.status}`)
+  }
+  return order
+}
+
+export async function retryFailedOrder(orderId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const order = await _verifyFailedOrder(supabase, orderId, user.id)
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      status: "pending",
+      route_id: null,
+      stop_sequence: null,
+      retry_count: (order.retry_count ?? 0) + 1,
+    })
+    .eq("id", orderId)
+    .eq("admin_id", user.id)
+
+  if (updateError) {
+    console.error("[v0] [RETRY_FAILED] update failed:", updateError)
+    throw new Error(`Failed to retry order: ${updateError.message}`)
+  }
+
+  // Audit trail (best-effort)
+  await supabase.from("stop_events").insert({
+    order_id: orderId,
+    driver_id: user.id, // admin id is logged here as actor
+    event_type: "rerouted",
+    notes: `Order returned to pending queue (retry #${(order.retry_count ?? 0) + 1})`,
+  })
+
+  revalidatePath("/admin/orders")
+  if (order.route_id) revalidatePath(`/admin/routes/${order.route_id}`)
+  if (order.original_route_id) revalidatePath(`/admin/routes/${order.original_route_id}`)
+  return { success: true }
+}
+
+export async function addFailedOrderToRoute(orderId: string, targetRouteId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const order = await _verifyFailedOrder(supabase, orderId, user.id)
+
+  // Verify target route belongs to admin and is not archived/completed
+  const { data: targetRoute, error: routeError } = await supabase
+    .from("routes")
+    .select("id, status, archived_at")
+    .eq("id", targetRouteId)
+    .eq("admin_id", user.id)
+    .single()
+
+  if (routeError || !targetRoute) {
+    throw new Error("Target route not found or access denied")
+  }
+  if (targetRoute.archived_at) {
+    throw new Error("Cannot add stops to an archived route. Restore it first or pick another route.")
+  }
+  if (targetRoute.status === "completed") {
+    throw new Error("Cannot add stops to a completed route. Pick a draft or active route.")
+  }
+
+  // Find the current max stop_sequence on this route to append at the end
+  const { data: maxStopRow } = await supabase
+    .from("orders")
+    .select("stop_sequence")
+    .eq("route_id", targetRouteId)
+    .eq("admin_id", user.id)
+    .order("stop_sequence", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const nextSeq = (maxStopRow?.stop_sequence ?? 0) + 1
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      status: "assigned",
+      route_id: targetRouteId,
+      stop_sequence: nextSeq,
+      retry_count: (order.retry_count ?? 0) + 1,
+    })
+    .eq("id", orderId)
+    .eq("admin_id", user.id)
+
+  if (updateError) {
+    console.error("[v0] [REROUTE] update failed:", updateError)
+    throw new Error(`Failed to add order to route: ${updateError.message}`)
+  }
+
+  // Bump the route's total_stops counter
+  await supabase
+    .from("routes")
+    .update({ total_stops: nextSeq })
+    .eq("id", targetRouteId)
+    .eq("admin_id", user.id)
+
+  // Audit trail
+  await supabase.from("stop_events").insert({
+    order_id: orderId,
+    driver_id: user.id,
+    event_type: "rerouted",
+    notes: `Order moved to route ${targetRouteId} as stop #${nextSeq} (retry #${(order.retry_count ?? 0) + 1})`,
+  })
+
+  revalidatePath("/admin/orders")
+  revalidatePath(`/admin/routes/${targetRouteId}`)
+  if (order.route_id && order.route_id !== targetRouteId) {
+    revalidatePath(`/admin/routes/${order.route_id}`)
+  }
+  return { success: true, stop_sequence: nextSeq }
+}
+
+export async function bulkRetryFailedOrders(orderIds: string[]) {
+  let retried = 0
+  const errors: string[] = []
+  for (const id of orderIds) {
+    try {
+      await retryFailedOrder(id)
+      retried++
+    } catch (err: any) {
+      errors.push(`${id}: ${err?.message ?? "unknown error"}`)
+    }
+  }
+  return { retried, errors }
 }

@@ -35,6 +35,16 @@ export default async function OrdersPage() {
     console.error("[ORDERS] Error fetching orders:", error)
   }
 
+  // Routes that a failed order can be re-added to: own admin, not archived,
+  // not completed. The Retry dialog only shows these.
+  const { data: eligibleRoutes } = await supabase
+    .from("routes")
+    .select("id, name, status")
+    .eq("admin_id", user.id)
+    .is("archived_at", null)
+    .in("status", ["draft", "active"])
+    .order("created_at", { ascending: false })
+
   const needsMigration =
     orders && orders.length > 0 && !("order_number" in orders[0])
 
@@ -48,7 +58,7 @@ export default async function OrdersPage() {
 
       <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">
         {needsMigration && <MigrationBanner />}
-        <OrdersTable orders={orders || []} />
+        <OrdersTable orders={orders || []} eligibleRoutes={eligibleRoutes || []} />
       </main>
     </div>
   )

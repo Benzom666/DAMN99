@@ -6,10 +6,27 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { CreateRouteDialog } from "./create-route-dialog"
 import { PrintLabelsDialog } from "@/components/print-labels-dialog"
-import { deleteRoute, updateRouteStatus, bulkDeleteRoutes, bulkAssignDriver } from "./actions"
+import {
+  deleteRoute,
+  updateRouteStatus,
+  bulkDeleteRoutes,
+  bulkAssignDriver,
+  archiveRoute,
+  exportRouteCSV,
+} from "./actions"
 import { useState } from "react"
 import type { Order, Profile } from "@/lib/types"
-import { Plus, Trash2, Play, CheckCircle, Printer, Eye, UserPlus } from "lucide-react"
+import {
+  Plus,
+  Trash2,
+  Play,
+  CheckCircle,
+  Printer,
+  Eye,
+  UserPlus,
+  Archive,
+  Download,
+} from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -51,8 +68,68 @@ export function RoutesTable({ routes, orders, drivers }: RoutesTableProps) {
   const [isBulkAssignDialogOpen, setIsBulkAssignDialogOpen] = useState(false)
   const [bulkAssignDriverId, setBulkAssignDriverId] = useState<string>("")
   const [isAssigning, setIsAssigning] = useState(false)
+  const [archivingRouteId, setArchivingRouteId] = useState<string | null>(null)
+  const [exportingRouteId, setExportingRouteId] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
+
+  function downloadCsv(filename: string, csv: string) {
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  async function handleArchiveRoute(routeId: string, routeName: string) {
+    if (
+      !confirm(
+        `Archive "${routeName}"? It will be moved to Route History. A permanent snapshot will be saved.`,
+      )
+    )
+      return
+    setArchivingRouteId(routeId)
+    try {
+      await archiveRoute(routeId)
+      toast({
+        title: "Route archived",
+        description: `"${routeName}" moved to Route History.`,
+      })
+      router.refresh()
+    } catch (err: any) {
+      toast({
+        title: "Archive failed",
+        description: err?.message ?? "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setArchivingRouteId(null)
+    }
+  }
+
+  async function handleExportRoute(routeId: string) {
+    setExportingRouteId(routeId)
+    try {
+      const result = await exportRouteCSV(routeId)
+      downloadCsv(result.filename, result.csv)
+      toast({
+        title: "Export ready",
+        description: `Downloaded ${result.filename}`,
+      })
+    } catch (err: any) {
+      toast({
+        title: "Export failed",
+        description: err?.message ?? "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setExportingRouteId(null)
+    }
+  }
 
   async function handleDeleteRoute(routeId: string) {
     if (confirm("Are you sure you want to delete this route? Orders will be reset to pending.")) {
@@ -322,6 +399,26 @@ export function RoutesTable({ routes, orders, drivers }: RoutesTableProps) {
                           title="Complete Route"
                         >
                           <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleExportRoute(route.id)}
+                        disabled={exportingRouteId === route.id}
+                        title="Export CSV"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {route.status === "completed" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleArchiveRoute(route.id, route.name)}
+                          disabled={archivingRouteId === route.id}
+                          title="Archive route"
+                        >
+                          <Archive className="h-4 w-4" />
                         </Button>
                       )}
                       <Button

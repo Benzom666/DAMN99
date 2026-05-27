@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastMigration": "016_fix_multi_tenancy_data",
+  "lastMigration": "030_route_history_unique_orders_retry",
   "migrations": [
     {
       "id": "001",
@@ -104,6 +104,13 @@
       "id": "016",
       "name": "fix_multi_tenancy_data",
       "description": "Fix data integrity for multi-tenancy",
+      "appliedAt": null,
+      "status": "pending"
+    },
+    {
+      "id": "030",
+      "name": "route_history_unique_orders_retry",
+      "description": "Route history/archival, unique order numbers, failed-delivery retry",
       "appliedAt": null,
       "status": "pending"
     }

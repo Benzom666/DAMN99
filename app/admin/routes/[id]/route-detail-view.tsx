@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import dynamic from "next/dynamic"
-import { ArrowLeft, User, Package, MapPin, Edit, Trash2, Calculator, Ruler, Clock } from "lucide-react"
+import { ArrowLeft, User, Package, MapPin, Edit, Trash2, Calculator, Ruler, Clock, Archive, Download } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import {
@@ -18,12 +18,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { updateRoute, deleteRoute, recalcRouteMetricsAction } from "../actions"
+import { updateRoute, deleteRoute, recalcRouteMetricsAction, archiveRoute, exportRouteCSV } from "../actions"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import ErrorBoundary from "@/components/error-boundary"
 import { formatDuration } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { RetryFailedOrderButton, type RetryRouteOption } from "@/components/retry-failed-order-button"
 
 const HereMapClient = dynamic(() => import("@/components/here-map"), {
   ssr: false,
@@ -38,15 +39,18 @@ interface RouteDetailViewProps {
   route: any
   orders: any[]
   drivers?: any[]
+  eligibleRoutes?: RetryRouteOption[]
 }
 
-export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailViewProps) {
+export function RouteDetailView({ route, orders, drivers = [], eligibleRoutes = [] }: RouteDetailViewProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editName, setEditName] = useState(route.name)
   const [editDriverId, setEditDriverId] = useState(route.driver_id || "unassigned")
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isRecalculating, setIsRecalculating] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const router = useRouter()
 
   const orderedStops = orders
@@ -154,6 +158,47 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
     }
   }
 
+  async function handleArchive() {
+    if (
+      !confirm(
+        `Archive "${route.name}"? It will be moved to Route History with a permanent snapshot.`,
+      )
+    )
+      return
+    setIsArchiving(true)
+    try {
+      await archiveRoute(route.id)
+      toast.success("Route archived. Moved to Route History.")
+      router.push("/admin/routes")
+    } catch (error: any) {
+      console.error("[v0] Error archiving route:", error)
+      toast.error(error?.message ?? "Failed to archive route")
+      setIsArchiving(false)
+    }
+  }
+
+  async function handleExport() {
+    setIsExporting(true)
+    try {
+      const result = await exportRouteCSV(route.id)
+      const blob = new Blob(["\uFEFF" + result.csv], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = result.filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+      toast.success(`Downloaded ${result.filename}`)
+    } catch (error: any) {
+      console.error("[v0] Error exporting route:", error)
+      toast.error(error?.message ?? "Failed to export route")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -182,6 +227,16 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
           <Edit className="h-4 w-4 mr-2" />
           Edit
         </Button>
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
+          <Download className="h-4 w-4 mr-2" />
+          {isExporting ? "Exporting..." : "Export CSV"}
+        </Button>
+        {(route.status === "completed" || route.status === "active" || route.status === "draft") && !route.archived_at && (
+          <Button variant="outline" size="sm" onClick={handleArchive} disabled={isArchiving}>
+            <Archive className="h-4 w-4 mr-2" />
+            {isArchiving ? "Archiving..." : "Archive"}
+          </Button>
+        )}
         <Button variant="destructive" size="sm" onClick={handleDeleteRoute} disabled={isDeleting}>
           <Trash2 className="h-4 w-4 mr-2" />
           {isDeleting ? "Deleting..." : "Delete"}
@@ -367,17 +422,27 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <h3 className="font-semibold">{order.customer_name}</h3>
-                    <Badge
-                      variant={
-                        order.status === "delivered"
-                          ? "default"
-                          : order.status === "failed"
-                            ? "destructive"
-                            : "secondary"
-                      }
-                    >
-                      {order.status}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge
+                        variant={
+                          order.status === "delivered"
+                            ? "default"
+                            : order.status === "failed"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {order.status}
+                      </Badge>
+                      {order.status === "failed" && (
+                        <RetryFailedOrderButton
+                          orderId={order.id}
+                          orderLabel={order.order_number || order.id.substring(0, 8).toUpperCase()}
+                          availableRoutes={eligibleRoutes}
+                          variant="icon"
+                        />
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground mb-1">{order.address}</p>
                   {order.city && (
@@ -387,6 +452,11 @@ export function RouteDetailView({ route, orders, drivers = [] }: RouteDetailView
                     </p>
                   )}
                   {order.phone && <p className="text-sm text-primary mt-1">{order.phone}</p>}
+                  {order.retry_count > 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Retried {order.retry_count} time{order.retry_count > 1 ? "s" : ""}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

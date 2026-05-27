@@ -59,6 +59,16 @@ export default async function AdminRouteDetailPage({
 
   const { data: drivers } = await supabase.from("profiles").select("*").eq("role", "driver").order("display_name")
 
+  // Eligible target routes for the "retry / re-route failed delivery" dialog
+  const { data: eligibleRoutes } = await supabase
+    .from("routes")
+    .select("id, name, status")
+    .eq("admin_id", user.id)
+    .is("archived_at", null)
+    .in("status", ["draft", "active"])
+    .neq("id", id) // can't reroute back onto itself
+    .order("created_at", { ascending: false })
+
   console.log("[v0] Route loaded successfully:", route.name, "with", orders?.length || 0, "orders")
 
   return (
@@ -90,7 +100,12 @@ export default async function AdminRouteDetailPage({
         </div>
       </header>
       <main className="flex-1 container mx-auto p-6">
-        <RouteDetailView route={route} orders={orders || []} drivers={drivers || []} />
+        <RouteDetailView
+          route={route}
+          orders={orders || []}
+          drivers={drivers || []}
+          eligibleRoutes={eligibleRoutes || []}
+        />
       </main>
     </div>
   )
