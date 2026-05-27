@@ -35,12 +35,9 @@ function LandingPage() {
       {/* Nav */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-zinc-200">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
-              <Package className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight">DAMN99</span>
-          </div>
+          <Link href="/" className="flex items-center">
+            <img src="/logo.svg" alt="Delivery OS" className="h-8" />
+          </Link>
           <div className="flex items-center gap-3">
             <Link href="/auth/login">
               <Button variant="ghost" size="sm">Sign In</Button>
@@ -226,7 +223,7 @@ function LandingPage() {
             Start optimizing deliveries
           </h2>
           <p className="text-xl text-zinc-600 mb-8 max-w-2xl mx-auto">
-            Join 500+ logistics teams using DAMN99
+            Join 500+ logistics teams using Delivery OS
           </p>
           <div className="flex items-center gap-4 justify-center">
             <Link href="/auth/sign-up">
@@ -248,13 +245,10 @@ function LandingPage() {
       <footer className="bg-zinc-50">
         <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-zinc-900 flex items-center justify-center">
-                <Package className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-semibold">DAMN99</span>
-            </div>
-            <p className="text-sm text-zinc-600">© 2024 DAMN99</p>
+            <Link href="/" className="flex items-center">
+              <img src="/logo.svg" alt="Delivery OS" className="h-6" />
+            </Link>
+            <p className="text-sm text-zinc-600">© 2024 Delivery OS</p>
           </div>
         </div>
       </footer>
