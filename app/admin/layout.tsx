@@ -2,13 +2,6 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AppSidebar } from "@/components/app-sidebar"
 
-async function signOut() {
-  "use server"
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  redirect("/auth/login")
-}
-
 export default async function AdminLayout({
   children,
 }: {
@@ -43,7 +36,6 @@ export default async function AdminLayout({
       <AppSidebar 
         role={profile.role as "admin" | "super_admin"} 
         userName={profile.display_name || profile.email || undefined}
-        onSignOut={signOut}
       />
       <main className="flex-1 ml-64 transition-all duration-300">
         {children}

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { 
   LayoutDashboard, 
@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 interface NavItem {
   title: string
@@ -32,12 +33,18 @@ interface NavItem {
 interface AppSidebarProps {
   role: "admin" | "super_admin"
   userName?: string
-  onSignOut?: () => void
 }
 
-export function AppSidebar({ role, userName, onSignOut }: AppSidebarProps) {
+export function AppSidebar({ role, userName }: AppSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
+  const supabase = createClient()
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/auth/login")
+  }
 
   const adminNavItems: NavItem[] = [
     { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -150,7 +157,7 @@ export function AppSidebar({ role, userName, onSignOut }: AppSidebarProps) {
           )}
           <Button
             variant="ghost"
-            onClick={onSignOut}
+            onClick={handleSignOut}
             className={cn(
               "w-full justify-start text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent",
               collapsed && "justify-center"
