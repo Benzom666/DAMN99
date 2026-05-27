@@ -2,8 +2,9 @@ import { requireSuperAdmin } from "@/lib/auth/super-admin"
 import { getHereCostAnalytics } from "../actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { AutoRefresh } from "./auto-refresh"
-import { AlertTriangle, Clock, DollarSign, ShieldCheck, Zap } from "lucide-react"
+import { AlertTriangle, Clock, DollarSign, ShieldCheck, Zap, Key, Server } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -65,6 +66,17 @@ export default async function HereCostAnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Estimated 30d Cost</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{money(analytics.last30d.costCents)}</div>
+            <p className="text-xs text-muted-foreground">{analytics.last30d.requests} paid requests</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Cache Hits 24h</CardTitle>
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -73,7 +85,62 @@ export default async function HereCostAnalyticsPage() {
             <p className="text-xs text-muted-foreground">Requests avoided</p>
           </CardContent>
         </Card>
+      </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Platform Key Usage (30d)</CardTitle>
+            <Server className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.last30d.platformKeyRequests}</div>
+            <p className="text-xs text-muted-foreground">
+              {money(analytics.last30d.platformKeyCost)} estimated cost
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Client Keys Usage (30d)</CardTitle>
+            <Key className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.last30d.ownKeyRequests}</div>
+            <p className="text-xs text-muted-foreground">
+              {money(analytics.last30d.ownKeyCost)} estimated cost (client-paid)
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>HERE API Free Tier Usage (30 days)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {Object.entries(analytics.freeTierUsage).map(([service, usage]: [string, any]) => (
+              <div key={service} className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{serviceLabel(service)}</span>
+                  <span className="text-muted-foreground">
+                    {usage.used.toLocaleString()} / {usage.limit.toLocaleString()} requests
+                  </span>
+                </div>
+                <Progress value={usage.percentUsed} className="h-2" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{usage.percentUsed.toFixed(1)}% used</span>
+                  <span>{usage.remaining.toLocaleString()} remaining</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Blocked 24h</CardTitle>

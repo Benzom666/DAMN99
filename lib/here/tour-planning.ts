@@ -1,6 +1,7 @@
 import { getHereAccessToken } from "./oauth"
 import { checkTourPlanningRateLimit } from "@/lib/rate-limiter"
 import { assertHereBudget, recordHereUsage } from "@/lib/here/cost-control"
+import { getHereApiKey } from "@/app/actions/get-here-api-key"
 
 const BASE_URL = "https://tourplanning.hereapi.com/v3"
 
@@ -18,7 +19,7 @@ export interface HereSolutionInterface {
   unassigned?: Array<{ jobId: string; reasons: Array<{ code: string; description: string }> }>
 }
 
-async function getAuthHeaders(): Promise<{ headers: Record<string, string>; params: URLSearchParams }> {
+async function getAuthHeaders(adminId?: string): Promise<{ headers: Record<string, string>; params: URLSearchParams }> {
   const authMode = process.env.HERE_TOUR_PLANNING_AUTH || "apikey"
 
   if (authMode === "oauth") {
@@ -35,7 +36,7 @@ async function getAuthHeaders(): Promise<{ headers: Record<string, string>; para
   }
 
   // API key mode - NEVER put API key in Authorization header
-  const apiKey = process.env.HERE_API_KEY || process.env.HERE_SERVER_API_KEY
+  const apiKey = await getHereApiKey(adminId)
   if (!apiKey) throw new Error("HERE API key not configured")
 
   return {
@@ -57,7 +58,7 @@ function deepStripTimes(x: any): void {
   Object.values(x).forEach(deepStripTimes)
 }
 
-export async function submitOrPoll(problem: any, maxSeconds = 60, userId?: string): Promise<HereSolution> {
+export async function submitOrPoll(problem: any, maxSeconds = 60, userId?: string, adminId?: string): Promise<HereSolution> {
   // Check rate limit before making expensive HERE API call
   if (userId) {
     const rateLimit = checkTourPlanningRateLimit(userId)
@@ -93,7 +94,7 @@ export async function submitOrPoll(problem: any, maxSeconds = 60, userId?: strin
     ).length
     console.log("[v0] jobs with times after deep strip:", jobsWithTimes || 0)
 
-    const { headers, params } = await getAuthHeaders()
+    const { headers, params } = await getAuthHeaders(adminId)
     const url = `${BASE_URL}/problems?${params.toString()}`
     const jobCount = problem.plan?.jobs?.length || 0
 
@@ -215,7 +216,7 @@ export async function submitOrPoll(problem: any, maxSeconds = 60, userId?: strin
 
     console.log(`[SERVER] [v0] Problem submitted with ID: ${problemId}, starting polling...`)
 
-    return await pollSolution(problemId, maxSeconds, userId)
+    return await pollSolution(problemId, maxSeconds, userId, adminId)
   } catch (error) {
     console.error("[SERVER] [v0] Tour Planning error:", error)
     await recordHereUsage({
@@ -230,9 +231,9 @@ export async function submitOrPoll(problem: any, maxSeconds = 60, userId?: strin
   }
 }
 
-async function pollSolution(problemId: string, maxSeconds: number, userId?: string): Promise<HereSolution> {
+async function pollSolution(problemId: string, maxSeconds: number, userId?: string, adminId?: string): Promise<HereSolution> {
   const startTime = Date.now()
-  const { headers, params } = await getAuthHeaders()
+  const { headers, params } = await getAuthHeaders(adminId)
 
   while (Date.now() - startTime < maxSeconds * 1000) {
     const url = `${BASE_URL}/problems/${problemId}?${params.toString()}`
@@ -300,9 +301,10 @@ export async function optimizeWithHereTourPlanning(
   jobPlaceById: Map<string, { lat: number; lng: number }>,
   maxSeconds = 60,
   userId?: string,
+  adminId?: string,
 ): Promise<OptimizedTour[]> {
   try {
-    const solution = await submitOrPoll(problem, maxSeconds, userId)
+    const solution = await submitOrPoll(problem, maxSeconds, userId, adminId)
 
     if (solution.unassigned && solution.unassigned.length > 0) {
       console.log(`[SERVER] [v0] Warning: ${solution.unassigned.length} jobs unassigned:`)

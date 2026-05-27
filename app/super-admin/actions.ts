@@ -273,26 +273,41 @@ export async function getHereCostAnalytics() {
   const supabase = await getSupabaseAdmin()
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  const [last24h, last7d, recent] = await Promise.all([
+  const [last24h, last7d, last30d, recent] = await Promise.all([
     (supabase as any)
       .from('here_api_usage')
-      .select('service, request_count, unit_count, estimated_cost_cents, status, cache_hit')
+      .select('service, request_count, unit_count, estimated_cost_cents, status, cache_hit, used_own_key')
       .gte('created_at', since24h)
       .order('created_at', { ascending: false })
       .limit(5000),
     (supabase as any)
       .from('here_api_usage')
-      .select('service, request_count, unit_count, estimated_cost_cents, status, cache_hit')
+      .select('service, request_count, unit_count, estimated_cost_cents, status, cache_hit, used_own_key')
       .gte('created_at', since7d)
       .order('created_at', { ascending: false })
       .limit(20000),
     (supabase as any)
       .from('here_api_usage')
-      .select('created_at, service, operation, request_count, unit_count, estimated_cost_cents, status, cache_hit, error_message')
+      .select('service, request_count, unit_count, estimated_cost_cents, status, cache_hit, used_own_key')
+      .gte('created_at', since30d)
+      .order('created_at', { ascending: false })
+      .limit(50000),
+    (supabase as any)
+      .from('here_api_usage')
+      .select('created_at, service, operation, request_count, unit_count, estimated_cost_cents, status, cache_hit, used_own_key, error_message')
       .order('created_at', { ascending: false })
       .limit(25)
   ])
+
+  // HERE API Free Tier Limits (monthly)
+  const FREE_TIER = {
+    geocoding: 250000, // 250k requests/month
+    routing: 250000,   // 250k requests/month
+    tour_planning: 0,  // No free tier
+    maps_js: 250000    // 250k map loads/month
+  }
 
   const aggregate = (rows: any[] = []) => {
     const byService: Record<string, { requests: number; units: number; costCents: number; errors: number; blocked: number; cacheHits: number }> = {}
@@ -302,6 +317,10 @@ export async function getHereCostAnalytics() {
     let errors = 0
     let blocked = 0
     let cacheHits = 0
+    let platformKeyRequests = 0
+    let platformKeyCost = 0
+    let ownKeyRequests = 0
+    let ownKeyCost = 0
 
     for (const row of rows) {
       const service = row.service || 'unknown'
@@ -309,6 +328,7 @@ export async function getHereCostAnalytics() {
       const requestCount = Number(row.request_count || 0)
       const unitCount = Number(row.unit_count || 0)
       const cost = Number(row.estimated_cost_cents || 0)
+      const usedOwnKey = Boolean(row.used_own_key)
 
       requests += requestCount
       units += unitCount
@@ -316,6 +336,15 @@ export async function getHereCostAnalytics() {
       if (row.status === 'error') errors++
       if (row.status === 'blocked') blocked++
       if (row.cache_hit) cacheHits++
+
+      // Track platform vs own key usage
+      if (usedOwnKey) {
+        ownKeyRequests += requestCount
+        ownKeyCost += cost
+      } else {
+        platformKeyRequests += requestCount
+        platformKeyCost += cost
+      }
 
       byService[service].requests += requestCount
       byService[service].units += unitCount
@@ -325,14 +354,60 @@ export async function getHereCostAnalytics() {
       if (row.cache_hit) byService[service].cacheHits++
     }
 
-    return { requests, units, costCents, errors, blocked, cacheHits, byService }
+    return { 
+      requests, 
+      units, 
+      costCents, 
+      errors, 
+      blocked, 
+      cacheHits, 
+      byService,
+      platformKeyRequests,
+      platformKeyCost,
+      ownKeyRequests,
+      ownKeyCost
+    }
+  }
+
+  const last30dData = aggregate(last30d.data || [])
+
+  // Calculate free tier usage for 30-day period
+  const freeTierUsage: Record<string, { used: number; limit: number; remaining: number; percentUsed: number }> = {}
+  for (const [service, limit] of Object.entries(FREE_TIER)) {
+    const used = last30dData.byService[service]?.requests || 0
+    const remaining = Math.max(0, limit - used)
+    const percentUsed = limit > 0 ? Math.min(100, (used / limit) * 100) : 0
+    freeTierUsage[service] = { used, limit, remaining, percentUsed }
   }
 
   return {
     last24h: aggregate(last24h.data || []),
     last7d: aggregate(last7d.data || []),
+    last30d: last30dData,
+    freeTierUsage,
     recent: recent.data || [],
-    unavailable: Boolean(last24h.error || last7d.error || recent.error),
-    error: last24h.error?.message || last7d.error?.message || recent.error?.message || null
+    unavailable: Boolean(last24h.error || last7d.error || last30d.error || recent.error),
+    error: last24h.error?.message || last7d.error?.message || last30d.error?.message || recent.error?.message || null
   }
+}
+
+export async function updateAdminApiKey(adminId: string, apiKey: string | null) {
+  const supabase = await getSupabaseAdmin()
+  
+  const { error } = await supabase
+    .from('profiles')
+    .update({ here_api_key: apiKey })
+    .eq('id', adminId)
+    .eq('role', 'admin') // Only allow updating admin accounts
+  
+  if (error) throw error
+  
+  await logAuditAction(
+    'update_admin_api_key',
+    'profiles',
+    adminId,
+    { hasKey: !!apiKey }
+  )
+  
+  revalidatePath('/super-admin/admins')
 }

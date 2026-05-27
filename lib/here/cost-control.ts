@@ -16,6 +16,7 @@ type HereUsageInput = {
   status?: HereUsageStatus
   httpStatus?: number | null
   cacheHit?: boolean
+  usedOwnKey?: boolean
   metadata?: Record<string, unknown>
   errorMessage?: string
 }
@@ -153,6 +154,7 @@ export async function recordHereUsage(input: HereUsageInput): Promise<void> {
       status,
       http_status: input.httpStatus || null,
       cache_hit: Boolean(input.cacheHit),
+      used_own_key: Boolean(input.usedOwnKey),
       metadata: input.metadata || {},
       error_message: input.errorMessage || null,
     })

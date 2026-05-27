@@ -5,6 +5,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { geocodeAddress } from "@/lib/geocode-here"
+import { getHereApiKey, isUsingOwnKey } from "@/app/actions/get-here-api-key"
 
 export interface OrderWithCoords {
   id: string
@@ -18,16 +19,21 @@ export interface OrderWithCoords {
  * Returns updated orders array with geocoded coordinates
  * Mutates the input orders array to update coordinates in-place
  */
-export async function ensureOrderCoordinates(orders: any[]): Promise<{
+export async function ensureOrderCoordinates(
+  orders: any[],
+  adminId?: string
+): Promise<{
   orders: OrderWithCoords[]
   failed: Array<{ orderId: string; error: string }>
 }> {
   const supabase = await createClient()
-  const apiKey = process.env.HERE_API_KEY
+  const apiKey = await getHereApiKey(adminId)
 
   if (!apiKey) {
     throw new Error("HERE_API_KEY not configured")
   }
+
+  const usedOwnKey = await isUsingOwnKey(adminId)
 
   const failed: Array<{ orderId: string; error: string }> = []
 
@@ -87,9 +93,10 @@ export async function ensureOrderCoordinates(orders: any[]): Promise<{
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
           g = await geocodeAddress(fullAddress, apiKey, ottawaBias, {
-            adminId: o.admin_id,
+            adminId: o.admin_id || adminId,
             orderId: o.id,
             operation: "ensure_order_coordinates",
+            usedOwnKey,
           })
           if (g) break // Success!
 

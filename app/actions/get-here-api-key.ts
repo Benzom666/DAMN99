@@ -1,26 +1,58 @@
-"use server"
+'use server'
 
-import { recordHereUsage } from "@/lib/here/cost-control"
+import { createServiceRoleClient } from '@/lib/supabase/server'
 
 /**
- * Returns the HERE Maps API key securely from the server.
- * Uses server-side HERE_API_KEY environment variable only.
- * This prevents exposing the API key to the client.
+ * Get HERE API key for a specific admin.
+ * Returns admin's own key if set, otherwise falls back to platform key.
+ * 
+ * @param adminId - The admin's user ID
+ * @returns HERE API key to use
  */
-export async function getHereApiKey(): Promise<string> {
-  const apiKey = process.env.HERE_API_KEY || ""
-
-  if (!apiKey) {
-    console.error("[v0] [HERE_KEY] HERE_API_KEY not configured")
-    throw new Error("HERE Maps API key is not configured")
+export async function getHereApiKey(adminId?: string): Promise<string> {
+  // If no admin ID provided, use platform key
+  if (!adminId) {
+    return process.env.HERE_API_KEY || ''
   }
 
-  console.log("[v0] [HERE_KEY] API key loaded successfully")
-  await recordHereUsage({
-    service: "maps_js",
-    operation: "load_map_sdk",
-    metadata: { source: "get_here_api_key" },
-  })
+  try {
+    const supabase = createServiceRoleClient()
+    
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('here_api_key')
+      .eq('id', adminId)
+      .single()
 
-  return apiKey
+    // If admin has their own key, use it
+    if (profile?.here_api_key) {
+      return profile.here_api_key
+    }
+  } catch (error) {
+    console.error('[getHereApiKey] Error fetching admin key:', error)
+  }
+
+  // Fall back to platform key
+  return process.env.HERE_API_KEY || ''
+}
+
+/**
+ * Check if admin is using their own HERE API key
+ */
+export async function isUsingOwnKey(adminId?: string): Promise<boolean> {
+  if (!adminId) return false
+
+  try {
+    const supabase = createServiceRoleClient()
+    
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('here_api_key')
+      .eq('id', adminId)
+      .single()
+
+    return !!profile?.here_api_key
+  } catch {
+    return false
+  }
 }

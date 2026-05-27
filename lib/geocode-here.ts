@@ -5,6 +5,7 @@
 
 import { assertHereBudget, normalizeAddressKey, recordHereUsage } from "@/lib/here/cost-control"
 import { createServiceRoleClient } from "@/lib/supabase/server"
+import { getHereApiKey, isUsingOwnKey } from "@/app/actions/get-here-api-key"
 
 export interface GeocodeResult {
   lat: number
@@ -252,11 +253,11 @@ export async function geocodeAddress(
 }
 
 /**
- * Geocode a single address with API key from environment
+ * Geocode a single address with API key from environment or admin-specific key
  * Convenience wrapper around geocodeAddress
  */
-export async function geocodeHere(fullAddress: string): Promise<GeocodeResult | null> {
-  const apiKey = process.env.HERE_API_KEY
+export async function geocodeHere(fullAddress: string, adminId?: string): Promise<GeocodeResult | null> {
+  const apiKey = await getHereApiKey(adminId)
   if (!apiKey) {
     console.error("[v0] HERE_API_KEY not configured")
     return null
@@ -265,7 +266,12 @@ export async function geocodeHere(fullAddress: string): Promise<GeocodeResult | 
   // Default Ottawa bias for depot geocoding
   const ottawaBias = { lat: 45.4215, lng: -75.6972 }
 
-  return geocodeAddress(fullAddress, apiKey, ottawaBias, { operation: "geocode_depot" })
+  const usedOwnKey = await isUsingOwnKey(adminId)
+  return geocodeAddress(fullAddress, apiKey, ottawaBias, { 
+    operation: "geocode_depot",
+    adminId,
+    usedOwnKey 
+  })
 }
 
 /**
@@ -280,6 +286,7 @@ export async function geocodeBatch(
     bias?: { lat: number; lng: number }
     adminId?: string | null
     userId?: string | null
+    usedOwnKey?: boolean
   } = {},
 ): Promise<Array<{ result: GeocodeResult | null; error?: string }>> {
   const { batchSize = Number(process.env.HERE_GEOCODING_BATCH_SIZE || 5), retries = 1, bias } = options

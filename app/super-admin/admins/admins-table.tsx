@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Ban, CheckCircle, Edit, Trash2, MoreHorizontal } from 'lucide-react'
-import { suspendAccount, restoreAccount, deleteProfile } from '../actions'
+import { suspendAccount, restoreAccount, deleteProfile, updateAdminApiKey } from '../actions'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -29,6 +29,7 @@ type Admin = {
   id: string
   email: string
   display_name: string | null
+  here_api_key: string | null
   created_at: string
   is_suspended: boolean | null
   suspended_at: string | null
@@ -42,7 +43,12 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
     open: false,
     admin: null
   })
+  const [apiKeyDialog, setApiKeyDialog] = useState<{ open: boolean; admin: Admin | null }>({
+    open: false,
+    admin: null
+  })
   const [suspendReason, setSuspendReason] = useState('')
+  const [apiKey, setApiKey] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSuspend = async () => {
@@ -95,6 +101,28 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
     }
   }
 
+  const handleUpdateApiKey = async () => {
+    if (!apiKeyDialog.admin) return
+
+    setLoading(true)
+    try {
+      await updateAdminApiKey(apiKeyDialog.admin.id, apiKey || null)
+      toast.success(apiKey ? 'API key updated' : 'API key removed - using platform key')
+      setApiKeyDialog({ open: false, admin: null })
+      setApiKey('')
+      router.refresh()
+    } catch (error) {
+      toast.error('Failed to update API key')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const openApiKeyDialog = (admin: Admin) => {
+    setApiKey(admin.here_api_key || '')
+    setApiKeyDialog({ open: true, admin })
+  }
+
   return (
     <>
       <div className="border rounded-lg">
@@ -103,6 +131,7 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
             <TableRow>
               <TableHead>Email</TableHead>
               <TableHead>Display Name</TableHead>
+              <TableHead>HERE API Key</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Actions</TableHead>
@@ -113,6 +142,15 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
               <TableRow key={admin.id}>
                 <TableCell className="font-medium">{admin.email}</TableCell>
                 <TableCell>{admin.display_name || '-'}</TableCell>
+                <TableCell>
+                  {admin.here_api_key ? (
+                    <Badge variant="outline" className="gap-1 font-mono text-xs">
+                      {admin.here_api_key.slice(0, 12)}...
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Platform key</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   {admin.role === 'super_admin' ? (
                     <Badge variant="destructive">Super Admin</Badge>
@@ -140,6 +178,10 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openApiKeyDialog(admin)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit API Key
+                        </DropdownMenuItem>
                         {admin.is_suspended ? (
                           <DropdownMenuItem onClick={() => handleRestore(admin)}>
                             <CheckCircle className="h-4 w-4 mr-2" />
@@ -197,3 +239,37 @@ export function AdminsTable({ admins }: { admins: Admin[] }) {
     </>
   )
 }
+
+      <Dialog open={apiKeyDialog.open} onOpenChange={(open) => setApiKeyDialog({ open, admin: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit HERE API Key</DialogTitle>
+            <DialogDescription>
+              Set a custom HERE API key for {apiKeyDialog.admin?.email}. Leave blank to use the platform key.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="apiKey">HERE API Key (Optional)</Label>
+              <Input
+                id="apiKey"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter HERE API key or leave blank..."
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                {apiKey ? 'This admin will use their own key for all HERE API calls' : 'This admin will use the platform key (shared)'}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApiKeyDialog({ open: false, admin: null })}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateApiKey} disabled={loading}>
+              {apiKey ? 'Set Custom Key' : 'Use Platform Key'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
