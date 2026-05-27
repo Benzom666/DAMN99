@@ -206,18 +206,20 @@ export default async function HereCostAnalyticsPage() {
             {analytics.recent.length === 0 ? (
               <p className="text-sm text-muted-foreground">No recent usage events.</p>
             ) : (
-              analytics.recent.map((event: any) => (
-                <div key={`${event.created_at}-${event.operation}`} className="flex items-center justify-between border-b pb-3">
+              analytics.recent.map((event: any, idx: number) => (
+                <div key={`${event.created_at}-${idx}`} className="flex items-center justify-between border-b pb-3">
                   <div>
-                    <div className="font-medium">{serviceLabel(event.service)} - {event.operation}</div>
+                    <div className="font-medium">
+                      {event.service ? serviceLabel(event.service) : 'Unknown Service'} - {event.operation || 'unknown operation'}
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(event.created_at).toLocaleString()} - {event.request_count} requests -{" "}
+                      {new Date(event.created_at).toLocaleString()} - {event.request_count || 0} requests -{" "}
                       {money(Number(event.estimated_cost_cents || 0))}
                     </div>
                     {event.error_message && <div className="text-xs text-red-600 mt-1">{event.error_message}</div>}
                   </div>
                   <Badge variant={event.status === "error" || event.status === "blocked" ? "destructive" : "secondary"}>
-                    {event.cache_hit ? "cache hit" : event.status}
+                    {event.cache_hit ? "cache hit" : (event.status || 'unknown')}
                   </Badge>
                 </div>
               ))
