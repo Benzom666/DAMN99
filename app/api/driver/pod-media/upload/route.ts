@@ -13,6 +13,14 @@ import { createServiceRoleClient } from "@/lib/supabase/server"
  * That eliminates the "first request after token refresh fails" class of
  * bugs entirely.
  *
+ * The client sends the ORDER id (`orderId`). The matching `pods` row may not
+ * exist yet at upload time — the driver uploads media before the delivery is
+ * marked complete — so we resolve ownership through the order → route → driver
+ * chain and create (or reuse) the POD row here. Previously the client sent the
+ * order id under the `podId` field and the route looked it up directly in the
+ * `pods` table, which never matched, so EVERY upload 404'd and no photo or
+ * signature was ever stored. (`podId` is still accepted as a legacy alias.)
+ *
  * Paths are deterministic (`pod-photos/{podId}.{ext}`) and uploads use
  * `upsert: true` so retries are idempotent — running the same upload
  * twice replaces the file in place and produces the same public URL,
@@ -40,50 +48,90 @@ export async function POST(request: Request) {
       )
     }
 
-    const podId = String(formData.get("podId") || "")
-    console.log("[POD_UPLOAD] POD ID:", podId)
+    // Accept the order id (preferred). `podId` is kept as a legacy alias for
+    // older clients, but it actually carried the order id too.
+    const orderId = String(formData.get("orderId") || formData.get("podId") || "")
+    console.log("[POD_UPLOAD] Order ID:", orderId)
 
-    if (!validateUUID(podId)) {
-      console.error("[POD_UPLOAD] Invalid POD ID")
+    if (!validateUUID(orderId)) {
+      console.error("[POD_UPLOAD] Invalid order ID")
       return NextResponse.json(
-        { success: false, error: "Invalid POD ID", code: "BAD_POD_ID" },
+        { success: false, error: "Invalid order ID", code: "BAD_ORDER_ID" },
         { status: 400 },
       )
     }
 
-    // Verify the POD belongs to this driver — service role can read every
-    // row, so we filter explicitly on driver_id to enforce ownership.
-    const { data: pod, error: podError } = await admin
-      .from("pods")
-      .select("id, driver_id")
-      .eq("id", podId)
+    // Verify the order belongs to this driver via its route, then make sure a
+    // POD row exists to attach the media to. Service role can read every row,
+    // so ownership is enforced explicitly on the route's driver_id.
+    const { data: order, error: orderError } = await admin
+      .from("orders")
+      .select("id, routes!inner(driver_id)")
+      .eq("id", orderId)
       .maybeSingle()
 
-    if (podError) {
-      console.error("[POD_UPLOAD] POD lookup error:", podError)
+    if (orderError) {
+      console.error("[POD_UPLOAD] Order lookup error:", orderError)
+      return NextResponse.json(
+        { success: false, error: "Order lookup failed", code: "ORDER_LOOKUP" },
+        { status: 500 },
+      )
+    }
+
+    if (!order) {
+      console.error("[POD_UPLOAD] Order not found:", orderId)
+      return NextResponse.json(
+        { success: false, error: "Order not found", code: "ORDER_MISSING" },
+        { status: 404 },
+      )
+    }
+
+    // @ts-expect-error - routes is a joined relation
+    const driverId = order.routes?.driver_id
+    if (driverId !== user.id) {
+      console.error("[POD_UPLOAD] Order does not belong to this driver")
+      return NextResponse.json(
+        { success: false, error: "Unauthorized for this order", code: "ORDER_FORBIDDEN" },
+        { status: 403 },
+      )
+    }
+
+    // Resolve (or create) the POD row this media belongs to.
+    const { data: existingPod, error: podLookupError } = await admin
+      .from("pods")
+      .select("id")
+      .eq("order_id", orderId)
+      .maybeSingle()
+
+    if (podLookupError) {
+      console.error("[POD_UPLOAD] POD lookup error:", podLookupError)
       return NextResponse.json(
         { success: false, error: "POD lookup failed", code: "POD_LOOKUP" },
         { status: 500 },
       )
     }
 
-    if (!pod) {
-      console.error("[POD_UPLOAD] POD not found:", podId)
-      return NextResponse.json(
-        { success: false, error: "POD not found", code: "POD_MISSING" },
-        { status: 404 },
-      )
+    let podId: string
+    if (existingPod) {
+      podId = existingPod.id
+    } else {
+      const { data: newPod, error: podInsertError } = await admin
+        .from("pods")
+        .insert({ order_id: orderId, driver_id: user.id, status: "in_progress" })
+        .select("id")
+        .single()
+
+      if (podInsertError || !newPod) {
+        console.error("[POD_UPLOAD] POD create failed:", podInsertError)
+        return NextResponse.json(
+          { success: false, error: "Failed to create POD record", code: "POD_CREATE" },
+          { status: 500 },
+        )
+      }
+      podId = newPod.id
     }
 
-    if (pod.driver_id !== user.id) {
-      console.error("[POD_UPLOAD] POD does not belong to this driver")
-      return NextResponse.json(
-        { success: false, error: "Unauthorized for this POD", code: "POD_FORBIDDEN" },
-        { status: 403 },
-      )
-    }
-
-    console.log("[POD_UPLOAD] POD verified, belongs to driver")
+    console.log("[POD_UPLOAD] POD resolved:", podId)
 
     const updates: { photo_url?: string; signature_url?: string } = {}
 
