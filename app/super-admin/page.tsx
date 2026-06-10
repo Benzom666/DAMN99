@@ -243,7 +243,7 @@ function SuperKpi({
   }
 
   const cardClass =
-    tone === "destructive" ? "soft-card p-5 bg-destructive-soft/40" : "soft-card p-5"
+    tone === "destructive" ? "soft-card p-5 bg-destructive-soft/40 animate-rise" : "soft-card p-5 animate-rise"
 
   return (
     <div className={cardClass}>
@@ -281,7 +281,7 @@ function SuperNavCard({
   return (
     <Link
       href={href}
-      className={`soft-card p-5 group transition-transform hover:-translate-y-0.5 ${
+      className={`soft-card p-5 group transition-transform hover:-translate-y-0.5 animate-rise ${
         danger ? "border-destructive/30 bg-destructive-soft/40" : ""
       }`}
     >

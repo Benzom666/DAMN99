@@ -82,6 +82,9 @@ function Hero() {
   return (
     <section className="relative">
       <div className="hero-gradient hero-clip pb-32 pt-0">
+        {/* Animated aurora backdrop — CSS only, respects reduced-motion */}
+        <div className="aurora" aria-hidden="true" />
+        <div className="aurora-grid" aria-hidden="true" />
         {/* Top nav */}
         <nav className="relative z-10">
           <div className="max-w-[1280px] mx-auto px-6 lg:px-10 h-20 flex items-center justify-between">
@@ -133,6 +136,13 @@ function Hero() {
           <div className="grid lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-16 items-center">
             {/* Left: copy */}
             <div className="animate-rise stagger-1 max-w-xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm mb-6">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+                  <span className="relative inline-flex size-2 rounded-full bg-white" />
+                </span>
+                Live dispatch · routes recalculating now
+              </div>
               <h1 className="text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] leading-[1.1] font-bold tracking-tight text-white">
                 Modern logistics operations for the modern regional carrier
               </h1>
@@ -220,7 +230,7 @@ function DashboardMockup() {
       </div>
 
       {/* Floating panel — route detail */}
-      <div className="absolute -right-2 sm:-right-6 lg:-right-10 -top-3 lg:top-6 w-[260px] sm:w-[300px] mockup-card p-4 hidden sm:block">
+      <div className="absolute -right-2 sm:-right-6 lg:-right-10 -top-3 lg:top-6 w-[260px] sm:w-[300px] mockup-card p-4 hidden sm:block animate-float">
         <div className="flex items-center gap-2 pb-3 border-b border-border">
           <div className="size-7 rounded-md bg-primary-soft grid place-items-center text-primary">
             <Truck className="size-3.5" strokeWidth={2} />
@@ -265,9 +275,41 @@ function DashboardMockup() {
   )
 }
 
-/* --------------------------------------------------------- FEATURE ROW (compact) */
+/* --------------------------------------------------------- TRUST STRIP */
 function FeatureRow() {
-  return null
+  const chips = [
+    "Specialty local carriers",
+    "High-volume regional fleets",
+    "Same-day couriers",
+    "Pharmacy & medical delivery",
+    "Grocery & meal-kit logistics",
+    "3PL & cross-dock operators",
+    "E-commerce fulfilment",
+    "Furniture & big-and-bulky",
+  ]
+  // Duplicate the list so the marquee can loop seamlessly.
+  const loop = [...chips, ...chips]
+  return (
+    <section className="bg-background border-b border-border py-10">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
+        <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground mb-6">
+          Built for every last-mile operation
+        </p>
+        <div className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]">
+          <div className="marquee gap-3">
+            {loop.map((c, i) => (
+              <span
+                key={i}
+                className="whitespace-nowrap rounded-full border border-border bg-secondary/50 px-4 py-2 text-sm font-medium text-foreground/70"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
 }
 
 /* --------------------------------------------------------- PLATFORM SECTION */

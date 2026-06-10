@@ -204,7 +204,7 @@ export default async function DriverDashboard() {
                 <Link
                   key={route.id}
                   href={`/driver/routes/${route.id}`}
-                  className="soft-card p-5 group block transition-transform hover:-translate-y-0.5"
+                  className="soft-card p-5 group block transition-transform hover:-translate-y-0.5 animate-rise"
                 >
                   <div className="flex items-start justify-between gap-3 mb-4">
                     <div className="min-w-0 flex-1">

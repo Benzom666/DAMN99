@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache"
 import { requireDriver } from "@/lib/security/authorization"
 import { validateUUID } from "@/lib/security/input-validation"
 import { createServiceRoleClient } from "@/lib/supabase/server"
+import { ensurePodMediaBucket, POD_MEDIA_BUCKET } from "@/lib/supabase/storage"
 
 /**
  * POST /api/driver/pod-media/upload
@@ -28,6 +29,10 @@ export async function POST(request: Request) {
     // The actual storage + DB write uses service role to avoid any
     // session-cookie surprises mid-request.
     const admin = createServiceRoleClient()
+
+    // Self-heal: guarantee the bucket exists and is public before we upload.
+    // Removes the fragile dependency on an operator having run migration 027.
+    await ensurePodMediaBucket(admin)
 
     let formData: FormData
     try {
@@ -109,7 +114,7 @@ export async function POST(request: Request) {
       )
 
       const { data: photoData, error: photoError } = await admin.storage
-        .from("pod-media")
+        .from(POD_MEDIA_BUCKET)
         .upload(path, photoFile, { contentType, upsert: true })
 
       if (photoError) {
@@ -125,7 +130,7 @@ export async function POST(request: Request) {
       }
 
       const { data: photoUrl } = admin.storage
-        .from("pod-media")
+        .from(POD_MEDIA_BUCKET)
         .getPublicUrl(photoData.path)
       updates.photo_url = photoUrl.publicUrl
       console.log("[POD_UPLOAD] Photo uploaded:", updates.photo_url)
@@ -143,7 +148,7 @@ export async function POST(request: Request) {
       )
 
       const { data: sigData, error: sigError } = await admin.storage
-        .from("pod-media")
+        .from(POD_MEDIA_BUCKET)
         .upload(path, signatureFile, {
           contentType: "image/png",
           upsert: true,
@@ -162,7 +167,7 @@ export async function POST(request: Request) {
       }
 
       const { data: sigUrl } = admin.storage
-        .from("pod-media")
+        .from(POD_MEDIA_BUCKET)
         .getPublicUrl(sigData.path)
       updates.signature_url = sigUrl.publicUrl
       console.log("[POD_UPLOAD] Signature uploaded:", updates.signature_url)

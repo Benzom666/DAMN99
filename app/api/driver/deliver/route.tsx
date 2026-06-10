@@ -199,6 +199,14 @@ export async function POST(request: Request) {
     }
     console.log("[DELIVER] Order status updated successfully")
 
+    // POD insert runs through the SERVICE ROLE client. The order update above
+    // already proved ownership (RLS returned the row), so we set driver_id
+    // explicitly and bypass the pods INSERT RLS policy — which historically
+    // could be missing/misconfigured and silently prevent a podId from being
+    // returned, which in turn meant photos/signatures never uploaded.
+    const { createServiceRoleClient } = await import("@/lib/supabase/server")
+    const admin = createServiceRoleClient()
+
     let podId: string | null = null
     const podInsert = {
       order_id: orderId,
@@ -211,7 +219,7 @@ export async function POST(request: Request) {
     }
 
     console.log("[DELIVER] Creating POD record")
-    const { data: podData, error: podError } = await supabase.from("pods").insert(podInsert).select("id").single()
+    const { data: podData, error: podError } = await admin.from("pods").insert(podInsert).select("id").single()
 
     if (podError) {
       console.error("[DELIVER] Full POD insert failed after delivery was saved:", podError)
@@ -221,7 +229,7 @@ export async function POST(request: Request) {
         : sanitizedNotes
 
       console.log("[DELIVER] Attempting fallback POD insert")
-      const { data: fallbackPod, error: fallbackPodError } = await supabase
+      const { data: fallbackPod, error: fallbackPodError } = await admin
         .from("pods")
         .insert({
           order_id: orderId,

@@ -253,7 +253,7 @@ function KpiCard({
     info: "bg-info-soft text-info",
   }
   return (
-    <div className="soft-card p-5">
+    <div className="soft-card p-5 animate-rise">
       <div className="flex items-start justify-between mb-4">
         <div className="text-sm text-muted-foreground">{label}</div>
         <div className={`size-9 rounded-full grid place-items-center ${iconMap[tone]}`}>
@@ -285,7 +285,7 @@ function NavCard({
   return (
     <Link
       href={href}
-      className={`soft-card p-5 group transition-transform hover:-translate-y-0.5 ${
+      className={`soft-card p-5 group transition-transform hover:-translate-y-0.5 animate-rise ${
         highlight ? "border-primary/30 bg-primary-soft/40" : ""
       }`}
     >
