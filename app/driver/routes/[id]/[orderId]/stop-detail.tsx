@@ -23,7 +23,7 @@ import Link from "next/link"
 import { SignaturePad } from "@/components/signature-pad"
 import { useToast } from "@/hooks/use-toast"
 import { compressImage } from "@/lib/pod-uploads/compress"
-import { enqueue as enqueuePodUpload } from "@/lib/pod-uploads/db"
+import { enqueueDelivery } from "@/lib/pod-uploads/db"
 
 interface StopDetailProps {
   order: any
@@ -209,66 +209,71 @@ export function StopDetail({
   }
 
   /* --------------------------------------------------------- UPLOAD */
-  const buildFormData = (podId: string): FormData => {
+  /**
+   * Build the multipart delivery payload. Reads media from REFS (not state)
+   * so a stale closure can never submit a delivery with a missing photo.
+   */
+  const buildDeliveryFormData = (): FormData => {
     const fd = new FormData()
-    fd.append("podId", podId)
+    fd.append("orderId", order.id)
+    if (notes) fd.append("notes", notes)
+    if (recipientName) fd.append("recipientName", recipientName)
 
-    // ALWAYS read from refs at FormData build time. State could be stale.
     const photo = photoBlobRef.current
-    if (photo && photo.size > 0) {
-      fd.append("photo", photo, "photo.jpg")
-    }
+    if (photo && photo.size > 0) fd.append("photo", photo, "photo.jpg")
+
     const signature = signatureBlobRef.current
-    if (signature && signature.size > 0) {
-      fd.append("signature", signature, "signature.png")
-    }
+    if (signature && signature.size > 0) fd.append("signature", signature, "signature.png")
+
     return fd
   }
 
-  const uploadMediaHotPath = async (
-    podId: string,
-  ): Promise<{ ok: boolean; permanent?: boolean; error?: string }> => {
+  /**
+   * Single-request, storage-first delivery with bounded retries. The server
+   * uploads media to storage and writes the POD row with the URLs already
+   * attached, atomically — so a 2xx here means the photo + signature are
+   * persisted, full stop. Idempotent, so every attempt is safe.
+   */
+  const submitDeliveryHotPath = async (): Promise<{
+    ok: boolean
+    permanent?: boolean
+    warning?: string | null
+    error?: string
+  }> => {
     const MAX_ATTEMPTS = 4
-    const BACKOFF_MS = [1000, 3000, 6000, 10000]
+    const BACKOFF_MS = [1000, 3000, 6000]
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        setSubmitStatus(`Retrying (${attempt}/${MAX_ATTEMPTS - 1})…`)
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt - 1] ?? 6000))
+      } else {
+        setSubmitStatus(
+          photoBlobRef.current || signatureBlobRef.current
+            ? "Uploading proof + saving delivery…"
+            : "Saving delivery…",
+        )
+      }
+
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 90_000)
       try {
-        if (attempt > 0) {
-          setSubmitStatus(`Retrying upload (${attempt}/${MAX_ATTEMPTS - 1})…`)
-          await new Promise((r) =>
-            setTimeout(r, BACKOFF_MS[attempt - 1] ?? 10000),
-          )
-        } else {
-          setSubmitStatus(
-            photoBlobRef.current ? "Uploading photo…" : "Uploading signature…",
-          )
-        }
-
-        const controller = new AbortController()
-        const timer = setTimeout(() => controller.abort(), 90_000)
-
-        let res: Response
-        try {
-          res = await fetch("/api/driver/pod-media/upload", {
-            method: "POST",
-            body: buildFormData(podId),
-            credentials: "include",
-            signal: controller.signal,
-          })
-        } finally {
-          clearTimeout(timer)
-        }
+        const res = await fetch("/api/driver/deliver", {
+          method: "POST",
+          body: buildDeliveryFormData(),
+          credentials: "include",
+          signal: controller.signal,
+        })
 
         if (res.ok) {
           const body = await res.json().catch(() => ({}))
           if (body?.success) {
-            console.log("[v0] [DRIVER] hot-path upload succeeded")
-            return { ok: true }
+            return { ok: true, warning: body.warning ?? null }
           }
-          console.warn("[v0] [DRIVER] upload returned non-success body:", body)
           continue
         }
 
+        // Auth / client errors are permanent — don't hammer the server.
         if (res.status === 401 || res.status === 403) {
           let message = `HTTP ${res.status}`
           try {
@@ -277,13 +282,7 @@ export function StopDetail({
           } catch {}
           return { ok: false, permanent: true, error: message }
         }
-
-        if (
-          res.status >= 400 &&
-          res.status < 500 &&
-          res.status !== 408 &&
-          res.status !== 429
-        ) {
+        if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
           let message = `HTTP ${res.status}`
           try {
             const body = await res.json()
@@ -291,13 +290,11 @@ export function StopDetail({
           } catch {}
           return { ok: false, permanent: true, error: message }
         }
-
-        console.warn(
-          "[v0] [DRIVER] hot-path upload non-2xx, will retry:",
-          res.status,
-        )
+        // 5xx / 408 / 429 — fall through and retry.
       } catch (err) {
-        console.warn("[v0] [DRIVER] hot-path upload threw, will retry:", err)
+        console.warn("[v0] [DRIVER] deliver attempt threw, will retry:", err)
+      } finally {
+        clearTimeout(timer)
       }
     }
 
@@ -308,18 +305,12 @@ export function StopDetail({
   const handleDeliver = async () => {
     if (isSubmitting) return
 
-    /* Defensive guard: if the driver clearly captured a photo (preview set to
-     * a blob: URL — meaning a NEW capture, not just an existing pod URL) but
-     * the ref is somehow empty, refuse and tell them why. This shouldn't
-     * happen with the new ref-based flow but protects against unknown
-     * regressions. */
-    const userCapturedPhoto =
-      photoPreview && photoPreview.startsWith("blob:")
+    /* Defensive guard: a fresh capture (blob: preview) must have a ref. */
+    const userCapturedPhoto = photoPreview && photoPreview.startsWith("blob:")
     if (userCapturedPhoto && !photoBlobRef.current) {
       toast({
         title: "Photo isn't ready",
-        description:
-          "We couldn't read the photo. Please re-take or re-select it.",
+        description: "We couldn't read the photo. Please re-take or re-select it.",
         variant: "destructive",
       })
       return
@@ -327,9 +318,7 @@ export function StopDetail({
 
     setIsSubmitting(true)
 
-    /* If photo compression is still running, wait briefly so the smaller
-     * version uploads. After 4 seconds, give up and proceed with whatever
-     * the ref currently holds (always at least the original file). */
+    /* Wait briefly for in-flight compression so the smaller image uploads. */
     if (photoCompressionRef.current) {
       setSubmitStatus("Finishing photo processing…")
       try {
@@ -338,148 +327,68 @@ export function StopDetail({
           new Promise<void>((resolve) => setTimeout(resolve, 4000)),
         ])
       } catch {
-        // ignore — original is still in the ref
+        /* original is still in the ref */
       }
     }
 
-    setSubmitStatus("Saving delivery…")
-    console.log("[v0] [DRIVER] ========== POD SUBMISSION START ==========")
     console.log(
-      "[v0] [DRIVER] photo blob:",
+      "[v0] [DRIVER] deliver — photo:",
       photoBlobRef.current?.size || "none",
-      "signature blob:",
+      "signature:",
       signatureBlobRef.current?.size || "none",
     )
 
+    const result = await submitDeliveryHotPath()
+
+    if (result.ok) {
+      if (result.warning) {
+        toast({ title: "Delivered with note", description: result.warning })
+      } else {
+        toast({
+          title: "Delivered",
+          description:
+            photoBlobRef.current || signatureBlobRef.current
+              ? "Proof uploaded and delivery saved."
+              : "Stop marked as complete.",
+        })
+      }
+      setSubmitStatus(null)
+      setTimeout(returnToRoute, 400)
+      return
+    }
+
+    // Hot path failed — persist the WHOLE delivery to IndexedDB and let the
+    // background sweeper retry the idempotent endpoint until it lands.
     try {
-      // 1. Mark delivered + create POD row
-      let deliverRes: Response
-      try {
-        const controller = new AbortController()
-        const timer = setTimeout(() => controller.abort(), 60_000)
-        try {
-          deliverRes = await fetch("/api/driver/deliver", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              orderId: order.id,
-              notes,
-              recipientName,
-            }),
-            credentials: "include",
-            signal: controller.signal,
-          })
-        } finally {
-          clearTimeout(timer)
-        }
-      } catch (err) {
-        console.error("[v0] [DRIVER] /deliver fetch error:", err)
+      await enqueueDelivery({
+        orderId: order.id,
+        notes,
+        recipientName,
+        photo: photoBlobRef.current || undefined,
+        signature: signatureBlobRef.current || undefined,
+        lastError: result.error,
+      })
+      console.log("[v0] [DRIVER] delivery enqueued for background retry:", order.id)
+
+      if (result.permanent) {
         toast({
-          title: "Network error",
-          description:
-            "Couldn't reach the server. Check your connection and try again.",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        setSubmitStatus(null)
-        return
-      }
-
-      const deliverBody = await deliverRes.json().catch(() => ({}))
-      if (!deliverRes.ok || !deliverBody?.success) {
-        toast({
-          title: "Delivery failed",
-          description:
-            deliverBody?.error || "Couldn't mark this stop as delivered.",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        setSubmitStatus(null)
-        return
-      }
-
-      const podId: string | undefined = deliverBody.podId
-      const hasMedia =
-        (photoBlobRef.current || signatureBlobRef.current) && podId
-
-      // 2. Upload media if any
-      if (hasMedia && podId) {
-        const result = await uploadMediaHotPath(podId)
-
-        if (result.ok) {
-          toast({
-            title: "Delivered",
-            description: "Photo + signature uploaded.",
-          })
-          setSubmitStatus(null)
-          setTimeout(returnToRoute, 400)
-          return
-        }
-
-        // Hot path exhausted — enqueue blobs to IndexedDB (durable retry).
-        try {
-          await enqueuePodUpload({
-            podId,
-            orderId: order.id,
-            photo: photoBlobRef.current || undefined,
-            signature: signatureBlobRef.current || undefined,
-            lastError: result.error,
-          })
-          console.log(
-            "[v0] [DRIVER] enqueued for background retry, podId:",
-            podId,
-          )
-
-          if (result.permanent) {
-            toast({
-              title: "Delivered — sign-in needed",
-              description:
-                "Your delivery was saved. Photos will sync once you re-authenticate.",
-              variant: "destructive",
-            })
-          } else {
-            toast({
-              title: "Delivered — sync in progress",
-              description:
-                "Photo + signature saved on this device. We'll keep retrying in the background.",
-            })
-          }
-          setSubmitStatus(null)
-          setTimeout(returnToRoute, 600)
-          return
-        } catch (queueErr) {
-          console.error("[v0] [DRIVER] failed to enqueue:", queueErr)
-          toast({
-            title: "Delivered, upload pending",
-            description:
-              "Photo + signature couldn't be saved for retry. Stay on this page and try again.",
-            variant: "destructive",
-          })
-          setIsSubmitting(false)
-          setSubmitStatus(null)
-          return
-        }
-      }
-
-      // 3. No media path
-      if (deliverBody.warning) {
-        toast({
-          title: "Delivered with warning",
-          description: deliverBody.warning,
+          title: "Saved on device — sign-in needed",
+          description: "Your delivery is stored and will sync once you re-authenticate.",
           variant: "destructive",
         })
       } else {
         toast({
-          title: "Delivered",
-          description: "Stop marked as complete.",
+          title: "Saved on device — syncing",
+          description: "Delivery, photo + signature are saved here and retrying in the background.",
         })
       }
-      setTimeout(returnToRoute, 400)
-    } catch (err) {
-      console.error("[v0] [DRIVER] unexpected:", err)
+      setSubmitStatus(null)
+      setTimeout(returnToRoute, 700)
+    } catch (queueErr) {
+      console.error("[v0] [DRIVER] failed to enqueue delivery:", queueErr)
       toast({
-        title: "Unexpected error",
-        description: err instanceof Error ? err.message : "Please try again.",
+        title: "Couldn't save delivery",
+        description: "Please stay on this page and try again in a moment.",
         variant: "destructive",
       })
       setIsSubmitting(false)

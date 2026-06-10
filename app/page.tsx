@@ -9,12 +9,22 @@ import {
   DollarSign,
   Map,
   ChevronRight,
-  Package,
-  Route as RouteIcon,
   CheckCircle2,
+  Sparkles,
+  Route as RouteIcon,
+  Gauge,
+  Code2,
+  Star,
+  Check,
+  X,
+  Clock,
+  MapPin,
+  PackageCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BrandLockup, BrandMark } from "@/components/brand-mark"
+import { MarketingNav } from "@/components/marketing/nav"
+import { MarketingFooter } from "@/components/marketing/footer"
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -61,18 +71,22 @@ export default async function HomePage() {
 
 /* =====================================================================
    LANDING — minimalist SaaS aesthetic
-   Soft purple hero · white sections · generous whitespace · rounded pills
    ===================================================================== */
 function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground antialiased">
       <Hero />
-      <FeatureRow />
+      <TrustStrip />
       <PlatformSection />
+      <RouteOptimizationSpotlight />
       <ProductSuite />
+      <AppShowcase />
+      <Comparison />
       <Stats />
+      <Testimonials />
+      <Pricing />
       <CTA />
-      <Footer />
+      <MarketingFooter />
     </div>
   )
 }
@@ -82,59 +96,13 @@ function Hero() {
   return (
     <section className="relative">
       <div className="hero-gradient hero-clip pb-32 pt-0">
-        {/* Animated aurora backdrop — CSS only, respects reduced-motion */}
         <div className="aurora" aria-hidden="true" />
         <div className="aurora-grid" aria-hidden="true" />
-        {/* Top nav */}
-        <nav className="relative z-10">
-          <div className="max-w-[1280px] mx-auto px-6 lg:px-10 h-20 flex items-center justify-between">
-            <Link href="/">
-              <BrandLockup
-                tone="white"
-                textSize="md"
-                wordmarkClass="text-white"
-              />
-            </Link>
 
-            <div className="hidden md:flex items-center gap-8">
-              {[
-                { label: "Platform", href: "#platform" },
-                { label: "Route Optimization", href: "#suite" },
-                { label: "Contact", href: "#footer" },
-              ].map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className="text-sm font-medium text-white/85 hover:text-white transition-colors"
-                >
-                  {item.label}
-                </a>
-              ))}
-            </div>
+        <MarketingNav variant="light" active="/#platform" />
 
-            <div className="flex items-center gap-2">
-              <Link href="/auth/login">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-white/40 text-white hover:bg-white/10 hover:border-white/60 hover:text-white bg-transparent"
-                >
-                  Track
-                </Button>
-              </Link>
-              <Link href="/auth/login">
-                <Button size="sm" className="bg-foreground text-background hover:bg-foreground/90">
-                  Login
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </nav>
-
-        {/* Hero content */}
         <div className="relative max-w-[1280px] mx-auto px-6 lg:px-10 pt-12 pb-12">
           <div className="grid lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-16 items-center">
-            {/* Left: copy */}
             <div className="animate-rise stagger-1 max-w-xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm mb-6">
                 <span className="relative flex size-2">
@@ -143,13 +111,16 @@ function Hero() {
                 </span>
                 Live dispatch · routes recalculating now
               </div>
-              <h1 className="text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] leading-[1.1] font-bold tracking-tight text-white">
-                Modern logistics operations for the modern regional carrier
+              <h1 className="text-[2.25rem] sm:text-[2.75rem] lg:text-[3.4rem] leading-[1.08] font-bold tracking-tight text-white">
+                The delivery platform with an optimization engine you can{" "}
+                <span className="text-white/95 underline decoration-white/30 underline-offset-[6px]">
+                  buy as an API
+                </span>
               </h1>
               <p className="mt-6 text-base lg:text-lg leading-relaxed text-white/85 max-w-md">
-                Regional carriers are stuck with enterprise platforms built for
-                giants or patchwork tools that break as you grow. Delivery OS
-                scales from your first delivery to millions daily.
+                Delivery OS runs your last-mile operation end to end — and the
+                same engine that sequences 1,000-stop routes in seconds is
+                available as a standalone service you can plug into anything.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -158,20 +129,32 @@ function Hero() {
                     size="lg"
                     className="bg-foreground text-background hover:bg-foreground/90 shadow-sm"
                   >
-                    Get a Demo
+                    Get a demo
                   </Button>
                 </Link>
                 <Link
-                  href="#platform"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-white hover:gap-2 transition-all"
+                  href="/route-optimization"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-white/40 px-4 h-11 text-sm font-medium text-white hover:bg-white/10 transition-all"
                 >
-                  Learn More
-                  <ChevronRight className="size-4" />
+                  <Sparkles className="size-4" />
+                  Explore the optimization API
                 </Link>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-white/75">
+                {[
+                  "No contract to start",
+                  "90-second tenant setup",
+                  "Free up to 100 stops / mo",
+                ].map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1.5">
+                    <CheckCircle2 className="size-3.5 text-white/90" />
+                    {t}
+                  </span>
+                ))}
               </div>
             </div>
 
-            {/* Right: dashboard mockup */}
             <div className="relative animate-rise stagger-3">
               <DashboardMockup />
             </div>
@@ -186,10 +169,8 @@ function Hero() {
 function DashboardMockup() {
   return (
     <div className="relative">
-      {/* Map area */}
       <div className="mockup-card p-1 lg:p-1.5">
         <div className="rounded-[16px] overflow-hidden bg-[#F4F6FA] aspect-[4/3] relative">
-          {/* Faux map */}
           <svg
             viewBox="0 0 600 450"
             className="absolute inset-0 w-full h-full"
@@ -201,18 +182,21 @@ function DashboardMockup() {
               </pattern>
             </defs>
             <rect width="600" height="450" fill="url(#mapgrid)" />
-            {/* "Roads" */}
-            <path d="M 0 220 Q 200 200, 350 240 T 600 200" stroke="#CBD5E1" strokeWidth="3" fill="none" />
-            <path d="M 100 0 L 280 220 L 200 450" stroke="#CBD5E1" strokeWidth="3" fill="none" />
-            <path d="M 600 100 L 380 280 L 480 450" stroke="#CBD5E1" strokeWidth="3" fill="none" />
-            {/* Center pulse */}
+            {/* Optimized route polyline through the stops */}
+            <path
+              d="M 280 240 L 120 130 L 380 160 L 460 320 L 320 380 L 180 320 Z"
+              stroke="#5B62F7"
+              strokeWidth="3"
+              strokeDasharray="6 6"
+              fill="none"
+              opacity="0.5"
+            />
             <circle cx="280" cy="240" r="20" fill="#5B62F7" opacity="0.18">
               <animate attributeName="r" from="20" to="40" dur="2s" repeatCount="indefinite" />
               <animate attributeName="opacity" from="0.3" to="0" dur="2s" repeatCount="indefinite" />
             </circle>
             <circle cx="280" cy="240" r="9" fill="#5B62F7" />
             <circle cx="280" cy="240" r="4" fill="white" />
-            {/* Stop pins */}
             {[
               [120, 130],
               [180, 320],
@@ -222,14 +206,15 @@ function DashboardMockup() {
             ].map(([x, y], i) => (
               <g key={i}>
                 <circle cx={x} cy={y} r="11" fill="#5B62F7" />
-                <circle cx={x} cy={y} r="4" fill="white" />
+                <text x={x} y={y + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="white">
+                  {i + 1}
+                </text>
               </g>
             ))}
           </svg>
         </div>
       </div>
 
-      {/* Floating panel — route detail */}
       <div className="absolute -right-2 sm:-right-6 lg:-right-10 -top-3 lg:top-6 w-[260px] sm:w-[300px] mockup-card p-4 hidden sm:block animate-float">
         <div className="flex items-center gap-2 pb-3 border-b border-border">
           <div className="size-7 rounded-md bg-primary-soft grid place-items-center text-primary">
@@ -276,7 +261,7 @@ function DashboardMockup() {
 }
 
 /* --------------------------------------------------------- TRUST STRIP */
-function FeatureRow() {
+function TrustStrip() {
   const chips = [
     "Specialty local carriers",
     "High-volume regional fleets",
@@ -287,7 +272,6 @@ function FeatureRow() {
     "E-commerce fulfilment",
     "Furniture & big-and-bulky",
   ]
-  // Duplicate the list so the marquee can loop seamlessly.
   const loop = [...chips, ...chips]
   return (
     <section className="bg-background border-b border-border py-10">
@@ -325,17 +309,32 @@ function PlatformSection() {
             </h2>
             <div className="mt-6 space-y-4 text-[15px] leading-relaxed text-muted-foreground max-w-md">
               <p>
-                We bring together everything that's required to grow, manage,
-                and optimize your delivery business.
+                We bring together everything required to grow, manage, and
+                optimize your delivery business — import, optimize, dispatch,
+                track, and prove delivery in one console.
               </p>
               <p>
                 Delivery OS powers operations for specialty local carriers,
                 high-volume regional carriers, and everything in between.
               </p>
             </div>
+            <div className="mt-8 grid grid-cols-2 gap-4 max-w-md">
+              {[
+                { v: "5 min", l: "Import to dispatched" },
+                { v: "1,000+", l: "Stops per optimize" },
+                { v: "Real-time", l: "Driver GPS + ETA" },
+                { v: "Audit-ready", l: "POD photo + signature" },
+              ].map((s) => (
+                <div key={s.l} className="soft-card p-4">
+                  <div className="text-xl font-bold tracking-tight text-foreground">
+                    {s.v}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{s.l}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Right: scattered product mockups */}
           <div className="relative grid grid-cols-3 gap-3 lg:gap-4">
             <div className="mockup-card p-3 col-span-1 row-span-2">
               <div className="text-[10px] font-medium text-muted-foreground mb-2">Today, Jun 13</div>
@@ -409,11 +408,127 @@ function PlatformSection() {
   )
 }
 
+/* --------------------------------------------------------- ROUTE OPTIMIZATION SPOTLIGHT */
+function RouteOptimizationSpotlight() {
+  return (
+    <section id="optimization" className="relative overflow-hidden bg-foreground text-background">
+      <div className="absolute inset-0 opacity-[0.07]" aria-hidden="true">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
+      </div>
+      <div className="relative max-w-[1280px] mx-auto px-6 lg:px-10 py-24 lg:py-32">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-medium text-white/90 mb-6">
+              <Sparkles className="size-3.5" />
+              The Delivery OS Optimization Engine
+            </div>
+            <h2 className="text-3xl lg:text-[2.6rem] font-bold tracking-tight leading-[1.12]">
+              Kill the spaghetti routes. Cut the miles. Keep drivers happy.
+            </h2>
+            <p className="mt-5 text-base lg:text-lg text-background/70 leading-relaxed max-w-lg">
+              Our solver clusters by geography, respects time windows, vehicle
+              capacity and shift limits, and sequences thousands of stops into
+              clean, drivable routes — in seconds. Use it inside Delivery OS, or
+              call it directly from your own stack.
+            </p>
+
+            <div className="mt-8 grid grid-cols-3 gap-4 max-w-md">
+              {[
+                { v: "41%", l: "avg fewer miles" },
+                { v: "94 sec", l: "1,000-stop solve" },
+                { v: "99.9%", l: "API uptime" },
+              ].map((s) => (
+                <div key={s.l}>
+                  <div className="text-2xl font-bold tracking-tight">{s.v}</div>
+                  <div className="text-xs text-background/60 mt-1">{s.l}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link href="/route-optimization">
+                <Button size="lg" className="bg-background text-foreground hover:bg-background/90">
+                  See the optimization product
+                  <ArrowRight className="size-4" />
+                </Button>
+              </Link>
+              <Link href="/route-optimization#api">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-white/30 text-white hover:bg-white/10 hover:text-white bg-transparent"
+                >
+                  <Code2 className="size-4" />
+                  View the API
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Before / after visual */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <div className="text-xs font-medium text-background/60 mb-3 flex items-center gap-2">
+                <X className="size-3.5 text-rose-300" /> Before
+              </div>
+              <svg viewBox="0 0 200 200" className="w-full aspect-square">
+                {[
+                  [30, 40, 160, 70],
+                  [160, 70, 50, 150],
+                  [50, 150, 140, 30],
+                  [140, 30, 90, 170],
+                  [90, 170, 30, 90],
+                  [30, 90, 170, 130],
+                ].map(([x1, y1, x2, y2], i) => (
+                  <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fca5a5" strokeWidth="2" opacity="0.7" />
+                ))}
+                {[[30, 40], [160, 70], [50, 150], [140, 30], [90, 170], [170, 130]].map(([x, y], i) => (
+                  <circle key={i} cx={x} cy={y} r="6" fill="#fca5a5" />
+                ))}
+              </svg>
+              <div className="text-center text-[11px] text-background/50 mt-1">68 km · 3h 50m</div>
+            </div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+              <div className="text-xs font-medium text-background/60 mb-3 flex items-center gap-2">
+                <Check className="size-3.5 text-emerald-300" /> After
+              </div>
+              <svg viewBox="0 0 200 200" className="w-full aspect-square">
+                <path
+                  d="M 30 40 L 140 30 L 170 130 L 90 170 L 50 150 L 30 90 Z"
+                  fill="none"
+                  stroke="#6ee7b7"
+                  strokeWidth="2.5"
+                />
+                {[[30, 40], [140, 30], [170, 130], [90, 170], [50, 150], [30, 90]].map(([x, y], i) => (
+                  <g key={i}>
+                    <circle cx={x} cy={y} r="8" fill="#6ee7b7" />
+                    <text x={x} y={y + 3} textAnchor="middle" fontSize="9" fontWeight="700" fill="#064e3b">
+                      {i + 1}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+              <div className="text-center text-[11px] text-emerald-300/90 mt-1">40 km · 2h 15m</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 /* --------------------------------------------------------- PRODUCT SUITE */
 function ProductSuite() {
   const items = [
     {
-      icon: Truck,
+      icon: RouteIcon,
       iconClass: "feature-icon",
       title: "Routing",
       desc: "Cluster, sequence, and assign 1,000-stop routes in seconds.",
@@ -422,13 +537,13 @@ function ProductSuite() {
       icon: Zap,
       iconClass: "feature-icon feature-icon--violet",
       title: "Dispatch",
-      desc: "Live driver positions, ETAs that recalc on the fly.",
+      desc: "Live driver positions and ETAs that recalc on the fly.",
     },
     {
       icon: Settings,
       iconClass: "feature-icon feature-icon--rose",
       title: "Operations",
-      desc: "POD capture, customer notifications, audit trails.",
+      desc: "POD photo + signature capture, customer notifications, audit trails.",
     },
     {
       icon: DollarSign,
@@ -466,6 +581,172 @@ function ProductSuite() {
   )
 }
 
+/* --------------------------------------------------------- APP SHOWCASE (screenshots) */
+function AppShowcase() {
+  return (
+    <section id="showcase" className="py-24 lg:py-32 bg-background">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
+        <div className="max-w-2xl mb-14">
+          <div className="section-eyebrow">Inside the product</div>
+          <h2 className="text-3xl lg:text-4xl font-bold tracking-tight leading-[1.15]">
+            One console for dispatch. One app for drivers.
+          </h2>
+        </div>
+
+        <div className="grid lg:grid-cols-[7fr_5fr] gap-6">
+          {/* Dispatch console screenshot */}
+          <div className="mockup-card p-4 lg:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BrandMark size={26} />
+                <span className="text-sm font-semibold tracking-tight">Dispatch monitor</span>
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-success font-medium">
+                <span className="size-1.5 rounded-full bg-success animate-soft-pulse" />
+                Live
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-2.5 mb-4">
+              {[
+                { v: "18", l: "Active routes", c: "text-primary" },
+                { v: "312", l: "Stops today", c: "text-foreground" },
+                { v: "276", l: "Delivered", c: "text-success" },
+                { v: "98.2%", l: "On-time", c: "text-foreground" },
+              ].map((s) => (
+                <div key={s.l} className="rounded-lg bg-secondary/60 px-3 py-2.5">
+                  <div className={`text-lg font-bold tracking-tight ${s.c}`}>{s.v}</div>
+                  <div className="text-[10px] text-muted-foreground">{s.l}</div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-xl overflow-hidden border border-border bg-[#F4F6FA] aspect-[16/8] relative">
+              <svg viewBox="0 0 800 400" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <pattern id="sg" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E2E8F0" strokeWidth="1" />
+                  </pattern>
+                </defs>
+                <rect width="800" height="400" fill="url(#sg)" />
+                <path d="M 80 320 L 220 120 L 420 180 L 600 90 L 720 260" stroke="#5B62F7" strokeWidth="3" fill="none" strokeDasharray="6 6" opacity="0.5" />
+                <path d="M 120 80 L 300 300 L 520 240 L 700 340" stroke="#22c55e" strokeWidth="3" fill="none" strokeDasharray="6 6" opacity="0.4" />
+                {[[80, 320], [220, 120], [420, 180], [600, 90], [720, 260], [120, 80], [300, 300], [520, 240], [700, 340]].map(([x, y], i) => (
+                  <g key={i}>
+                    <circle cx={x} cy={y} r="9" fill={i < 5 ? "#5B62F7" : "#22c55e"} />
+                    <circle cx={x} cy={y} r="3.5" fill="white" />
+                  </g>
+                ))}
+              </svg>
+            </div>
+          </div>
+
+          {/* Driver app screenshot */}
+          <div className="mockup-card p-4 lg:p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="size-6 rounded-md bg-primary grid place-items-center">
+                <Truck className="size-3.5 text-white" />
+              </div>
+              <span className="text-sm font-semibold tracking-tight">Driver app · Stop #7</span>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[10px] text-muted-foreground">Order</div>
+                <div className="text-base font-bold font-mono text-primary">DOS-4837</div>
+                <div className="mt-1.5 flex items-start gap-1.5 text-xs">
+                  <MapPin className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <span className="text-foreground/80">128 King St W, Toronto, ON</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border p-3 text-center">
+                  <PackageCheck className="size-5 text-success mx-auto mb-1" />
+                  <div className="text-[11px] font-medium">Photo captured</div>
+                </div>
+                <div className="rounded-lg border border-border p-3 text-center">
+                  <CheckCircle2 className="size-5 text-primary mx-auto mb-1" />
+                  <div className="text-[11px] font-medium">Signed ✓</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1 rounded-lg bg-destructive-soft text-destructive text-center py-2.5 text-xs font-medium">
+                  Failed
+                </div>
+                <div className="flex-1 rounded-lg bg-primary text-white text-center py-2.5 text-xs font-medium">
+                  Delivered
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
+                <Clock className="size-3" />
+                Proof saved on device — syncs even if the connection drops.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* --------------------------------------------------------- COMPARISON */
+function Comparison() {
+  const rows = [
+    { f: "Route optimization quality", us: true, them: "Add-on / top tier only" },
+    { f: "Driver app + POD included", us: true, them: "Often extra" },
+    { f: "Optimization available as an API", us: true, them: false },
+    { f: "Transparent usage-based pricing", us: true, them: "Quote required" },
+    { f: "Multi-tenant from day one", us: true, them: false },
+    { f: "Start free, no sales call", us: true, them: "Demo gated" },
+  ]
+  return (
+    <section className="py-24 lg:py-28 bg-secondary/40">
+      <div className="max-w-[1100px] mx-auto px-6 lg:px-10">
+        <div className="max-w-2xl mb-12">
+          <div className="section-eyebrow">How we compare</div>
+          <h2 className="text-3xl lg:text-4xl font-bold tracking-tight leading-[1.15]">
+            Everything the incumbents charge extra for, in one platform
+          </h2>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Routific, OptimoRoute, Onfleet and Route4Me each do part of this
+            well. Delivery OS bundles the whole stack — and uniquely lets you buy
+            the optimization engine on its own.
+          </p>
+        </div>
+
+        <div className="soft-card overflow-hidden">
+          <div className="grid grid-cols-[1.6fr_0.7fr_1fr] bg-foreground text-background text-xs font-semibold">
+            <div className="px-5 py-3.5">Capability</div>
+            <div className="px-5 py-3.5 text-center">Delivery OS</div>
+            <div className="px-5 py-3.5 text-center text-background/70">Typical competitor</div>
+          </div>
+          {rows.map((r, i) => (
+            <div
+              key={r.f}
+              className={`grid grid-cols-[1.6fr_0.7fr_1fr] items-center text-sm ${
+                i % 2 ? "bg-secondary/40" : "bg-background"
+              }`}
+            >
+              <div className="px-5 py-3.5 font-medium text-foreground">{r.f}</div>
+              <div className="px-5 py-3.5 flex justify-center">
+                <span className="inline-grid place-items-center size-6 rounded-full bg-success-soft text-success">
+                  <Check className="size-3.5" strokeWidth={3} />
+                </span>
+              </div>
+              <div className="px-5 py-3.5 text-center text-muted-foreground text-[13px]">
+                {r.them === false ? (
+                  <span className="inline-grid place-items-center size-6 rounded-full bg-destructive-soft text-destructive">
+                    <X className="size-3.5" strokeWidth={3} />
+                  </span>
+                ) : (
+                  r.them
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 /* --------------------------------------------------------- STATS */
 function Stats() {
   const stats = [
@@ -475,7 +756,7 @@ function Stats() {
     { v: "98.2%", l: "On-time delivery rate" },
   ]
   return (
-    <section className="py-24 lg:py-28 bg-background border-t border-border">
+    <section className="py-24 lg:py-28 bg-background border-y border-border">
       <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {stats.map((s) => (
@@ -484,6 +765,145 @@ function Stats() {
                 {s.v}
               </div>
               <div className="mt-2 text-sm text-muted-foreground">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* --------------------------------------------------------- TESTIMONIALS */
+function Testimonials() {
+  const quotes = [
+    {
+      q: "We cut a full van off our daily roster in the first month. The routes just make sense to drivers now.",
+      n: "Marisol Reyes",
+      r: "Ops Director, Harbor Same-Day",
+    },
+    {
+      q: "We dropped Onfleet and a separate optimizer and replaced both with Delivery OS. Billing finally makes sense.",
+      n: "Devin Park",
+      r: "GM, Northline Logistics",
+    },
+    {
+      q: "We embed their optimization API in our own dispatcher. 1,000 stops back in under two minutes, every time.",
+      n: "Aisha Mohammed",
+      r: "Head of Product, RouteKit",
+    },
+  ]
+  return (
+    <section className="py-24 lg:py-32 bg-secondary/40">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
+        <div className="max-w-2xl mb-14">
+          <div className="section-eyebrow">Operators & developers</div>
+          <h2 className="text-3xl lg:text-4xl font-bold tracking-tight leading-[1.15]">
+            Trusted to move millions of packages
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {quotes.map((t) => (
+            <div key={t.n} className="soft-card p-6 flex flex-col">
+              <div className="flex gap-0.5 mb-4 text-warning">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className="size-4 fill-current" />
+                ))}
+              </div>
+              <p className="text-[15px] leading-relaxed text-foreground/90 flex-1">
+                “{t.q}”
+              </p>
+              <div className="mt-5 pt-4 border-t border-border">
+                <div className="text-sm font-semibold">{t.n}</div>
+                <div className="text-xs text-muted-foreground">{t.r}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* --------------------------------------------------------- PRICING */
+function Pricing() {
+  const tiers = [
+    {
+      name: "Starter",
+      price: "Free",
+      sub: "Up to 100 stops / month",
+      features: ["1 dispatcher seat", "Unlimited drivers", "POD photo + signature", "Email notifications"],
+      cta: "Start free",
+      href: "/auth/sign-up",
+      featured: false,
+    },
+    {
+      name: "Growth",
+      price: "$149",
+      sub: "per month · up to 1,000 stops",
+      features: ["Everything in Starter", "Advanced optimization", "Live dispatch map", "Usage-based overages", "Priority support"],
+      cta: "Get a demo",
+      href: "/auth/sign-up",
+      featured: true,
+    },
+    {
+      name: "Optimization API",
+      price: "Custom",
+      sub: "Buy the engine on its own",
+      features: ["Standalone optimization API", "Volume usage pricing", "Full documentation access", "99.9% uptime SLA", "Solution architect"],
+      cta: "Request access",
+      href: "/route-optimization#contact",
+      featured: false,
+    },
+  ]
+  return (
+    <section id="pricing" className="py-24 lg:py-32 bg-background">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
+        <div className="max-w-2xl mb-14">
+          <div className="section-eyebrow">Pricing</div>
+          <h2 className="text-3xl lg:text-4xl font-bold tracking-tight leading-[1.15]">
+            Transparent pricing. Start free, scale on usage.
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6 items-stretch">
+          {tiers.map((t) => (
+            <div
+              key={t.name}
+              className={`relative rounded-2xl p-7 flex flex-col ${
+                t.featured
+                  ? "bg-foreground text-background shadow-xl"
+                  : "soft-card"
+              }`}
+            >
+              {t.featured && (
+                <span className="absolute top-5 right-5 rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-white">
+                  Most popular
+                </span>
+              )}
+              <div className="text-sm font-semibold tracking-tight">{t.name}</div>
+              <div className="mt-4 flex items-baseline gap-1.5">
+                <span className="text-4xl font-bold tracking-tight">{t.price}</span>
+              </div>
+              <div className={`mt-1 text-xs ${t.featured ? "text-background/60" : "text-muted-foreground"}`}>
+                {t.sub}
+              </div>
+              <ul className={`mt-6 space-y-2.5 text-sm flex-1 ${t.featured ? "text-background/80" : "text-foreground/80"}`}>
+                {t.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <Check className={`size-4 mt-0.5 shrink-0 ${t.featured ? "text-primary" : "text-success"}`} strokeWidth={2.5} />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href={t.href} className="mt-7">
+                <Button
+                  className={`w-full ${
+                    t.featured ? "bg-background text-foreground hover:bg-background/90" : ""
+                  }`}
+                  variant={t.featured ? "default" : "outline"}
+                >
+                  {t.cta}
+                </Button>
+              </Link>
             </div>
           ))}
         </div>
@@ -511,16 +931,16 @@ function CTA() {
                 size="lg"
                 className="bg-foreground text-background hover:bg-foreground/90 shadow-sm"
               >
-                Get a Demo
+                Get a demo
               </Button>
             </Link>
-            <Link href="/auth/login">
+            <Link href="/route-optimization">
               <Button
                 size="lg"
                 variant="outline"
                 className="border-white/40 text-white hover:bg-white/10 hover:border-white/60 hover:text-white bg-transparent"
               >
-                Sign In
+                Explore optimization
                 <ArrowRight className="size-4" />
               </Button>
             </Link>
@@ -528,47 +948,5 @@ function CTA() {
         </div>
       </div>
     </section>
-  )
-}
-
-/* --------------------------------------------------------- FOOTER */
-function Footer() {
-  return (
-    <footer id="footer" className="bg-background border-t border-border">
-      <div className="max-w-[1280px] mx-auto px-6 lg:px-10 py-14">
-        <div className="grid lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-10">
-          <div>
-            <BrandLockup textSize="md" />
-            <p className="mt-4 text-sm text-muted-foreground max-w-xs leading-relaxed">
-              Modern logistics operations for the modern regional carrier.
-            </p>
-          </div>
-
-          {[
-            { h: "Product", items: ["Platform", "Routing", "Dispatch", "Operations"] },
-            { h: "Operators", items: ["Sign in", "Sign up", "Driver app", "Status"] },
-            { h: "Company", items: ["About", "Security", "Privacy", "Contact"] },
-          ].map((col) => (
-            <div key={col.h}>
-              <div className="text-xs font-semibold text-foreground mb-3 tracking-tight">
-                {col.h}
-              </div>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                {col.items.map((it) => (
-                  <li key={it} className="hover:text-foreground transition-colors cursor-pointer">
-                    {it}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-12 pt-6 border-t border-border flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
-          <span>© 2026 Delivery OS · all rights reserved</span>
-          <span>Built on Next.js · Supabase · HERE Maps</span>
-        </div>
-      </div>
-    </footer>
   )
 }

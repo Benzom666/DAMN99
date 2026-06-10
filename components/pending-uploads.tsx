@@ -7,10 +7,10 @@ import {
   count as queueCount,
   peekAll,
   recordAttempt,
-  removeByPodId,
+  removeByOrderId,
   tryAcquireFlushLock,
   releaseFlushLock,
-  type PodUploadEntry,
+  type PodDeliveryEntry,
 } from "@/lib/pod-uploads/db"
 
 /**
@@ -61,12 +61,12 @@ export function PendingUploads({ compact = false }: { compact?: boolean }) {
 
       for (const entry of entries) {
         try {
-          await uploadEntry(entry)
-          await removeByPodId(entry.podId)
+          await submitDelivery(entry)
+          await removeByOrderId(entry.orderId)
           succeeded++
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
-          await recordAttempt(entry.podId, msg)
+          await recordAttempt(entry.orderId, msg)
           failed++
           lastErr = msg
         }
@@ -192,20 +192,16 @@ export function PendingUploads({ compact = false }: { compact?: boolean }) {
 
 /* -------------------------------------------------- helpers */
 
-async function uploadEntry(entry: PodUploadEntry): Promise<void> {
+async function submitDelivery(entry: PodDeliveryEntry): Promise<void> {
   const fd = new FormData()
-  fd.append("podId", entry.podId)
+  fd.append("orderId", entry.orderId)
+  if (entry.notes) fd.append("notes", entry.notes)
+  if (entry.recipientName) fd.append("recipientName", entry.recipientName)
+  if (entry.photo) fd.append("photo", entry.photo, "photo.jpg")
+  if (entry.signature) fd.append("signature", entry.signature, "signature.png")
 
-  if (entry.photo) {
-    fd.append("photo", entry.photo, "photo.jpg")
-  }
-  if (entry.signature) {
-    fd.append("signature", entry.signature, "signature.png")
-  }
-
-  // No abort signal here — these are background retries and we're happy to
-  // let them run as long as the network allows.
-  const res = await fetch("/api/driver/pod-media/upload", {
+  // Idempotent endpoint — safe to retry as long as the network allows.
+  const res = await fetch("/api/driver/deliver", {
     method: "POST",
     body: fd,
     credentials: "include",
@@ -224,6 +220,6 @@ async function uploadEntry(entry: PodUploadEntry): Promise<void> {
 
   const body = (await res.json()) as { success?: boolean; error?: string }
   if (!body.success) {
-    throw new Error(body.error || "Upload returned non-success")
+    throw new Error(body.error || "Delivery returned non-success")
   }
 }
