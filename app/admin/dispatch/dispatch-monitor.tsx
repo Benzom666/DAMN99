@@ -49,7 +49,11 @@ export function DispatchMonitor({
   }
 
   function getOrderPOD(orderId: string) {
-    return pods.find((p) => p.order_id === orderId)
+    // An order can have more than one POD row (failed-delivery retry, double
+    // submit). Prefer the one that actually has media so the dialog isn't
+    // blank when an earlier empty row happens to come first.
+    const matches = pods.filter((p) => p.order_id === orderId)
+    return matches.find((p) => p.photo_url || p.signature_url) ?? matches[0]
   }
 
   function handleViewPOD(order: any) {

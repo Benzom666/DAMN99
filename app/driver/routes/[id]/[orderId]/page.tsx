@@ -89,18 +89,30 @@ export default async function DriverStopPage(props: {
       notFound()
     }
 
-    const { data: existingPod, error: podError } = await supabase
+    // There can be more than one POD row per order (failed-delivery retry,
+    // double-submit). `.maybeSingle()` would error to null in that case and
+    // hide an already-uploaded photo/signature, so fetch them ordered and pick
+    // the most relevant: prefer the newest row that actually has media, and
+    // otherwise fall back to the newest row.
+    const { data: pods, error: podError } = await supabase
       .from("pods")
       .select("*")
       .eq("order_id", orderId)
-      .maybeSingle()
-
-    console.log("[v0] [DRIVER_STOP] Existing POD:", { exists: !!existingPod, error: podError?.message })
+      .order("delivered_at", { ascending: false })
 
     if (podError) {
       console.error("[v0] [DRIVER_STOP] POD error:", podError)
       // Don't throw error for POD, just log it
     }
+
+    const existingPod =
+      pods?.find((p) => p.photo_url || p.signature_url) ?? pods?.[0] ?? null
+
+    console.log("[v0] [DRIVER_STOP] Existing POD:", {
+      count: pods?.length ?? 0,
+      exists: !!existingPod,
+      error: podError?.message,
+    })
 
     return <StopDetail order={order} routeName={route.name} routeId={routeId} existingPod={existingPod} />
   } catch (error) {

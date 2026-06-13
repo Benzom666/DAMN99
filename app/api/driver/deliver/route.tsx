@@ -200,51 +200,110 @@ export async function POST(request: Request) {
     console.log("[DELIVER] Order status updated successfully")
 
     let podId: string | null = null
-    const podInsert = {
-      order_id: orderId,
-      driver_id: user.id,
-      photo_url: null,
-      signature_url: null,
-      recipient_name: sanitizedRecipient,
-      notes: sanitizedNotes,
-      delivered_at: new Date().toISOString(),
+
+    // A POD row may already exist for this order — the stop could have been
+    // delivered before (failed-delivery retry), or a previous request could
+    // have double-submitted. Reuse the existing row instead of inserting a
+    // duplicate. Duplicate rows are the root cause of the "photos/signature
+    // disappear" bug: the driver's stop view reads a single POD per order with
+    // `.maybeSingle()`, which returns nothing once more than one row exists, so
+    // previously-uploaded media becomes invisible. When reusing, we MUST NOT
+    // overwrite any photo_url/signature_url already stored on that row.
+    const { data: priorPods, error: priorPodError } = await supabase
+      .from("pods")
+      .select("id")
+      .eq("order_id", orderId)
+      .order("delivered_at", { ascending: false })
+      .limit(1)
+
+    if (priorPodError) {
+      console.error("[DELIVER] Prior POD lookup failed (will attempt insert):", priorPodError)
     }
 
-    console.log("[DELIVER] Creating POD record")
-    const { data: podData, error: podError } = await supabase.from("pods").insert(podInsert).select("id").single()
+    const existingPodId = priorPods?.[0]?.id ?? null
+    const fallbackNotes = sanitizedRecipient
+      ? [`Recipient: ${sanitizedRecipient}`, sanitizedNotes].filter(Boolean).join("\n")
+      : sanitizedNotes
 
-    if (podError) {
-      console.error("[DELIVER] Full POD insert failed after delivery was saved:", podError)
-
-      const fallbackNotes = sanitizedRecipient
-        ? [`Recipient: ${sanitizedRecipient}`, sanitizedNotes].filter(Boolean).join("\n")
-        : sanitizedNotes
-
-      console.log("[DELIVER] Attempting fallback POD insert")
-      const { data: fallbackPod, error: fallbackPodError } = await supabase
+    if (existingPodId) {
+      console.log("[DELIVER] Reusing existing POD record:", existingPodId)
+      // Update metadata only; leave photo_url/signature_url untouched so any
+      // media uploaded on a prior attempt is preserved.
+      const { error: podUpdateError } = await supabase
         .from("pods")
-        .insert({
-          order_id: orderId,
+        .update({
           driver_id: user.id,
-          photo_url: null,
-          signature_url: null,
-          notes: fallbackNotes,
+          recipient_name: sanitizedRecipient,
+          notes: sanitizedNotes,
           delivered_at: new Date().toISOString(),
         })
-        .select("id")
-        .single()
+        .eq("id", existingPodId)
 
-      if (fallbackPodError) {
-        console.error("[DELIVER] Fallback POD insert failed after delivery was saved:", fallbackPodError)
-        warnings.push("Delivery was completed, but proof of delivery details could not be saved.")
+      if (podUpdateError) {
+        console.error("[DELIVER] POD update failed, retrying without recipient_name:", podUpdateError)
+        const { error: fallbackUpdateError } = await supabase
+          .from("pods")
+          .update({
+            driver_id: user.id,
+            notes: fallbackNotes,
+            delivered_at: new Date().toISOString(),
+          })
+          .eq("id", existingPodId)
+
+        if (fallbackUpdateError) {
+          console.error("[DELIVER] Fallback POD update failed:", fallbackUpdateError)
+          warnings.push("Delivery was completed, but proof of delivery details could not be saved.")
+        } else {
+          podId = existingPodId
+          warnings.push("Delivery was completed. Recipient name was saved in notes because the POD schema is outdated.")
+        }
       } else {
-        podId = fallbackPod.id
-        console.log("[DELIVER] Fallback POD created:", podId)
-        warnings.push("Delivery was completed. Recipient name was saved in notes because the POD schema is outdated.")
+        podId = existingPodId
+        console.log("[DELIVER] Existing POD updated:", podId)
       }
     } else {
-      podId = podData.id
-      console.log("[DELIVER] POD created successfully:", podId)
+      const podInsert = {
+        order_id: orderId,
+        driver_id: user.id,
+        photo_url: null,
+        signature_url: null,
+        recipient_name: sanitizedRecipient,
+        notes: sanitizedNotes,
+        delivered_at: new Date().toISOString(),
+      }
+
+      console.log("[DELIVER] Creating POD record")
+      const { data: podData, error: podError } = await supabase.from("pods").insert(podInsert).select("id").single()
+
+      if (podError) {
+        console.error("[DELIVER] Full POD insert failed after delivery was saved:", podError)
+
+        console.log("[DELIVER] Attempting fallback POD insert")
+        const { data: fallbackPod, error: fallbackPodError } = await supabase
+          .from("pods")
+          .insert({
+            order_id: orderId,
+            driver_id: user.id,
+            photo_url: null,
+            signature_url: null,
+            notes: fallbackNotes,
+            delivered_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single()
+
+        if (fallbackPodError) {
+          console.error("[DELIVER] Fallback POD insert failed after delivery was saved:", fallbackPodError)
+          warnings.push("Delivery was completed, but proof of delivery details could not be saved.")
+        } else {
+          podId = fallbackPod.id
+          console.log("[DELIVER] Fallback POD created:", podId)
+          warnings.push("Delivery was completed. Recipient name was saved in notes because the POD schema is outdated.")
+        }
+      } else {
+        podId = podData.id
+        console.log("[DELIVER] POD created successfully:", podId)
+      }
     }
 
     if (podId && process.env.NEXT_PUBLIC_ENABLE_POD_EMAIL !== "false") {
