@@ -107,7 +107,22 @@ function buildBubbleContent(d: any): string {
 
   const rows: string[] = []
   if (!isDepot && !isDriver && customer) rows.push(row("👤", escapeHtml(customer)))
-  if (d.address && !isDriver) rows.push(row("📍", escapeHtml(d.address)))
+  if (d.address && !isDriver) {
+    // Make the address a tap target that opens Google Maps directions to the
+    // exact pin (lat,lng when available, else the address text). Origin is the
+    // viewer's current location.
+    const dest =
+      Number.isFinite(d.lat) && Number.isFinite(d.lng)
+        ? `${d.lat},${d.lng}`
+        : encodeURIComponent(String(d.address))
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}`
+    rows.push(
+      row(
+        "📍",
+        `<a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:none;">${escapeHtml(d.address)}<span style="white-space:nowrap;color:#94a3b8;font-size:11px;"> · Directions ↗</span></a>`,
+      ),
+    )
+  }
   if (d.phone)
     rows.push(
       row(
