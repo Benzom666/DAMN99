@@ -89,11 +89,23 @@ export default async function DriverStopPage(props: {
       notFound()
     }
 
-    const { data: existingPod, error: podError } = await supabase
+    // Tolerant of legacy duplicate POD rows: `.maybeSingle()` throws PGRST116
+    // when >1 row exists (which hid already-uploaded media). Fetch all rows for
+    // the order and pick the best one — prefer a row that actually has media,
+    // then the most recently delivered — so the driver always sees their proof
+    // even before the dedupe migration (031) has run.
+    const { data: existingPods, error: podError } = await supabase
       .from("pods")
       .select("*")
       .eq("order_id", orderId)
-      .maybeSingle()
+      .order("delivered_at", { ascending: false })
+    const existingPod =
+      (existingPods ?? []).slice().sort((a: any, b: any) => {
+        const am = a.photo_url || a.signature_url ? 0 : 1
+        const bm = b.photo_url || b.signature_url ? 0 : 1
+        if (am !== bm) return am - bm
+        return new Date(b.delivered_at || 0).getTime() - new Date(a.delivered_at || 0).getTime()
+      })[0] ?? null
 
     console.log("[v0] [DRIVER_STOP] Existing POD:", { exists: !!existingPod, error: podError?.message })
 

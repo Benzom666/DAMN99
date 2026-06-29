@@ -49,7 +49,17 @@ export function DispatchMonitor({
   }
 
   function getOrderPOD(orderId: string) {
-    return pods.find((p) => p.order_id === orderId)
+    // Tolerant of legacy duplicate POD rows: prefer one that actually has media,
+    // then the most recently delivered, so the dialog never shows an empty
+    // duplicate when a real proof exists.
+    const matches = pods.filter((p) => p.order_id === orderId)
+    if (matches.length <= 1) return matches[0]
+    return [...matches].sort((a, b) => {
+      const am = a.photo_url || a.signature_url ? 0 : 1
+      const bm = b.photo_url || b.signature_url ? 0 : 1
+      if (am !== bm) return am - bm
+      return new Date(b.delivered_at || 0).getTime() - new Date(a.delivered_at || 0).getTime()
+    })[0]
   }
 
   function handleViewPOD(order: any) {

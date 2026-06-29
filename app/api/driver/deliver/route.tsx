@@ -249,11 +249,15 @@ export async function POST(request: Request) {
 
     // 3. Upsert the POD row WITH the media URLs already attached. Idempotent:
     //    a retried delivery updates the existing POD instead of duplicating it.
-    const { data: existingPod } = await admin
+    //    Tolerant of any legacy duplicates (order by latest, take one) so this
+    //    lookup never throws PGRST116 the way `.maybeSingle()` does on >1 row.
+    const { data: existingPods } = await admin
       .from("pods")
       .select("id, photo_url, signature_url")
       .eq("order_id", orderId)
-      .maybeSingle()
+      .order("delivered_at", { ascending: false })
+      .limit(1)
+    const existingPod = existingPods?.[0] ?? null
 
     const podRow = {
       order_id: orderId,
@@ -281,7 +285,33 @@ export async function POST(request: Request) {
         .select("id")
         .single()
 
-      if (insertErr) {
+      // Unique violation (23505) means a POD for this order already exists
+      // (concurrent submit, or the unique index from migration 031). Update it
+      // in place instead of creating a duplicate.
+      if (insertErr && (insertErr as any).code === "23505") {
+        console.warn("[DELIVER] POD already exists for order, updating in place")
+        const { data: conflictRow } = await admin
+          .from("pods")
+          .select("id, photo_url, signature_url")
+          .eq("order_id", orderId)
+          .order("delivered_at", { ascending: false })
+          .limit(1)
+        const target = conflictRow?.[0]
+        if (target?.id) {
+          const merged = {
+            ...podRow,
+            photo_url: podRow.photo_url ?? target.photo_url ?? null,
+            signature_url: podRow.signature_url ?? target.signature_url ?? null,
+          }
+          const { error: updErr } = await admin.from("pods").update(merged).eq("id", target.id)
+          if (updErr) {
+            console.error("[DELIVER] Conflict update failed:", updErr)
+            warnings.push("Delivery saved, but proof details could not be fully updated.")
+          } else {
+            podId = target.id
+          }
+        }
+      } else if (insertErr) {
         // Last-ditch fallback: some legacy DBs lack recipient_name. Retry
         // folding the recipient into notes so the POD (and its media) survive.
         console.error("[DELIVER] POD insert failed, attempting fallback:", insertErr)
