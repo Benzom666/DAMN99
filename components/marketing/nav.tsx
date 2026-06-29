@@ -11,9 +11,9 @@ interface MarketingNavProps {
 
 const LINKS = [
   { label: "Platform", href: "/#platform" },
-  { label: "Route Optimization", href: "/route-optimization" },
+  { label: "Route optimization", href: "/#optimize" },
   { label: "Pricing", href: "/#pricing" },
-  { label: "Contact", href: "/#footer" },
+  { label: "For developers", href: "/#developers" },
 ]
 
 /**
