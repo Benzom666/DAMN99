@@ -80,6 +80,11 @@ export function RouteDetail({ route, orders }: RouteDetailProps) {
           : o.status === "failed"
             ? "#dc2626"
             : "#5B62F7",
+      status: o.status,
+      address: o.address,
+      customerName: o.customer_name,
+      phone: o.phone,
+      kind: "stop" as const,
     }))
 
   const buildNavigationUrl = (lat: number, lng: number) => {

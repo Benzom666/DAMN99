@@ -68,7 +68,9 @@ export function DispatchMonitor({
       color: o.status === "delivered" ? "#22c55e" : o.status === "failed" ? "#ef4444" : "#3b82f6",
       status: o.status,
       address: o.address,
-      customerId: o.customer_name,
+      customerName: o.customer_name,
+      phone: o.phone,
+      kind: "stop" as const,
       orderId: o.id,
     }))
 
@@ -78,8 +80,10 @@ export function DispatchMonitor({
     label: "🚗",
     color: "#8b5cf6",
     status: "driver",
+    kind: "driver" as const,
+    customerName: dp.profiles?.display_name || dp.profiles?.email || "Driver",
     address: dp.profiles?.display_name || dp.profiles?.email || "Driver",
-    customerId: "",
+    updatedAt: dp.updated_at,
     orderId: dp.driver_id,
   }))
 

@@ -13,10 +13,155 @@ declare global {
   }
 }
 
-type LatLng = { lat: number; lng: number; label?: string; color?: string; status?: string; address?: string }
+type LatLng = {
+  lat: number
+  lng: number
+  label?: string
+  color?: string
+  status?: string
+  address?: string
+  /** Display name of the customer (delivery stops). */
+  customerName?: string
+  /** Legacy alias some callers use to carry the customer name. */
+  customerId?: string
+  /** Phone number (rendered as a tel: link). */
+  phone?: string
+  /** Marker kind — controls the popup style. */
+  kind?: "stop" | "driver" | "depot"
+  /** ISO timestamp of the last update (driver markers). */
+  updatedAt?: string
+}
+
+// ---------------------------------------------------------------------------
+// Styled marker popup (InfoBubble) helpers
+// ---------------------------------------------------------------------------
+
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  delivered: { label: "Delivered", color: "#16a34a" },
+  failed: { label: "Failed", color: "#dc2626" },
+  assigned: { label: "Pending", color: "#2563eb" },
+  pending: { label: "Pending", color: "#2563eb" },
+  in_transit: { label: "In transit", color: "#d97706" },
+  driver: { label: "Live driver", color: "#7c3aed" },
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+  )
+}
+
+function timeAgo(iso?: string): string | null {
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return null
+  const mins = Math.floor((Date.now() - then) / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} hr ago`
+  return `${Math.floor(hrs / 24)} d ago`
+}
+
+/** Inject a one-time stylesheet that restyles HERE's default bubble chrome
+ *  (otherwise the bubble is a large unstyled white block). */
+function injectBubbleStyles(): void {
+  if (!isBrowser) return
+  if (document.getElementById("hm-bubble-style")) return
+  const style = document.createElement("style")
+  style.id = "hm-bubble-style"
+  style.textContent = `
+    .H_ib_body{padding:0!important;border:0!important;background:transparent!important;
+      box-shadow:0 12px 32px rgba(15,23,42,.18)!important;border-radius:14px!important;}
+    .H_ib_content{margin:0!important;border-radius:14px!important;overflow:hidden;
+      background:#fff!important;border:1px solid #e7ecf3!important;}
+    .H_ib_close{top:7px!important;right:7px!important;border-radius:6px!important;}
+    .H_ib_tail{display:none!important;}
+  `
+  document.head.appendChild(style)
+}
+
+function row(icon: string, html: string): string {
+  return `<div style="display:flex;gap:7px;font-size:12.5px;color:#334155;line-height:1.4;">
+    <span style="flex:0 0 auto;opacity:.7;">${icon}</span>
+    <span style="min-width:0;word-break:break-word;">${html}</span></div>`
+}
+
+/** Build the HTML for a marker's detail popup. Self-contained inline styles so
+ *  it renders identically regardless of app CSS. */
+function buildBubbleContent(d: any): string {
+  const isDepot = d.isDepot || d.kind === "depot"
+  const isDriver = !isDepot && (d.kind === "driver" || d.status === "driver")
+  const meta = STATUS_META[d.status as string] || { label: String(d.status || ""), color: "#475569" }
+  const accent = isDepot ? "#0d9488" : isDriver ? "#7c3aed" : d.color || meta.color
+  const customer = d.customerName || d.customerId || ""
+
+  const headIcon = isDepot ? "🏢" : isDriver ? "🚗" : "📦"
+  const title = isDepot
+    ? "Depot"
+    : isDriver
+      ? escapeHtml(customer || d.address || "Driver")
+      : `Stop ${escapeHtml(d.label ?? "")}`
+  const subtitle = isDepot ? "Route start / end" : isDriver ? "Live driver location" : "Delivery stop"
+
+  const rows: string[] = []
+  if (!isDepot && !isDriver && customer) rows.push(row("👤", escapeHtml(customer)))
+  if (d.address && !isDriver) rows.push(row("📍", escapeHtml(d.address)))
+  if (d.phone)
+    rows.push(
+      row(
+        "📞",
+        `<a href="tel:${escapeHtml(d.phone)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(d.phone)}</a>`,
+      ),
+    )
+  if (isDriver) {
+    const ago = timeAgo(d.updatedAt)
+    if (ago) rows.push(row("🕘", `Updated ${escapeHtml(ago)}`))
+  }
+
+  const pill = isDriver
+    ? `<span style="align-self:flex-start;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:#16a34a1a;color:#16a34a;font-size:11px;font-weight:600;">
+        <span style="width:6px;height:6px;border-radius:999px;background:#16a34a;display:inline-block;"></span>Live</span>`
+    : !isDepot && d.status
+      ? `<span style="align-self:flex-start;padding:3px 9px;border-radius:999px;background:${meta.color}1a;color:${meta.color};font-size:11px;font-weight:600;">${escapeHtml(meta.label)}</span>`
+      : ""
+
+  const coords =
+    Number.isFinite(d.lat) && Number.isFinite(d.lng)
+      ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;">${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}</div>`
+      : ""
+
+  return `<div style="font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;width:248px;color:#0f172a;">
+    <div style="display:flex;align-items:center;gap:9px;padding:12px 14px 10px;border-bottom:1px solid #eef2f7;">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:${accent}1a;font-size:15px;flex:0 0 auto;">${headIcon}</span>
+      <div style="min-width:0;">
+        <div style="font-weight:700;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title}</div>
+        <div style="font-size:11px;color:#64748b;line-height:1.3;">${subtitle}</div>
+      </div>
+    </div>
+    <div style="padding:11px 14px 13px;display:flex;flex-direction:column;gap:7px;">
+      ${rows.join("")}
+      ${pill}
+      ${coords}
+    </div>
+  </div>`
+}
 
 async function loadHereScripts(apiKey: string): Promise<void> {
   if (!isBrowser) return
+
+  // HERE UI stylesheet — REQUIRED for InfoBubble to render as a styled card.
+  // Without it the bubble appears as a large unstyled white block.
+  const cssHref = "https://js.api.here.com/v3/3.1/mapsjs-ui.css"
+  if (!document.querySelector(`link[href="${cssHref}"]`)) {
+    const link = document.createElement("link")
+    link.rel = "stylesheet"
+    link.href = cssHref
+    document.head.appendChild(link)
+  }
+  injectBubbleStyles()
+
   if (window.H?.Map) return // Already loaded
 
   const scripts = [
@@ -132,6 +277,19 @@ export function HereMap({
 
         mapInstanceRef.current = map
 
+        // Open a styled detail popup for a marker, closing any other open one
+        // first so bubbles never stack on the map.
+        const showBubble = (target: any) => {
+          try {
+            const existing = (ui.getBubbles && ui.getBubbles()) || []
+            existing.forEach((b: any) => ui.removeBubble(b))
+          } catch {}
+          const bubble = new H.ui.InfoBubble(target.getGeometry(), {
+            content: buildBubbleContent(target.getData()),
+          })
+          ui.addBubble(bubble)
+        }
+
         const group = new H.map.Group()
 
         if (depot) {
@@ -142,14 +300,7 @@ export function HereMap({
           const depotIcon = new H.map.Icon(depotSvg)
           const depotMarker = new H.map.Marker(depot, { icon: depotIcon })
           depotMarker.setData({ label: "Depot", lat: depot.lat, lng: depot.lng, isDepot: true })
-
-          depotMarker.addEventListener("tap", (e: any) => {
-            const data = e.target.getData()
-            const bubble = new H.ui.InfoBubble(e.target.getGeometry(), {
-              content: `<div style="padding: 8px;"><strong>🏢 Depot</strong><br/>Lat: ${data.lat.toFixed(5)}<br/>Lng: ${data.lng.toFixed(5)}</div>`,
-            })
-            ui.addBubble(bubble)
-          })
+          depotMarker.addEventListener("tap", (e: any) => showBubble(e.target))
 
           group.addObject(depotMarker)
         }
@@ -187,27 +338,15 @@ export function HereMap({
               lng: point.lng,
               status: point.status,
               address: point.address,
+              color: point.color,
+              customerName: point.customerName,
+              customerId: point.customerId,
+              phone: point.phone,
+              kind: point.kind,
+              updatedAt: point.updatedAt,
             })
 
-            marker.addEventListener("tap", (e: any) => {
-              const data = e.target.getData()
-              const statusEmoji = data.status === "delivered" ? "✅" : data.status === "failed" ? "❌" : "📦"
-              const content = `
-                <div style="padding: 12px; min-width: 200px;">
-                  <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px;">
-                    ${statusEmoji} Stop #${data.label}
-                  </div>
-                  ${data.address ? `<div style="margin-bottom: 4px;">${data.address}</div>` : ""}
-                  <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                    Lat: ${data.lat.toFixed(5)}<br/>
-                    Lng: ${data.lng.toFixed(5)}
-                  </div>
-                  ${data.status ? `<div style="margin-top: 8px; padding: 4px 8px; background: ${data.status === "delivered" ? "#22c55e" : data.status === "failed" ? "#ef4444" : "#3b82f6"}; color: white; border-radius: 4px; display: inline-block; font-size: 12px;">${data.status}</div>` : ""}
-                </div>
-              `
-              const bubble = new H.ui.InfoBubble(e.target.getGeometry(), { content })
-              ui.addBubble(bubble)
-            })
+            marker.addEventListener("tap", (e: any) => showBubble(e.target))
 
             group.addObject(marker)
           })

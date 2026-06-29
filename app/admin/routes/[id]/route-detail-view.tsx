@@ -64,7 +64,9 @@ export function RouteDetailView({ route, orders, drivers = [], eligibleRoutes = 
     color: o.status === "delivered" ? "#22c55e" : o.status === "failed" ? "#ef4444" : "#3b82f6",
     status: o.status,
     address: o.address,
-    customerId: o.customer_name,
+    customerName: o.customer_name,
+    phone: o.phone,
+    kind: "stop" as const,
     orderId: o.id,
   }))
 
