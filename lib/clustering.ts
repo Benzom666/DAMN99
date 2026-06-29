@@ -134,6 +134,21 @@ function clusterByProximity(orders: ClusterableOrder[], numClusters: number): Or
 }
 
 /**
+ * Split orders into exactly `k` geographically-coherent clusters (or fewer when
+ * there are fewer orders than k). Unlike clusterOrders this does NOT try to be
+ * clever about cities/radius — it always runs proximity k-means so the caller
+ * gets one coherent territory per route. This is the correct replacement for
+ * the old "slice the array into N chunks" fallback.
+ */
+export function clusterIntoRoutes(orders: ClusterableOrder[], k: number): OrderCluster[] {
+  if (orders.length === 0) return []
+  if (k <= 1 || orders.length <= 1) {
+    return [{ id: "cluster-0", orders, centroid: calculateCentroid(orders) }]
+  }
+  return clusterByProximity(orders, Math.min(k, orders.length))
+}
+
+/**
  * Main clustering function - decides strategy based on data
  */
 export function clusterOrders(orders: ClusterableOrder[], numDrivers: number, maxClusterRadiusKm = 30): OrderCluster[] {
