@@ -4,7 +4,11 @@ import { OrdersTable } from "./orders-table"
 import { MigrationBanner } from "./migration-banner"
 import { PageHeader } from "@/components/page-header"
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
   const supabase = await createClient()
 
   const {
@@ -25,11 +29,21 @@ export default async function OrdersPage() {
     redirect("/driver")
   }
 
-  const { data: orders, error } = await supabase
+  const { view } = await searchParams
+  const showArchived = view === "archived"
+
+  let ordersQuery = supabase
     .from("orders")
     .select("*")
     .eq("admin_id", user.id)
     .order("created_at", { ascending: false })
+
+  // Active manifest hides archived orders; the Archived tab shows only them.
+  ordersQuery = showArchived
+    ? ordersQuery.not("archived_at", "is", null)
+    : ordersQuery.is("archived_at", null)
+
+  const { data: orders, error } = await ordersQuery
 
   if (error) {
     console.error("[ORDERS] Error fetching orders:", error)
@@ -58,7 +72,7 @@ export default async function OrdersPage() {
 
       <main className="flex-1 px-6 lg:px-10 py-8 space-y-6">
         {needsMigration && <MigrationBanner />}
-        <OrdersTable orders={orders || []} eligibleRoutes={eligibleRoutes || []} />
+        <OrdersTable orders={orders || []} eligibleRoutes={eligibleRoutes || []} showArchived={showArchived} />
       </main>
     </div>
   )

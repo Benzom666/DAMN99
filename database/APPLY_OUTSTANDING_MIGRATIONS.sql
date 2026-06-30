@@ -46,12 +46,19 @@ alter table public.orders add column if not exists retry_count       integer def
 alter table public.orders add column if not exists last_failed_at    timestamptz;
 alter table public.orders add column if not exists original_route_id uuid;
 
+-- ── Order archival (migration 033) ──────────────────────────────────────────
+-- Set when a delivered order's route is completed (or when an admin archives an
+-- order manually). Archived orders are hidden from the active manifest but
+-- preserved in route_history and still queryable by super_admin.
+alter table public.orders add column if not exists archived_at timestamptz;
+
 -- ── Helpful indexes (no-ops if already present) ─────────────────────────────
 create index if not exists idx_orders_geocode_status on public.orders(geocode_status);
 create index if not exists idx_orders_coordinates
   on public.orders(latitude, longitude)
   where latitude is not null and longitude is not null;
 create index if not exists idx_orders_admin_id on public.orders(admin_id);
+create index if not exists idx_orders_archived_at on public.orders(archived_at);
 
 
 -- ============================================================================

@@ -202,7 +202,13 @@ export async function updateOrder(orderId: string, formData: FormData) {
   revalidatePath("/admin/orders")
 }
 
-export async function deleteOrder(orderId: string) {
+// ============================================================================
+// ARCHIVE (admin cannot delete — only archive). Archived orders drop off the
+// active manifest but stay queryable (and visible to super_admin) so package
+// volume is never lost. Deletion is reserved for super_admin only.
+// ============================================================================
+
+export async function archiveOrder(orderId: string) {
   const supabase = await createClient()
 
   const {
@@ -210,14 +216,18 @@ export async function deleteOrder(orderId: string) {
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  const { error } = await supabase.from("orders").delete().eq("id", orderId).eq("admin_id", user.id)
+  const { error } = await supabase
+    .from("orders")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", orderId)
+    .eq("admin_id", user.id)
 
   if (error) throw error
 
   revalidatePath("/admin/orders")
 }
 
-export async function bulkDeleteOrders(orderIds: string[]) {
+export async function unarchiveOrder(orderId: string) {
   const supabase = await createClient()
 
   const {
@@ -225,55 +235,122 @@ export async function bulkDeleteOrders(orderIds: string[]) {
   } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  console.log("[v0] [BULK_DELETE] Deleting", orderIds.length, "orders")
-  console.log("[v0] [BULK_DELETE] User:", user.id)
+  const { error } = await supabase
+    .from("orders")
+    .update({ archived_at: null })
+    .eq("id", orderId)
+    .eq("admin_id", user.id)
+
+  if (error) throw error
+
+  revalidatePath("/admin/orders")
+}
+
+export async function bulkArchiveOrders(orderIds: string[]) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
 
   const BATCH_SIZE = 100
-  let totalDeleted = 0
+  let totalArchived = 0
   const errors: string[] = []
+  const archivedAt = new Date().toISOString()
 
   for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
     const batch = orderIds.slice(i, i + BATCH_SIZE)
-    console.log(
-      `[v0] [BULK_DELETE] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(orderIds.length / BATCH_SIZE)}`,
-    )
 
     try {
       const { error, count } = await supabase
         .from("orders")
-        .delete({ count: "exact" })
+        .update({ archived_at: archivedAt }, { count: "exact" })
         .in("id", batch)
         .eq("admin_id", user.id)
 
       if (error) {
-        console.error("[v0] [BULK_DELETE] Batch error:", error)
+        console.error("[v0] [BULK_ARCHIVE] Batch error:", error)
         errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${error.message}`)
       } else {
-        totalDeleted += count || batch.length
-        console.log(
-          `[v0] [BULK_DELETE] Batch ${Math.floor(i / BATCH_SIZE) + 1} deleted ${count || batch.length} orders`,
-        )
+        totalArchived += count || batch.length
       }
     } catch (err) {
-      console.error("[v0] [BULK_DELETE] Batch exception:", err)
+      console.error("[v0] [BULK_ARCHIVE] Batch exception:", err)
       errors.push(
         `Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${err instanceof Error ? err.message : "Unknown error"}`,
       )
     }
   }
 
-  if (errors.length > 0) {
-    console.error("[v0] [BULK_DELETE] Completed with errors:", errors)
-  } else {
-    console.log("[v0] [BULK_DELETE] ✓ Successfully deleted", totalDeleted, "orders")
-  }
-
   revalidatePath("/admin/orders")
 
   return {
-    deleted: totalDeleted,
+    archived: totalArchived,
     errors: errors.length > 0 ? errors : undefined,
   }
+}
+
+// ============================================================================
+// MANUAL STATUS EDIT (admin). Any status except "delivered" — delivered only
+// ever comes from a driver POD, so the admin can't fake a proof of delivery.
+// ============================================================================
+
+const ADMIN_EDITABLE_STATUSES = ["pending", "assigned", "in_transit", "failed"] as const
+type AdminEditableStatus = (typeof ADMIN_EDITABLE_STATUSES)[number]
+
+export async function updateOrderStatus(orderId: string, status: AdminEditableStatus) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  if (!ADMIN_EDITABLE_STATUSES.includes(status)) {
+    throw new Error(
+      status === ("delivered" as any)
+        ? "Delivered status can only be set by a driver via proof of delivery."
+        : `Invalid status: ${status}`,
+    )
+  }
+
+  const { data: order, error: fetchError } = await supabase
+    .from("orders")
+    .select("id, status, route_id")
+    .eq("id", orderId)
+    .eq("admin_id", user.id)
+    .single()
+
+  if (fetchError || !order) {
+    throw new Error("Order not found or access denied")
+  }
+
+  if (order.status === status) {
+    return { success: true }
+  }
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", orderId)
+    .eq("admin_id", user.id)
+
+  if (updateError) throw updateError
+
+  // Audit trail (best-effort). 'failed' is a recognized stop_events type;
+  // other admin transitions are logged as 'rerouted' to stay within the
+  // event_type check constraint (migration 030).
+  await supabase.from("stop_events").insert({
+    order_id: orderId,
+    driver_id: user.id, // admin id logged as actor
+    event_type: status === "failed" ? "failed" : "rerouted",
+    notes: `Status changed by admin: ${order.status} → ${status}`,
+  })
+
+  revalidatePath("/admin/orders")
+  if (order.route_id) revalidatePath(`/admin/routes/${order.route_id}`)
+  return { success: true }
 }
 
 export async function importOrdersFromCSV(csvData: string) {

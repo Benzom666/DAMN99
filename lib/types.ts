@@ -36,6 +36,7 @@ export interface Order {
   status: OrderStatus
   route_id: string | null
   stop_sequence: number | null
+  archived_at: string | null
   created_at: string
   updated_at: string
 }

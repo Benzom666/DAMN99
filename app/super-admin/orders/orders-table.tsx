@@ -15,6 +15,7 @@ type Order = {
   customer_email: string | null
   status: string | null
   city: string | null
+  archived_at: string | null
   created_at: string
   admin: { email: string; display_name: string | null } | null
   route: { id: string; name: string | null; status: string | null } | null
@@ -88,7 +89,16 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                   '-'
                 )}
               </TableCell>
-              <TableCell>{getStatusBadge(order.status)}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5">
+                  {getStatusBadge(order.status)}
+                  {order.archived_at && (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Archived
+                    </Badge>
+                  )}
+                </div>
+              </TableCell>
               <TableCell className="text-sm">
                 {new Date(order.created_at).toLocaleDateString()}
               </TableCell>

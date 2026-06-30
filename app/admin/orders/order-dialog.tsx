@@ -14,9 +14,25 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { createOrder, updateOrder } from "./actions"
-import { useState } from "react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { createOrder, updateOrder, updateOrderStatus } from "./actions"
+import { useEffect, useState } from "react"
 import type { Order } from "@/lib/types"
+
+// Admin may set any status except "delivered" — that only comes from a driver POD.
+type AdminEditableStatus = "pending" | "assigned" | "in_transit" | "failed"
+const ADMIN_STATUS_OPTIONS: { value: AdminEditableStatus; label: string }[] = [
+  { value: "pending", label: "Pending" },
+  { value: "assigned", label: "Assigned" },
+  { value: "in_transit", label: "In transit" },
+  { value: "failed", label: "Failed" },
+]
 
 interface OrderDialogProps {
   open: boolean
@@ -26,6 +42,19 @@ interface OrderDialogProps {
 
 export function OrderDialog({ open, onOpenChange, order }: OrderDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
+  // Status is only editable on existing orders, and only when the current
+  // status is one the admin is allowed to set (i.e. not "delivered").
+  const canEditStatus = !!order && order.status !== "delivered"
+  const [status, setStatus] = useState<AdminEditableStatus>(
+    (order?.status as AdminEditableStatus) ?? "pending",
+  )
+
+  // Keep the status select in sync when the dialog is reused for another order.
+  useEffect(() => {
+    if (order && order.status !== "delivered") {
+      setStatus(order.status as AdminEditableStatus)
+    }
+  }, [order])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -35,6 +64,9 @@ export function OrderDialog({ open, onOpenChange, order }: OrderDialogProps) {
       const formData = new FormData(e.currentTarget)
       if (order) {
         await updateOrder(order.id, formData)
+        if (canEditStatus && status !== order.status) {
+          await updateOrderStatus(order.id, status)
+        }
       } else {
         await createOrder(formData)
       }
@@ -101,6 +133,34 @@ export function OrderDialog({ open, onOpenChange, order }: OrderDialogProps) {
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" name="notes" defaultValue={order?.notes || ""} rows={3} />
             </div>
+            {order &&
+              (canEditStatus ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={status} onValueChange={(v) => setStatus(v as AdminEditableStatus)}>
+                    <SelectTrigger id="status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ADMIN_STATUS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Delivered is set automatically when a driver captures proof of delivery.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label>Status</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Delivered — locked (set by driver proof of delivery).
+                  </p>
+                </div>
+              ))}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>

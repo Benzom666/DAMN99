@@ -654,11 +654,28 @@ export async function updateRouteStatus(routeId: string, status: "draft" | "acti
     } catch (snapErr) {
       console.error("[v0] [COMPLETE] route_history snapshot failed (non-fatal):", snapErr)
     }
+
+    // Archive the delivered orders off the active manifest. They remain in
+    // route_history (snapshotted above) and stay queryable via archived_at.
+    // Failed orders are intentionally left on the manifest so the admin can
+    // reattempt them (see retryFailedOrder / addFailedOrderToRoute).
+    const { error: archiveErr } = await supabase
+      .from("orders")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("route_id", routeId)
+      .eq("admin_id", user.id)
+      .eq("status", "delivered")
+      .is("archived_at", null)
+
+    if (archiveErr) {
+      console.error("[v0] [COMPLETE] archiving delivered orders failed (non-fatal):", archiveErr)
+    }
   }
 
   revalidatePath("/admin/routes")
   revalidatePath("/admin/dispatch")
   revalidatePath("/admin/routes/history")
+  revalidatePath("/admin/orders")
 }
 
 export async function deleteRoute(routeId: string) {
