@@ -117,6 +117,108 @@ export default async function HereCostAnalyticsPage() {
           </Card>
         </div>
 
+        {/* Cost by API key + admin (deep breakdown) */}
+        {(() => {
+          const has30d = (analytics.last30d.byAdmin?.length || 0) > 0
+          const src = has30d ? analytics.last30d : analytics.allTime
+          const scope = has30d ? "last 30 days" : "all time"
+          const rows = src.byAdmin || []
+          const defaults = rows.filter((r: any) => r.key === "default")
+          const own = rows.filter((r: any) => r.key === "own")
+          const renderRow = (r: any) => (
+            <tr key={(r.adminId || "platform") + r.name} className="border-b align-top">
+              <td className="py-2 pr-3 font-medium">
+                {r.name}
+                <div className="mt-0.5 flex flex-wrap gap-1">
+                  {Object.entries(r.byService).map(([svc, v]: [string, any]) => (
+                    <span key={svc} className="text-[10px] rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+                      {serviceLabel(svc)} {v.requests}
+                    </span>
+                  ))}
+                </div>
+              </td>
+              <td className="py-2 pr-3">
+                <Badge variant={r.key === "own" ? "default" : "secondary"}>
+                  {r.key === "own" ? "Admin key" : "Default key"}
+                </Badge>
+              </td>
+              <td className="py-2 pr-3 tabular-nums">{r.requests.toLocaleString()}</td>
+              <td className="py-2 pr-3 tabular-nums">{r.cacheHits.toLocaleString()}</td>
+              <td className="py-2 pr-3 tabular-nums">{r.errors.toLocaleString()}</td>
+              <td className="py-2 font-semibold tabular-nums">{money(r.costCents)}</td>
+            </tr>
+          )
+          return (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Cost by API key &amp; admin</CardTitle>
+                <Badge variant="outline" className="font-normal">
+                  {scope} · {analytics.adminsWithOwnKey}/{analytics.totalAdmins} admins on own key
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                {rows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No HERE usage recorded yet.</p>
+                ) : (
+                  <div className="space-y-5">
+                    <div>
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Server className="h-4 w-4 text-primary" /> Default (platform) key
+                        <span className="text-xs text-muted-foreground">
+                          {money(src.platformKeyCost)} · {src.platformKeyRequests.toLocaleString()} req
+                        </span>
+                      </div>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-xs text-muted-foreground">
+                            <th className="py-1.5 pr-3 font-medium">Consumer / services</th>
+                            <th className="py-1.5 pr-3 font-medium">Key</th>
+                            <th className="py-1.5 pr-3 font-medium">Requests</th>
+                            <th className="py-1.5 pr-3 font-medium">Cache</th>
+                            <th className="py-1.5 pr-3 font-medium">Errors</th>
+                            <th className="py-1.5 font-medium">Est. cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {defaults.length ? defaults.map(renderRow) : (
+                            <tr><td colSpan={6} className="py-3 text-muted-foreground">No default-key usage in {scope}.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Key className="h-4 w-4 text-success" /> Admin-specific keys (client-paid)
+                        <span className="text-xs text-muted-foreground">
+                          {money(src.ownKeyCost)} · {src.ownKeyRequests.toLocaleString()} req
+                        </span>
+                      </div>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-xs text-muted-foreground">
+                            <th className="py-1.5 pr-3 font-medium">Admin / services</th>
+                            <th className="py-1.5 pr-3 font-medium">Key</th>
+                            <th className="py-1.5 pr-3 font-medium">Requests</th>
+                            <th className="py-1.5 pr-3 font-medium">Cache</th>
+                            <th className="py-1.5 pr-3 font-medium">Errors</th>
+                            <th className="py-1.5 font-medium">Est. cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {own.length ? own.map(renderRow) : (
+                            <tr><td colSpan={6} className="py-3 text-muted-foreground">No admins are using their own HERE key yet.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })()}
+
         <Card>
           <CardHeader>
             <CardTitle>HERE API Free Tier Usage (30 days)</CardTitle>
@@ -217,6 +319,8 @@ export default async function HereCostAnalyticsPage() {
                       <div className="text-xs text-muted-foreground">
                         {new Date(event.created_at).toLocaleString()} - {event.request_count || 0} requests -{" "}
                         {money(Number(event.estimated_cost_cents || 0))}
+                        {" · "}
+                        {event.admin_name} ({event.key_label})
                       </div>
                       {event.error_message && <div className="text-xs text-destructive mt-1">{event.error_message}</div>}
                     </div>

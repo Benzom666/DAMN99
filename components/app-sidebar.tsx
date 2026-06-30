@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   LogOut,
   ArrowUpRight,
+  Archive,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BrandLockup, BrandMark } from "@/components/brand-mark"
@@ -60,6 +61,7 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
     { title: "Drivers", href: "/super-admin/drivers", icon: Truck },
     { title: "Orders", href: "/super-admin/orders", icon: Package },
     { title: "Routes", href: "/super-admin/routes", icon: Route },
+    { title: "History", href: "/super-admin/history", icon: Archive },
     { title: "Audit log", href: "/super-admin/audit-log", icon: FileText },
     { title: "Costs", href: "/super-admin/costs", icon: DollarSign },
     { title: "System", href: "/super-admin/system", icon: Database },
