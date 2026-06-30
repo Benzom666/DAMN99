@@ -14,6 +14,35 @@ import { buildCsv } from "@/lib/csv"
 
 const hereTourPlanningEnabled = () => process.env.HERE_TOUR_PLANNING_ENABLED === "true"
 
+/**
+ * Admin-controlled optimization constraints, collected in the create-route
+ * dialog. All optional — anything omitted falls back to the driver profile or
+ * a sane default.
+ */
+export interface RouteOptions {
+  /** Run the 2-opt refinement pass (fallback optimizer). */
+  use2Opt?: boolean
+  /** Whether vehicles must return to the depot at the end of the route. */
+  returnToDepot?: boolean
+  /** Max stops/items per vehicle (capacity). */
+  capacity?: number
+  /** Shift start as "HH:MM" (local clock). */
+  shiftStart?: string
+  /** Shift end as "HH:MM" (local clock). */
+  shiftEnd?: string
+}
+
+/** Convert an "HH:MM" clock time into an ISO-Z timestamp for today, or
+ *  undefined when the input is missing/invalid. */
+function shiftIso(hhmm?: string): string | undefined {
+  if (!hhmm) return undefined
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim())
+  if (!m) return undefined
+  const hh = m[1].padStart(2, "0")
+  const today = new Date().toISOString().split("T")[0]
+  return `${today}T${hh}:${m[2]}:00Z`
+}
+
 // Helper function to parse warehouse location
 function parseWarehouseLocation(location: string): Depot | null {
   // Try to parse as "lat,lng"
@@ -31,8 +60,9 @@ export async function createRoute(
   name: string,
   orderIds: string[],
   driverId: string | null,
-  use2Opt: boolean,
+  options: RouteOptions = {},
 ) {
+  const use2Opt = options.use2Opt ?? false
   const supabase = await createClient()
 
   const {
@@ -117,6 +147,14 @@ export async function createRoute(
     }
   }
 
+  // Apply admin-provided constraints (override driver/default values).
+  if (options.capacity && options.capacity > 0) vehicleConfig.capacity = options.capacity
+  if (options.returnToDepot !== undefined) vehicleConfig.returnToDepot = options.returnToDepot
+  const csStart = shiftIso(options.shiftStart)
+  const csEnd = shiftIso(options.shiftEnd)
+  if (csStart) vehicleConfig.shiftStart = csStart
+  if (csEnd) vehicleConfig.shiftEnd = csEnd
+
   const orderData: Order[] = validOrdersWithCoords.map((o) => ({
     id: o.id,
     latitude: o.latitude!,
@@ -194,8 +232,9 @@ export async function createMultipleRoutes(
   orderIds: string[],
   driverIds: string[],
   numberOfRoutes: number,
-  use2Opt: boolean,
+  options: RouteOptions = {},
 ) {
+  const use2Opt = options.use2Opt ?? false
   try {
     const supabase = await createClient()
 
@@ -326,10 +365,10 @@ export async function createMultipleRoutes(
       const vehicleId = driver?.id || `vehicle-${i + 1}`
       vehicles.push({
         id: vehicleId,
-        capacity: driver?.vehicle_capacity || env.ROUTE_CAPACITY,
-        shiftStart: driver?.shift_start ? `${today}T${driver.shift_start}Z` : undefined,
-        shiftEnd: driver?.shift_end ? `${today}T${driver.shift_end}Z` : undefined,
-        returnToDepot: true,
+        capacity: options.capacity && options.capacity > 0 ? options.capacity : driver?.vehicle_capacity || env.ROUTE_CAPACITY,
+        shiftStart: shiftIso(options.shiftStart) ?? (driver?.shift_start ? `${today}T${driver.shift_start}Z` : undefined),
+        shiftEnd: shiftIso(options.shiftEnd) ?? (driver?.shift_end ? `${today}T${driver.shift_end}Z` : undefined),
+        returnToDepot: options.returnToDepot ?? true,
       })
       driverByVehicleId.set(vehicleId, driver)
     }
@@ -461,7 +500,7 @@ export async function createMultipleRoutes(
             ? { latitude: driver.depot_lat, longitude: driver.depot_lng }
             : { latitude: cluster.centroid.lat, longitude: cluster.centroid.lng }
         const stops = cluster.orders.map((o) => ({ id: o.id, latitude: o.latitude, longitude: o.longitude }))
-        const orderedIds = optimizeRouteWithDepot(stops, depot, true, use2Opt)
+        const orderedIds = optimizeRouteWithDepot(stops, depot, options.returnToDepot ?? true, use2Opt)
         routeResults.push({ driverId: driver?.id || null, orderedIds })
       }
     }
@@ -562,8 +601,64 @@ export async function updateRouteStatus(routeId: string, status: "draft" | "acti
     await supabase.from("orders").update({ status: "in_transit" }).eq("route_id", routeId).eq("admin_id", user.id)
   }
 
+  // Permanent record on completion: snapshot the route + every order detail +
+  // POD into route_history so nothing is ever lost — even if the orders are
+  // later reassigned, retried, or deleted. Best-effort and idempotent (one
+  // snapshot per route); never blocks the status change.
+  if (status === "completed") {
+    try {
+      const { data: existingSnap } = await supabase
+        .from("route_history")
+        .select("id")
+        .eq("route_id", routeId)
+        .limit(1)
+        .maybeSingle()
+
+      if (!existingSnap) {
+        const { route, stops, completedStops, failedStops } = await buildRouteSnapshot(supabase, routeId, user.id)
+        await supabase.from("route_history").insert({
+          route_id: route.id,
+          admin_id: user.id,
+          name: route.name,
+          driver_id: route.driver_id,
+          driver_name: route.driver?.display_name ?? null,
+          driver_email: route.driver?.email ?? null,
+          status: "completed",
+          total_stops: stops.length,
+          completed_stops: completedStops,
+          failed_stops: failedStops,
+          distance_km: route.distance_km ?? null,
+          duration_sec: route.duration_sec ?? null,
+          created_at: route.created_at,
+          completed_at: updatePayload.completed_at,
+          snapshot: {
+            route: {
+              id: route.id,
+              name: route.name,
+              status: "completed",
+              driver_id: route.driver_id,
+              driver_name: route.driver?.display_name ?? null,
+              driver_email: route.driver?.email ?? null,
+              distance_km: route.distance_km ?? null,
+              duration_sec: route.duration_sec ?? null,
+              created_at: route.created_at,
+              completed_at: updatePayload.completed_at,
+            },
+            stops,
+            recorded_by: user.id,
+            reason: "completed",
+          },
+        })
+        console.log(`[v0] [COMPLETE] Recorded route ${routeId} snapshot (${stops.length} stops)`)
+      }
+    } catch (snapErr) {
+      console.error("[v0] [COMPLETE] route_history snapshot failed (non-fatal):", snapErr)
+    }
+  }
+
   revalidatePath("/admin/routes")
   revalidatePath("/admin/dispatch")
+  revalidatePath("/admin/routes/history")
 }
 
 export async function deleteRoute(routeId: string) {

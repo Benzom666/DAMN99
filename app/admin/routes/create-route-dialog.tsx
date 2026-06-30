@@ -36,7 +36,25 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
   const [selectedDrivers, setSelectedDrivers] = useState<Set<string>>(new Set())
   const [assignDriversLater, setAssignDriversLater] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
+
+  // --- Optimization constraints (admin-controlled) ---
+  const [optimizeOrder, setOptimizeOrder] = useState(true)
+  const [returnToDepot, setReturnToDepot] = useState(true)
+  const [capacity, setCapacity] = useState("")
+  const [shiftStart, setShiftStart] = useState("")
+  const [shiftEnd, setShiftEnd] = useState("")
+
   const router = useRouter()
+
+  function buildOptions() {
+    return {
+      use2Opt: optimizeOrder,
+      returnToDepot,
+      capacity: capacity ? Number(capacity) : undefined,
+      shiftStart: shiftStart || undefined,
+      shiftEnd: shiftEnd || undefined,
+    }
+  }
 
   const availableOrders = orders.filter((o) => {
     const validStatus = !o.status || o.status === "pending"
@@ -77,17 +95,18 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
 
     setIsLoading(true)
     try {
+      const options = buildOptions()
       if (multiRouteMode) {
         const routeCount = Number.parseInt(numberOfRoutes) || 2
         const driversToUse = assignDriversLater ? [] : Array.from(selectedDrivers)
-        await createMultipleRoutes(Array.from(selectedOrders), driversToUse, routeCount, false)
+        await createMultipleRoutes(Array.from(selectedOrders), driversToUse, routeCount, options)
       } else {
         if (!name) {
           alert("Please enter a route name")
           setIsLoading(false)
           return
         }
-        await createRoute(name, Array.from(selectedOrders), driverId, false)
+        await createRoute(name, Array.from(selectedOrders), driverId, options)
       }
 
       // Reset form
@@ -98,6 +117,11 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
       setMultiRouteMode(false)
       setNumberOfRoutes("2")
       setAssignDriversLater(true)
+      setCapacity("")
+      setShiftStart("")
+      setShiftEnd("")
+      setOptimizeOrder(true)
+      setReturnToDepot(true)
       onOpenChange(false)
       router.refresh()
     } catch (error) {
@@ -238,6 +262,72 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
               </Select>
             </div>
           )}
+
+          <Separator className="my-4" />
+
+          {/* Optimization constraints */}
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Optimization constraints</Label>
+              <span className="text-xs text-muted-foreground">applied when building routes</span>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="shift-start" className="text-xs font-normal text-muted-foreground">
+                  Shift start
+                </Label>
+                <Input id="shift-start" type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="shift-end" className="text-xs font-normal text-muted-foreground">
+                  Shift end
+                </Label>
+                <Input id="shift-end" type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="capacity" className="text-xs font-normal text-muted-foreground">
+                Vehicle capacity (max stops per route, optional)
+              </Label>
+              <Input
+                id="capacity"
+                type="number"
+                min="1"
+                placeholder="e.g., 50"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="return-depot"
+                  checked={returnToDepot}
+                  onCheckedChange={(c) => setReturnToDepot(c === true)}
+                />
+                <Label htmlFor="return-depot" className="text-sm font-normal">
+                  Return to depot
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="optimize-order"
+                  checked={optimizeOrder}
+                  onCheckedChange={(c) => setOptimizeOrder(c === true)}
+                />
+                <Label htmlFor="optimize-order" className="text-sm font-normal">
+                  Optimize stop order
+                </Label>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Shift window and capacity are enforced by the optimization engine. Leave blank to use each driver&apos;s
+              defaults.
+            </p>
+          </div>
 
           <Separator className="my-4" />
 

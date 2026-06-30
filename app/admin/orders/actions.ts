@@ -15,6 +15,35 @@ function generateOrderNumber(): string {
   return `ORD-${timestamp}-${random}`
 }
 
+/**
+ * Return a unique order number given a desired value and the set of numbers
+ * already taken (existing in DB + assigned so far in this batch). If the
+ * desired number is free it is used as-is; if it collides (it has already been
+ * created or delivered before) a fresh one is derived — `BASE-2`, `BASE-3`, …,
+ * falling back to a fully generated number. The chosen value is added to
+ * `taken` so subsequent calls stay unique.
+ */
+function uniqueOrderNumber(desired: string | undefined, taken: Set<string>): string {
+  const base = (desired || "").trim()
+  if (base && !taken.has(base)) {
+    taken.add(base)
+    return base
+  }
+  if (base) {
+    for (let n = 2; n < 1000; n++) {
+      const candidate = `${base}-${n}`
+      if (!taken.has(candidate)) {
+        taken.add(candidate)
+        return candidate
+      }
+    }
+  }
+  let generated = generateOrderNumber()
+  while (taken.has(generated)) generated = generateOrderNumber()
+  taken.add(generated)
+  return generated
+}
+
 async function hasCustomerEmailColumn(supabase: any): Promise<boolean> {
   try {
     const { error } = await supabase.from("orders").select("customer_email").limit(1)
@@ -78,14 +107,22 @@ export async function createOrder(formData: FormData) {
     orderData.customer_email = customerEmail
   }
 
-  const { error } = await supabase.from("orders").insert(orderData)
-
-  if (error) {
-    if ((error as any)?.code === "23505" || error.message.toLowerCase().includes("unique")) {
-      throw new Error("Order number already exists for your account. Please try again.")
+  // Auto-regenerate the order number if it ever collides with an existing one
+  // (created or delivered before) instead of failing the create.
+  let insertError: any = null
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const { error } = await supabase.from("orders").insert(orderData)
+    insertError = error
+    if (!error) break
+    const isDup = (error as any)?.code === "23505" || error.message.toLowerCase().includes("unique")
+    if (isDup && attempt < 5) {
+      orderData.order_number = generateOrderNumber()
+      continue
     }
-    throw error
+    break
   }
+
+  if (insertError) throw insertError
 
   revalidatePath("/admin/orders")
 }
@@ -321,48 +358,34 @@ export async function importOrdersFromCSV(csvData: string) {
 
   console.log(`[v0] Geocoding ${ordersToGeocode.length} addresses in batches...`)
 
-  // ----- Pre-flight order_number duplicate detection -----------------------
-  // 1. Detect duplicates within the CSV itself.
-  const dedupSeen = new Map<string, number>()
-  const csvDupes: string[] = []
+  // ----- Order number assignment (auto-regenerate on collision) ------------
+  // Instead of rejecting duplicates, any order_number that collides with one
+  // already created/delivered for this admin — or repeated within the CSV — is
+  // re-issued a fresh, unique number so nothing is lost. We seed `taken` with
+  // every existing order_number for this admin so generated values can't clash.
+  const { data: existingRows } = await supabase
+    .from("orders")
+    .select("order_number")
+    .eq("admin_id", user.id)
+    .not("order_number", "is", null)
+
+  const taken = new Set<string>((existingRows || []).map((r: any) => r.order_number).filter(Boolean))
+  const renamed: string[] = []
+
   for (const o of ordersToGeocode) {
-    if (o.order_number && o.order_number.trim() !== "") {
-      const key = o.order_number.trim()
-      if (dedupSeen.has(key)) {
-        csvDupes.push(`Row ${o.rowIndex}: order_number "${key}" duplicates row ${dedupSeen.get(key)}`)
-      } else {
-        dedupSeen.set(key, o.rowIndex)
-      }
+    const requested = (o.order_number || "").trim()
+    const assigned = uniqueOrderNumber(requested, taken)
+    if (requested && assigned !== requested) {
+      renamed.push(`${requested} → ${assigned}`)
     }
+    o.order_number = assigned
   }
 
-  if (csvDupes.length > 0) {
-    return { imported: 0, errors: csvDupes }
-  }
-
-  // 2. Detect duplicates against orders already in the database for this admin.
-  const providedNumbers = ordersToGeocode
-    .map((o) => o.order_number?.trim())
-    .filter((n): n is string => !!n && n.length > 0)
-
-  if (providedNumbers.length > 0) {
-    const { data: existing } = await supabase
-      .from("orders")
-      .select("order_number")
-      .eq("admin_id", user.id)
-      .in("order_number", providedNumbers)
-
-    const existingSet = new Set((existing || []).map((r: any) => r.order_number))
-    const dbDupes = providedNumbers.filter((n) => existingSet.has(n))
-
-    if (dbDupes.length > 0) {
-      return {
-        imported: 0,
-        errors: [
-          `The following order_number value(s) already exist in your account and would create duplicates: ${dbDupes.join(", ")}. Please remove or rename them and try again.`,
-        ],
-      }
-    }
+  if (renamed.length > 0) {
+    errors.push(
+      `${renamed.length} order number(s) already existed and were auto-renumbered to keep them unique` +
+        ` (e.g. ${renamed.slice(0, 3).join(", ")}${renamed.length > 3 ? ", …" : ""}).`,
+    )
   }
 
   // Batch geocode all addresses
