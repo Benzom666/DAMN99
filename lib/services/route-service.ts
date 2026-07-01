@@ -110,10 +110,11 @@ export async function createRouteCore(
     throw new Error("No orders found. Please ensure orders have been imported.")
   }
 
-  const ordersNeedingAdminId = fetchedOrders.filter((o: any) => !o.admin_id)
-  const validOrders = fetchedOrders.filter((o: any) => !o.admin_id || o.admin_id === adminId)
+  const activeOrders = fetchedOrders.filter((o: any) => !o.archived_at)
+  const ordersNeedingAdminId = activeOrders.filter((o: any) => !o.admin_id)
+  const validOrders = activeOrders.filter((o: any) => !o.admin_id || o.admin_id === adminId)
   if (validOrders.length === 0) {
-    throw new Error("No orders available. All selected orders belong to other admins.")
+    throw new Error("No active orders available. Selected orders are archived or belong to other admins.")
   }
 
   if (ordersNeedingAdminId.length > 0) {
@@ -241,9 +242,10 @@ export async function createMultipleRoutesCore(
 
   if (fetchedOrders.length === 0) throw new Error("No orders found. Please ensure orders have been imported.")
 
-  const ordersNeedingAdminId = fetchedOrders.filter((o) => !o.admin_id)
-  const validOrders = fetchedOrders.filter((o) => !o.admin_id || o.admin_id === adminId)
-  if (validOrders.length === 0) throw new Error("No orders available. All selected orders belong to other admins.")
+  const activeOrders = fetchedOrders.filter((o) => !o.archived_at)
+  const ordersNeedingAdminId = activeOrders.filter((o) => !o.admin_id)
+  const validOrders = activeOrders.filter((o) => !o.admin_id || o.admin_id === adminId)
+  if (validOrders.length === 0) throw new Error("No active orders available. Selected orders are archived or belong to other admins.")
 
   if (ordersNeedingAdminId.length > 0) {
     await supabase

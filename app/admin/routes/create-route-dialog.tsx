@@ -59,7 +59,8 @@ export function CreateRouteDialog({ open, onOpenChange, orders, drivers }: Creat
   const availableOrders = orders.filter((o) => {
     const validStatus = !o.status || o.status === "pending"
     const hasCoords = o.latitude && o.longitude
-    return validStatus && hasCoords
+    const notArchived = !o.archived_at
+    return validStatus && hasCoords && notArchived
   })
 
   function toggleOrder(orderId: string) {
