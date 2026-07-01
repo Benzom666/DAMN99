@@ -25,7 +25,7 @@ export default async function AdminRouteDetailPage({
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
     redirect("/driver")
   }
 

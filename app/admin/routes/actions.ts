@@ -10,8 +10,6 @@ import {
   type RouteOptions,
 } from "@/lib/services/route-service"
 
-export type { RouteOptions }
-
 export async function createRoute(
   name: string,
   orderIds: string[],
