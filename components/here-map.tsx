@@ -33,6 +33,51 @@ type LatLng = {
 }
 
 // ---------------------------------------------------------------------------
+// Co-located marker spreading
+// ---------------------------------------------------------------------------
+
+/**
+ * Multiple stops can share the exact same coordinates (e.g. several orders at
+ * one address). Drawn as-is they stack on a single pixel and only the top
+ * marker is visible/clickable. This fans any group of co-located points out
+ * into a small ring around their shared location so each stays individually
+ * selectable. Only the *display* position moves — the popup still shows each
+ * stop's true address. Returns display positions parallel to `allPoints`.
+ */
+function spreadColocated<T extends { lat: number; lng: number }>(
+  allPoints: T[],
+): Array<{ lat: number; lng: number }> {
+  // ~6 meters at typical latitudes; small enough to read as "same place",
+  // large enough that 36px markers don't fully overlap at street zoom.
+  const RADIUS_DEG = 0.00006
+  const keyOf = (p: T) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
+
+  const groups = new Map<string, number[]>()
+  allPoints.forEach((p, i) => {
+    const k = keyOf(p)
+    const arr = groups.get(k)
+    if (arr) arr.push(i)
+    else groups.set(k, [i])
+  })
+
+  const result = allPoints.map((p) => ({ lat: p.lat, lng: p.lng }))
+  for (const indices of groups.values()) {
+    if (indices.length < 2) continue
+    const n = indices.length
+    // Correct east/west spread for latitude so the ring stays circular.
+    const lngScale = Math.max(0.2, Math.cos((allPoints[indices[0]].lat * Math.PI) / 180))
+    indices.forEach((pointIdx, ringIdx) => {
+      const angle = (2 * Math.PI * ringIdx) / n
+      result[pointIdx] = {
+        lat: allPoints[pointIdx].lat + RADIUS_DEG * Math.sin(angle),
+        lng: allPoints[pointIdx].lng + (RADIUS_DEG / lngScale) * Math.cos(angle),
+      }
+    })
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // Styled marker popup (InfoBubble) helpers
 // ---------------------------------------------------------------------------
 
@@ -323,6 +368,9 @@ export function HereMap({
         if (allPoints.length > 0) {
           console.log(`[v0] [HERE_MAP] Adding ${allPoints.length} markers to map`)
 
+          // Fan out stops that share identical coordinates so each is visible.
+          const displayPositions = spreadColocated(allPoints)
+
           allPoints.forEach((point, idx) => {
             if (
               !Number.isFinite(point.lat) ||
@@ -345,7 +393,8 @@ export function HereMap({
               icon = new H.map.Icon(svgMarkup)
             }
 
-            const marker = icon ? new H.map.Marker(point, { icon }) : new H.map.Marker(point)
+            const displayPos = displayPositions[idx] || { lat: point.lat, lng: point.lng }
+            const marker = icon ? new H.map.Marker(displayPos, { icon }) : new H.map.Marker(displayPos)
             const label = point.label || `${idx + 1}`
             marker.setData({
               label,
