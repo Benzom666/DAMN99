@@ -9,6 +9,7 @@ type HereUsageInput = {
   operation: string
   adminId?: string | null
   userId?: string | null
+  apiKeyId?: string | null
   routeId?: string | null
   orderId?: string | null
   requestCount?: number
@@ -146,6 +147,7 @@ export async function recordHereUsage(input: HereUsageInput): Promise<void> {
       operation: input.operation,
       admin_id: input.adminId || null,
       user_id: input.userId || null,
+      api_key_id: input.apiKeyId || null,
       route_id: input.routeId || null,
       order_id: input.orderId || null,
       request_count: requestCount,

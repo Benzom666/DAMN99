@@ -4,44 +4,10 @@ import { createClient } from "@/lib/supabase/server"
 import { geocodeAddress, geocodeBatch } from "@/lib/geocoding"
 import { revalidatePath } from "next/cache"
 import { normalizeAddressKey } from "@/lib/here/cost-control"
+import { generateOrderNumber, uniqueOrderNumber } from "@/lib/order-number"
 
 function isValidEmail(email: string): boolean {
   return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)
-}
-
-function generateOrderNumber(): string {
-  const timestamp = Date.now().toString(36).toUpperCase()
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-  return `ORD-${timestamp}-${random}`
-}
-
-/**
- * Return a unique order number given a desired value and the set of numbers
- * already taken (existing in DB + assigned so far in this batch). If the
- * desired number is free it is used as-is; if it collides (it has already been
- * created or delivered before) a fresh one is derived — `BASE-2`, `BASE-3`, …,
- * falling back to a fully generated number. The chosen value is added to
- * `taken` so subsequent calls stay unique.
- */
-function uniqueOrderNumber(desired: string | undefined, taken: Set<string>): string {
-  const base = (desired || "").trim()
-  if (base && !taken.has(base)) {
-    taken.add(base)
-    return base
-  }
-  if (base) {
-    for (let n = 2; n < 1000; n++) {
-      const candidate = `${base}-${n}`
-      if (!taken.has(candidate)) {
-        taken.add(candidate)
-        return candidate
-      }
-    }
-  }
-  let generated = generateOrderNumber()
-  while (taken.has(generated)) generated = generateOrderNumber()
-  taken.add(generated)
-  return generated
 }
 
 async function hasCustomerEmailColumn(supabase: any): Promise<boolean> {

@@ -19,6 +19,7 @@ import {
   LogOut,
   ArrowUpRight,
   Archive,
+  Settings,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BrandLockup, BrandMark } from "@/components/brand-mark"
@@ -53,6 +54,7 @@ export function AppSidebar({ role, userName }: AppSidebarProps) {
     { title: "Routes", href: "/admin/routes", icon: Route },
     { title: "Drivers", href: "/admin/drivers", icon: Users },
     { title: "Dispatch", href: "/admin/dispatch", icon: Radio },
+    { title: "Settings", href: "/admin/settings", icon: Settings },
   ]
 
   const superAdminNavItems: NavItem[] = [

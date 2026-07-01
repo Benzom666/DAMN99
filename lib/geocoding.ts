@@ -84,7 +84,7 @@ async function geocodeSingle(
   state?: string,
   zip?: string,
   retries = 2,
-  context: { adminId?: string | null; userId?: string | null; orderId?: string | null } = {},
+  context: { adminId?: string | null; userId?: string | null; orderId?: string | null; apiKeyId?: string | null } = {},
 ): Promise<GeocodingResult | null> {
   const fullAddress = [address, city, state, zip].filter(Boolean).join(", ")
   const cacheKey = normalizeAddressKey([address, city, state, zip])
@@ -233,7 +233,7 @@ export async function geocodeAddress(
   city?: string,
   state?: string,
   zip?: string,
-  context?: { adminId?: string | null; userId?: string | null; orderId?: string | null },
+  context?: { adminId?: string | null; userId?: string | null; orderId?: string | null; apiKeyId?: string | null },
 ): Promise<GeocodingResult | null> {
   return geocodeSingle(address, city, state, zip, 2, context)
 }
@@ -241,7 +241,7 @@ export async function geocodeAddress(
 export async function geocodeBatch(
   addresses: Array<{ address: string; city?: string; state?: string; zip?: string }>,
   batchSize = Number(process.env.HERE_GEOCODING_BATCH_SIZE || 5),
-  context: { adminId?: string | null; userId?: string | null } = {},
+  context: { adminId?: string | null; userId?: string | null; apiKeyId?: string | null } = {},
 ): Promise<Array<GeocodingResult | null>> {
   const results: Array<GeocodingResult | null> = new Array(addresses.length).fill(null)
   const effectiveBatchSize = Math.max(1, Math.min(batchSize, 10))

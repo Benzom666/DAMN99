@@ -417,6 +417,55 @@ where p.id = r.id
 --    retries / concurrent submits from ever re-creating duplicates.
 create unique index if not exists pods_order_id_key on public.pods(order_id);
 
+-- ============================================================================
+-- 6) API KEYS  (from 029_create_api_keys.sql)
+-- ============================================================================
+-- Admin-issued API keys for the public /api/v1 surface. Only a SHA-256 hash of
+-- each token is stored; the plaintext is shown once at creation.
+
+create extension if not exists pgcrypto;
+
+create table if not exists public.api_keys (
+  id uuid primary key default gen_random_uuid(),
+  admin_id uuid not null references public.profiles(id) on delete cascade,
+  name text not null,
+  key_prefix text not null,
+  key_hash text not null unique,
+  last_four text not null,
+  scopes text[] not null default array['*'],
+  last_used_at timestamptz,
+  revoked_at timestamptz,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_api_keys_admin on public.api_keys(admin_id, created_at desc);
+create unique index if not exists idx_api_keys_hash on public.api_keys(key_hash);
+
+alter table public.here_api_usage
+  add column if not exists api_key_id uuid references public.api_keys(id) on delete set null;
+create index if not exists idx_here_api_usage_api_key_created_at
+  on public.here_api_usage(api_key_id, created_at desc);
+
+alter table public.api_keys enable row level security;
+
+drop policy if exists "api_keys_owner_select" on public.api_keys;
+create policy "api_keys_owner_select" on public.api_keys for select
+  using (admin_id = auth.uid() or public.get_user_role() = 'super_admin');
+
+drop policy if exists "api_keys_owner_insert" on public.api_keys;
+create policy "api_keys_owner_insert" on public.api_keys for insert
+  with check (admin_id = auth.uid());
+
+drop policy if exists "api_keys_owner_update" on public.api_keys;
+create policy "api_keys_owner_update" on public.api_keys for update
+  using (admin_id = auth.uid() or public.get_user_role() = 'super_admin')
+  with check (admin_id = auth.uid() or public.get_user_role() = 'super_admin');
+
+drop policy if exists "api_keys_owner_delete" on public.api_keys;
+create policy "api_keys_owner_delete" on public.api_keys for delete
+  using (admin_id = auth.uid() or public.get_user_role() = 'super_admin');
+
 COMMIT;
 -- ============================================================================
 -- DONE. Your schema now matches the application code.
